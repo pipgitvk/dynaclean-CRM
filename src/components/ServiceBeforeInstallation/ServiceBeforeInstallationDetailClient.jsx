@@ -40,7 +40,10 @@ import {
 } from "@/lib/upcomingInstallationDeliveryDisplay";
 import { isServiceRecordAssigned } from "@/lib/serviceRecordAssignment";
 import UpcomingInstallationReferenceIds from "@/components/installation/UpcomingInstallationReferenceIds";
-import { parseUpcomingInstallationServiceDetails } from "@/components/installation/UpcomingInstallationServiceStatusColumn";
+import {
+  listUpcomingInstallationServiceIds,
+  parseUpcomingInstallationServiceDetails,
+} from "@/components/installation/UpcomingInstallationServiceStatusColumn";
 import OpenInstallationStatusColumn from "@/components/installation/OpenInstallationStatusColumn";
 import { useWarrantyProductFollowup } from "@/components/warranty/WarrantyProductFollowupControls";
 
@@ -377,10 +380,10 @@ function openInstallationCompletedByEngineer(row) {
 }
 
 function assignedByEngineerExport(row) {
-  const by = String(row.assigned_by || "").trim();
+  const registeredBy = registeredByLabel(row);
   const completedBy = openInstallationCompletedByEngineer(row);
   return [
-    by ? `Assigned By: ${by}` : "",
+    registeredBy ? `Assigned By: ${registeredBy}` : "",
     completedBy ? `Completed by: ${completedBy}` : "",
   ]
     .filter(Boolean)
@@ -388,9 +391,9 @@ function assignedByEngineerExport(row) {
 }
 
 function OpenInstallationAssignedByEngineerCell({ row }) {
-  const by = String(row.assigned_by || "").trim();
+  const registeredBy = registeredByLabel(row);
   const completedBy = openInstallationCompletedByEngineer(row);
-  if (!by && !completedBy) {
+  if (!registeredBy && !completedBy) {
     return <span className="text-slate-400">—</span>;
   }
   return (
@@ -398,7 +401,7 @@ function OpenInstallationAssignedByEngineerCell({ row }) {
       <div className="text-sm leading-snug text-slate-800">
         <span className="text-xs font-semibold text-slate-500">Assigned By</span>
         <span className="mx-1 text-slate-400">–</span>
-        <span className="font-semibold text-slate-900">{by || "—"}</span>
+        <span className="font-semibold text-slate-900">{registeredBy || "—"}</span>
       </div>
       <div className="text-sm leading-snug text-slate-800">
         <span className="text-xs font-semibold text-slate-500">Completed by</span>
@@ -1011,12 +1014,29 @@ function orderDeliveryExport(row) {
 
 function openInstallationPrimaryServiceId(row) {
   const items = parseUpcomingInstallationServiceDetails(row?.service_details);
+  const completed = items.find(
+    (it) => String(it.status || "").trim().toUpperCase() === "COMPLETED",
+  );
+  if (completed?.serviceId) return completed.serviceId;
   return (
     items[0]?.serviceId ||
     String(row?.service_id || "")
       .split(",")[0]
       ?.trim() ||
     ""
+  );
+}
+
+function openInstallationServiceReportCompleted(row, serviceId) {
+  const items = parseUpcomingInstallationServiceDetails(row?.service_details);
+  const id = String(serviceId || "").trim();
+  const match = items.find((it) => it.serviceId === id);
+  if (match && String(match.status || "").trim().toUpperCase() === "COMPLETED") {
+    return true;
+  }
+  return (
+    items.some((it) => String(it.status || "").trim().toUpperCase() === "COMPLETED") ||
+    Number(row?.order_installation_status) === 1
   );
 }
 
@@ -1043,9 +1063,19 @@ function openInstallationReportAttachment(row) {
 const openInstallationReportBtnClass =
   "inline-flex items-center gap-1 rounded bg-emerald-700 px-2 py-1 text-xs font-medium text-white whitespace-nowrap hover:bg-emerald-800";
 
-function OpenInstallationReportButton({ row, dashboardBase }) {
-  const serviceId = openInstallationPrimaryServiceId(row);
-  const attachment = openInstallationReportAttachment(row);
+function OpenInstallationReportButton({
+  row,
+  dashboardBase,
+  serviceId: serviceIdProp,
+  compactLabel = false,
+}) {
+  const items = parseUpcomingInstallationServiceDetails(row?.service_details);
+  const serviceId = serviceIdProp || openInstallationPrimaryServiceId(row);
+  const item = items.find((it) => it.serviceId === serviceId);
+  const attachment =
+    serviceIdProp || items.length <= 1 ? openInstallationReportAttachment(row) : null;
+
+  const label = compactLabel && serviceId ? `Report ${serviceId}` : "Installation Report";
 
   if (attachment?.kind === "external") {
     return (
@@ -1056,7 +1086,7 @@ function OpenInstallationReportButton({ row, dashboardBase }) {
         className={openInstallationReportBtnClass}
       >
         <FileText className="h-3 w-3 shrink-0" aria-hidden />
-        Installation Report
+        {label}
       </a>
     );
   }
@@ -1065,7 +1095,7 @@ function OpenInstallationReportButton({ row, dashboardBase }) {
     return (
       <ServiceAttachmentLink
         filePath={attachment.path}
-        fileName="Installation Report"
+        fileName={label}
         className={openInstallationReportBtnClass}
       />
     );
@@ -1075,14 +1105,55 @@ function OpenInstallationReportButton({ row, dashboardBase }) {
     return null;
   }
 
+  const instFlag = String(row.installation_report || "").trim();
+  const itemCompleted =
+    item && String(item.status || "").trim().toUpperCase() === "COMPLETED";
+  const reportDone =
+    itemCompleted ||
+    openInstallationServiceReportCompleted(row, serviceId) ||
+    instFlag === "uploadFO";
+
+  if (reportDone) {
+    return (
+      <Link
+        href={`/${dashboardBase}/complete-service/${encodeURIComponent(serviceId)}`}
+        className={openInstallationReportBtnClass}
+      >
+        <FileText className="h-3 w-3 shrink-0" aria-hidden />
+        {label}
+      </Link>
+    );
+  }
+
   return (
     <Link
       href={`/${dashboardBase}/installation-completion-video/${encodeURIComponent(serviceId)}`}
       className="inline-flex items-center gap-1 rounded bg-slate-600 px-2 py-1 text-xs font-medium text-white whitespace-nowrap hover:bg-slate-700"
     >
       <FileText className="h-3 w-3 shrink-0" aria-hidden />
-      Installation Report
+      {label}
     </Link>
+  );
+}
+
+function OpenInstallationReportButtons({ row, dashboardBase }) {
+  const serviceIds = listUpcomingInstallationServiceIds(row);
+  if (!serviceIds.length) return null;
+  if (serviceIds.length === 1) {
+    return <OpenInstallationReportButton row={row} dashboardBase={dashboardBase} />;
+  }
+  return (
+    <div className="flex w-full flex-col items-stretch gap-1">
+      {serviceIds.map((id) => (
+        <OpenInstallationReportButton
+          key={id}
+          row={row}
+          dashboardBase={dashboardBase}
+          serviceId={id}
+          compactLabel
+        />
+      ))}
+    </div>
   );
 }
 
@@ -1123,7 +1194,7 @@ function OpenInstallationActionCell({ row, dashboardBase, ProductFollowupIcons }
           variant="button"
         />
       ) : null}
-      <OpenInstallationReportButton row={row} dashboardBase={dashboardBase} />
+      <OpenInstallationReportButtons row={row} dashboardBase={dashboardBase} />
       {row.order_id ? (
         <Link
           href={`/${dashboardBase}/order/${encodeURIComponent(row.order_id)}`}
@@ -1229,7 +1300,7 @@ function OpenInstallationRows({
           {dispatchLabel}
         </td>
         <td className="px-4 py-3.5 align-top">
-          <UpcomingInstallationReferenceIds record={row} />
+          <UpcomingInstallationReferenceIds record={row} dashboardBase={dashboardBase} />
         </td>
         <td className="px-4 py-3.5 align-top">
           <OpenInstallationCompanyStateDeliveryCell row={row} />

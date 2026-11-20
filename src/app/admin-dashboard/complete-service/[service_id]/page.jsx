@@ -4,6 +4,10 @@ import Image from "next/image";
 import dayjs from "dayjs";
 import ServiceForm from "./ServiceForm";
 import UpdateReportButton from "@/components/UpdateReportButton";
+import {
+  fetchLatestInstallationReport,
+  mergeInstallationReportIntoService,
+} from "@/lib/mergeInstallationReportIntoService";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +26,9 @@ export default async function CompleteServicePage({ params }) {
     [service?.serial_number]
   );
 
-  const isNewReport = true;
+  const installationReport = service
+    ? await fetchLatestInstallationReport(conn, serviceId)
+    : null;
 
   const warrantyExpiry = product?.installation_date
     ? dayjs(product.installation_date)
@@ -34,18 +40,26 @@ export default async function CompleteServicePage({ params }) {
     ? service.attachments.split(",")
     : [];
 
-  const combinedServiceData = {
-    ...service,
-    product,
-    warrantyExpiry,
-    isNewReport,
-  };
+  const combinedServiceData = mergeInstallationReportIntoService(
+    {
+      ...service,
+      product,
+      warrantyExpiry,
+    },
+    installationReport,
+  );
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8  border">
-      <div className="mt-8">
-        <UpdateReportButton serviceId={serviceId} />
-      </div>
+      {combinedServiceData?.isNewReport ? (
+        <div className="mt-8">
+          <UpdateReportButton serviceId={serviceId} />
+        </div>
+      ) : (
+        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-700">
+          Saved installation report — view only (no edits).
+        </div>
+      )}
       <div id="service-page-content">
         <header className="flex flex-col sm:flex-row items-center justify-between mb-8 pb-4  ">
           <div className="mb-4 sm:mb-0 sm:w-1/4 flex-shrink-0 ">

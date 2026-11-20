@@ -389,8 +389,17 @@ function buildOpenInstallationNeworderWhereSql(filters, { overdueDelayedOnly = f
       no.order_id LIKE ? OR no.quote_number LIKE ? OR no.company_name LIKE ?
       OR no.contact LIKE ? OR no.invoice_number LIKE ? OR no.delivery_location LIKE ?
       OR no.state LIKE ? OR no.created_by LIKE ?
+      OR EXISTS (
+        SELECT 1
+        FROM dispatch d_srch
+        INNER JOIN service_records sr_srch
+          ON ${sqlTrimUtf8EqColumns("sr_srch.serial_number", "d_srch.serial_no")}
+        WHERE ${sqlTrimUtf8EqColumns("d_srch.quote_number", "no.quote_number")}
+          AND UPPER(TRIM(COALESCE(sr_srch.service_type, ''))) = 'INSTALLATION'
+          AND CAST(sr_srch.service_id AS CHAR) LIKE ?
+      )
     )`;
-    params.push(...Array(8).fill(term));
+    params.push(...Array(8).fill(term), term);
   }
   if (f.state) {
     sql += ` AND no.state LIKE ?`;

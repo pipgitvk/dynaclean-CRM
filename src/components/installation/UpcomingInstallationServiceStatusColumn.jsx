@@ -18,6 +18,17 @@ export function parseUpcomingInstallationServiceDetails(blob) {
     });
 }
 
+export function listUpcomingInstallationServiceIds(record) {
+  const items = parseUpcomingInstallationServiceDetails(record?.service_details);
+  if (items.length > 0) {
+    return items.map((it) => String(it.serviceId || "").trim()).filter(Boolean);
+  }
+  return String(record?.service_id || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 export function serializeUpcomingInstallationServiceDetails(items) {
   if (!Array.isArray(items) || items.length === 0) return "";
   return items

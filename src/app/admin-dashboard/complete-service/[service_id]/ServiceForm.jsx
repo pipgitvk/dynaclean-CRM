@@ -11,6 +11,15 @@ import {
   installationReportPdfFilename,
 } from "@/lib/buildServiceReportPdfPayload";
 
+function storedSignatureSrc(path) {
+  const p = String(path || "").trim();
+  if (!p) return "";
+  if (p.startsWith("http://") || p.startsWith("https://")) return p;
+  if (p.startsWith("/")) return p;
+  if (p.startsWith("signatures/")) return `/${p}`;
+  return `/signatures/${p}`;
+}
+
 const CHECKLIST_ITEMS = [
   "Voltage (V)",
   "Condition of Motor",
@@ -73,20 +82,34 @@ const FormInput = ({
   </div>
 );
 
+function isCompletedServiceStatus(status) {
+  const s = String(status || "").trim().toUpperCase();
+  return s === "COMPLETED" || s === "COMPLETE";
+}
+
 export default function ServiceForm({ service }) {
   const isNewReport = Boolean(service.isNewReport);
-  const isReportLocked = service.status === "COMPLETED" && !isNewReport;
+  const isReportLocked =
+    !isNewReport &&
+    (Boolean(service.installationReportId) ||
+      isCompletedServiceStatus(service.status));
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  const [trainees, setTrainees] = useState([
+  const defaultTraineeRows = [
     { id: 1, name: "", designation: "", contact: "" },
     { id: 2, name: "", designation: "", contact: "" },
     { id: 3, name: "", designation: "", contact: "" },
-  ]);
+  ];
+  const [trainees, setTrainees] = useState(
+    Array.isArray(service.initialTrainees) && service.initialTrainees.length > 0
+      ? service.initialTrainees
+      : defaultTraineeRows,
+  );
 
   const addTrainee = () => {
+    if (isReportLocked) return;
     setTrainees([
       ...trainees,
       { id: Date.now(), name: "", designation: "", contact: "" },
@@ -94,6 +117,7 @@ export default function ServiceForm({ service }) {
   };
 
   const removeTrainee = (id) => {
+    if (isReportLocked) return;
     setTrainees(trainees.filter((trainee) => trainee.id !== id));
   };
 
@@ -133,13 +157,35 @@ export default function ServiceForm({ service }) {
     customer_name: isNewReport ? "" : service.customer_name || "",
     customer_designation: isNewReport ? "" : service.customer_designation || "",
     customer_mobile: isNewReport ? "" : service.customer_mobile || "",
+    defects_found: isNewReport ? "" : service.defects_found || "",
+    engineers_remark: isNewReport ? "" : service.engineers_remark || "",
     // NEW: Fields for completion status
-    completion_engineer_name: "",
-    completion_engineer_designation: "",
-    completion_engineer_mobile: "",
-    completion_customer_name: "",
-    completion_customer_designation: "",
-    completion_customer_mobile: "",
+    completion_engineer_name: isNewReport
+      ? ""
+      : service.completion_engineer_name ||
+        service.authorized_person_name ||
+        "",
+    completion_engineer_designation: isNewReport
+      ? ""
+      : service.completion_engineer_designation ||
+        service.authorized_person_designation ||
+        "",
+    completion_engineer_mobile: isNewReport
+      ? ""
+      : service.completion_engineer_mobile ||
+        service.authorized_person_mobile ||
+        "",
+    completion_customer_name: isNewReport
+      ? ""
+      : service.completion_customer_name || service.customer_name || "",
+    completion_customer_designation: isNewReport
+      ? ""
+      : service.completion_customer_designation ||
+        service.customer_designation ||
+        "",
+    completion_customer_mobile: isNewReport
+      ? ""
+      : service.completion_customer_mobile || service.customer_mobile || "",
     // NEW: Location fields
     latitude: "",
     longitude: "",
@@ -392,6 +438,10 @@ export default function ServiceForm({ service }) {
   };
 
   const handleSubmit = async (event) => {
+    if (isReportLocked) {
+      event.preventDefault();
+      return;
+    }
     event.preventDefault();
 
     if (formData.status === "SELECT" || !formData.status) {
@@ -713,9 +763,10 @@ export default function ServiceForm({ service }) {
             <label className="block mb-1 font-medium text-sm">Status</label>
             <select
               name="status"
-              className="border p-2 w-full rounded text-sm"
+              className="border p-2 w-full rounded text-sm disabled:bg-gray-100"
               value={formData.status}
               onChange={handleChange}
+              disabled={isReportLocked}
               required
             >
               {isNewReport ? (
@@ -741,23 +792,25 @@ export default function ServiceForm({ service }) {
               <div className="p-4 border rounded-md bg-blue-50">
               <h3 className="text-lg font-semibold mb-3 text-sm">📍 SERVICE LOCATION</h3>
               <div className="space-y-3">
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={getCurrentLocation}
-                    disabled={isLocationLoading}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 text-sm font-medium transition-colors"
-                  >
-                    {isLocationLoading ? "Getting Location..." : "📍 Get Current Location"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={clearLocation}
-                    className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 text-sm font-medium transition-colors"
-                  >
-                    Clear Location
-                  </button>
-                </div>
+                {!isReportLocked ? (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={getCurrentLocation}
+                      disabled={isLocationLoading}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 text-sm font-medium transition-colors"
+                    >
+                      {isLocationLoading ? "Getting Location..." : "📍 Get Current Location"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={clearLocation}
+                      className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 text-sm font-medium transition-colors"
+                    >
+                      Clear Location
+                    </button>
+                  </div>
+                ) : null}
                 
                 {formData.location_address && (
                   <div className="space-y-2">
@@ -815,9 +868,11 @@ export default function ServiceForm({ service }) {
                 <textarea
                   name="completion_remark"
                   rows="4"
-                  className="border p-2 w-full rounded text-sm"
+                  className="border p-2 w-full rounded text-sm disabled:bg-gray-100"
                   value={formData.completion_remark}
                   onChange={handleChange}
+                  readOnly={isReportLocked}
+                  disabled={isReportLocked}
                   required
                 ></textarea>
               </div>
@@ -826,28 +881,40 @@ export default function ServiceForm({ service }) {
                 <label className="block mb-1 font-medium text-sm">
                   Completed Date
                 </label>
-                <TypeableDateFilterInput value={formData.completed_date} onChange={(v) => handleChange({ target: { name: "completed_date", value: v } })} className="border p-2 w-full rounded text-sm" required/>
+                <TypeableDateFilterInput
+                  value={formData.completed_date}
+                  onChange={(v) =>
+                    handleChange({ target: { name: "completed_date", value: v } })
+                  }
+                  className="border p-2 w-full rounded text-sm"
+                  disabled={isReportLocked}
+                  required
+                />
               </div>
-              <FileUploader
-                label="Pre-Completion Images"
-                name="pre_completion_images"
-                multiple
-                required={!files["pre_completion_images"]?.length}
-              />
-              <FileUploader
-                label="After Completion Images"
-                name="after_completion_images"
-                multiple
-                required={!files["after_completion_images"]?.length}
-              />
+              {!isReportLocked ? (
+                <>
+                  <FileUploader
+                    label="Pre-Completion Images"
+                    name="pre_completion_images"
+                    multiple
+                    required={!files["pre_completion_images"]?.length}
+                  />
+                  <FileUploader
+                    label="After Completion Images"
+                    name="after_completion_images"
+                    multiple
+                    required={!files["after_completion_images"]?.length}
+                  />
+                </>
+              ) : null}
             </>
-          ) : (
+          ) : !isReportLocked ? (
             <FileUploader
               label="Upload Service Images"
               name="completion_images"
               multiple
             />
-          )}
+          ) : null}
           <div className="mb-6 p-4 border rounded-md bg-gray-50">
             <h3 className="text-lg font-semibold mb-3 text-sm">
               CHECKLIST
@@ -972,8 +1039,10 @@ export default function ServiceForm({ service }) {
                     name="defects_found"
                     value={formData.defects_found || ""}
                     onChange={handleChange}
+                    readOnly={isReportLocked}
+                    disabled={isReportLocked}
                     placeholder="Enter defects observed during inspection"
-                    className="w-full rounded-lg border border-gray-300 p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-full rounded-lg border border-gray-300 p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:bg-gray-100"
                     rows={3}
                   />
                 </div>
@@ -986,8 +1055,10 @@ export default function ServiceForm({ service }) {
                     name="engineers_remark"
                     value={formData.engineers_remark || ""}
                     onChange={handleChange}
+                    readOnly={isReportLocked}
+                    disabled={isReportLocked}
                     placeholder="Enter engineer's remarks"
-                    className="w-full rounded-lg border border-gray-300 p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-full rounded-lg border border-gray-300 p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:bg-gray-100"
                     rows={3}
                   />
                 </div>
@@ -1034,7 +1105,9 @@ export default function ServiceForm({ service }) {
                                     e.target.value
                                   )
                                 }
-                                className="w-full border border-gray-300 rounded-md p-1 sm:p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200"
+                                readOnly={isReportLocked}
+                                disabled={isReportLocked}
+                                className="w-full border border-gray-300 rounded-md p-1 sm:p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 disabled:bg-gray-100"
                                 placeholder="Enter name"
                               />
                             </td>
@@ -1049,9 +1122,11 @@ export default function ServiceForm({ service }) {
                                     e.target.value
                                   )
                                 }
-                                className="w-full border border-gray-300 rounded-md p-1 sm:p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200"
+                                readOnly={isReportLocked}
+                                disabled={isReportLocked}
+                                className="w-full border border-gray-300 rounded-md p-1 sm:p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 disabled:bg-gray-100"
                                 placeholder="Enter designation"
-                                required
+                                required={!isReportLocked}
                               />
                             </td>
                             <td className="p-2 sm:p-3">
@@ -1065,13 +1140,15 @@ export default function ServiceForm({ service }) {
                                     e.target.value
                                   )
                                 }
-                                className="w-full border border-gray-300 rounded-md p-1 sm:p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200"
+                                readOnly={isReportLocked}
+                                disabled={isReportLocked}
+                                className="w-full border border-gray-300 rounded-md p-1 sm:p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 disabled:bg-gray-100"
                                 placeholder="Enter contact number"
-                                required
+                                required={!isReportLocked}
                               />
                             </td>
                             <td className="p-2 sm:p-3 text-center">
-                              {trainees.length > 1 && (
+                              {!isReportLocked && trainees.length > 1 && (
                                 <button
                                   type="button"
                                   onClick={() => removeTrainee(trainee.id)}
@@ -1087,15 +1164,17 @@ export default function ServiceForm({ service }) {
                       </tbody>
                     </table>
                   </div>
-                  <div className="mt-6 flex justify-center sm:justify-start">
-                    <button
-                      type="button"
-                      onClick={addTrainee}
-                      className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      Add Trainee ➕
-                    </button>
-                  </div>
+                  {!isReportLocked ? (
+                    <div className="mt-6 flex justify-center sm:justify-start">
+                      <button
+                        type="button"
+                        onClick={addTrainee}
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        Add Trainee ➕
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               </>
             ) : (
@@ -1214,9 +1293,15 @@ export default function ServiceForm({ service }) {
                   <h3 className="text-lg font-semibold mb-3 text-sm">
                     Authorized Person (Engineer)
                   </h3>
-                  {service.authorized_person_sign ? (
+                  {storedSignatureSrc(
+                    service.authorised_person_sign ||
+                      service.authorized_person_sign,
+                  ) ? (
                     <img
-                      src={`/signatures/${service.authorized_person_sign}`}
+                      src={storedSignatureSrc(
+                        service.authorised_person_sign ||
+                          service.authorized_person_sign,
+                      )}
                       alt="Authorized Person Signature"
                       className="w-full h-auto object-contain border border-gray-300 rounded-md mb-4"
                     />
@@ -1272,9 +1357,9 @@ export default function ServiceForm({ service }) {
                   <h3 className="text-lg font-semibold mb-3 text-sm">
                     Customer
                   </h3>
-                  {service.customer_sign ? (
+                  {storedSignatureSrc(service.customer_sign) ? (
                     <img
-                      src={`/signatures/${service.customer_sign}`}
+                      src={storedSignatureSrc(service.customer_sign)}
                       alt="Customer Signature"
                       className="w-full h-auto object-contain border border-gray-300 rounded-md mb-4"
                     />
@@ -1335,31 +1420,48 @@ export default function ServiceForm({ service }) {
                   <h3 className="text-lg font-semibold mb-3 text-sm">
                     Authorized Person (Engineer)
                   </h3>
-                  <div className="border border-gray-300 rounded-md mb-4 bg-gray-50 p-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Signature:
-                    </label>
-                    <canvas
-                      ref={completionEngineerCanvasRef}
-                      width="400"
-                      height="200"
-                      className="w-full border border-gray-400 rounded-md bg-white cursor-crosshair"
+                  {storedSignatureSrc(
+                    service.authorised_person_sign ||
+                      service.authorized_person_sign,
+                  ) ? (
+                    <img
+                      src={storedSignatureSrc(
+                        service.authorised_person_sign ||
+                          service.authorized_person_sign,
+                      )}
+                      alt="Engineer signature"
+                      className="w-full h-auto object-contain border border-gray-300 rounded-md mb-4"
                     />
-                    <div className="mt-2 flex justify-end no-print">
-                      <button
-                        type="button"
-                        onClick={() => clearSignature("completion_engineer")}
-                        className="text-sm text-blue-600 hover:text-blue-800 transition duration-150 ease-in-out"
-                      >
-                        Clear
-                      </button>
+                  ) : (
+                    <div className="border border-gray-300 rounded-md mb-4 bg-gray-50 p-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Signature:
+                      </label>
+                      <canvas
+                        ref={completionEngineerCanvasRef}
+                        width="400"
+                        height="200"
+                        className="w-full border border-gray-400 rounded-md bg-white cursor-crosshair"
+                      />
+                      {!isReportLocked ? (
+                        <div className="mt-2 flex justify-end no-print">
+                          <button
+                            type="button"
+                            onClick={() => clearSignature("completion_engineer")}
+                            className="text-sm text-blue-600 hover:text-blue-800 transition duration-150 ease-in-out"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
-                  </div>
+                  )}
                   <FormInput
                     label="Name"
                     name="completion_engineer_name"
                     value={formData.completion_engineer_name}
                     onChange={handleChange}
+                    readOnly={isReportLocked}
                     required
                   />
                   <FormInput
@@ -1367,6 +1469,7 @@ export default function ServiceForm({ service }) {
                     name="completion_engineer_designation"
                     value={formData.completion_engineer_designation}
                     onChange={handleChange}
+                    readOnly={isReportLocked}
                     required
                   />
                   <FormInput
@@ -1374,6 +1477,7 @@ export default function ServiceForm({ service }) {
                     name="completion_engineer_mobile"
                     value={formData.completion_engineer_mobile}
                     onChange={handleChange}
+                    readOnly={isReportLocked}
                     required
                   />
                 </div>
@@ -1382,58 +1486,77 @@ export default function ServiceForm({ service }) {
                   <h3 className="text-lg font-semibold mb-3 text-sm">
                     Customer
                   </h3>
-                  <div className="border border-gray-300 rounded-md mb-4 bg-gray-50 p-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Signature:
-                    </label>
-                    <canvas
-                      ref={completionCustomerCanvasRef}
-                      width="400"
-                      height="200"
-                      className="w-full border border-gray-400 rounded-md bg-white cursor-crosshair"
+                  {storedSignatureSrc(service.customer_sign) ? (
+                    <img
+                      src={storedSignatureSrc(service.customer_sign)}
+                      alt="Customer signature"
+                      className="w-full h-auto object-contain border border-gray-300 rounded-md mb-4"
                     />
-                    <div className="mt-2 flex justify-end no-print">
-                      <button
-                        type="button"
-                        onClick={() => clearSignature("completion_customer")}
-                        className="text-sm text-blue-600 hover:text-blue-800 transition duration-150 ease-in-out"
-                      >
-                        Clear
-                      </button>
+                  ) : (
+                    <div className="border border-gray-300 rounded-md mb-4 bg-gray-50 p-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Signature:
+                      </label>
+                      <canvas
+                        ref={completionCustomerCanvasRef}
+                        width="400"
+                        height="200"
+                        className="w-full border border-gray-400 rounded-md bg-white cursor-crosshair"
+                      />
+                      {!isReportLocked ? (
+                        <div className="mt-2 flex justify-end no-print">
+                          <button
+                            type="button"
+                            onClick={() => clearSignature("completion_customer")}
+                            className="text-sm text-blue-600 hover:text-blue-800 transition duration-150 ease-in-out"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
-                  </div>
+                  )}
                   <FormInput
                     label="Name"
                     name="completion_customer_name"
                     value={formData.completion_customer_name}
                     onChange={handleChange}
-                    required
+                    readOnly={isReportLocked}
+                    required={!isReportLocked}
                   />
                   <FormInput
                     label="Designation"
                     name="completion_customer_designation"
                     value={formData.completion_customer_designation}
                     onChange={handleChange}
-                    required
+                    readOnly={isReportLocked}
+                    required={!isReportLocked}
                   />
                   <FormInput
                     label="Mobile"
                     name="completion_customer_mobile"
                     value={formData.completion_customer_mobile}
                     onChange={handleChange}
-                    required
+                    readOnly={isReportLocked}
+                    required={!isReportLocked}
                   />
                 </div>
               </>
             )}
           </div>
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 transition disabled:bg-gray-400 no-print"
-          >
-            {isLoading ? "Saving..." : "Save Service"}
-          </button>
+          {isReportLocked ? (
+            <p className="text-center text-sm font-medium text-slate-600 no-print">
+              This report is saved and cannot be edited here.
+            </p>
+          ) : (
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 transition disabled:bg-gray-400 no-print"
+            >
+              {isLoading ? "Saving..." : "Save Service"}
+            </button>
+          )}
         </form>
       </div>
     </div>

@@ -6,6 +6,8 @@ import {
 
 const INSTALLATION_SR_TYPE_SQL = `UPPER(TRIM(COALESCE(sr2.service_type, ''))) = 'INSTALLATION'`;
 const SR2_ASSIGNED_OK_SQL = `UPPER(TRIM(COALESCE(sr2.assigned_to, ''))) NOT IN ('', 'NOT ASSIGNED', 'UNASSIGNED')`;
+/** Prefer COMPLETED installation SR when picking report paths (not highest id alone). */
+const SR2_REPORT_PICK_ORDER = `CASE WHEN UPPER(TRIM(COALESCE(sr2.status, ''))) = 'COMPLETED' THEN 0 ELSE 1 END, sr2.service_id DESC`;
 
 /** Attach service_id, service_details, engineers for a page of open-installation rows (by quote). */
 export async function enrichOpenInstallationRowsWithServices(conn, rows) {
@@ -108,7 +110,7 @@ export async function enrichOpenInstallationRowsWithServices(conn, rows) {
              WHEN ${INSTALLATION_SR_TYPE_SQL}
              THEN NULLIF(TRIM(sr2.installation_report), '')
            END
-           ORDER BY sr2.service_id DESC
+           ORDER BY ${SR2_REPORT_PICK_ORDER}
            SEPARATOR '||'
          ),
          '||',
@@ -120,7 +122,7 @@ export async function enrichOpenInstallationRowsWithServices(conn, rows) {
              WHEN ${INSTALLATION_SR_TYPE_SQL}
              THEN NULLIF(TRIM(sr2.final_report_path), '')
            END
-           ORDER BY sr2.service_id DESC
+           ORDER BY ${SR2_REPORT_PICK_ORDER}
            SEPARATOR '||'
          ),
          '||',

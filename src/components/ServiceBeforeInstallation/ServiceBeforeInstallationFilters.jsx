@@ -11,7 +11,7 @@ const filterSelectClass =
 
 const SEARCH_PLACEHOLDER = {
   serviceRecord: "Search service id, serial, customer, model, engineer…",
-  upcomingOrder: "Search order, company, serial, model, invoice…",
+  upcomingOrder: "Search order, service id, company, serial, model, invoice…",
   warranty: "Search customer, serial, model, invoice, address…",
   amc: "Search company, serial, model, contact…",
 };
@@ -402,13 +402,6 @@ export default function ServiceBeforeInstallationFilters({
               }
               value={draft.state}
               onChange={setField("state")}
-              className={row2Field}
-            />
-            <FilterInput
-              label="Serial"
-              placeholder="Serial number…"
-              value={draft.serial}
-              onChange={setField("serial")}
               className={row2Field}
             />
             {segment === "open-installation" || segment === "overdue-delayed-installation" ? (

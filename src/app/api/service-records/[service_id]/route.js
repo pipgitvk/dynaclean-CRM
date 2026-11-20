@@ -191,8 +191,8 @@ export async function GET(request, context) {
 
     // ✅ Get installation report (if exists)
     const [installationRows] = await db.query(
-      "SELECT * FROM installation_reports WHERE service_id = ? and status = ?",
-      [serviceRecord.service_id, serviceRecord.status]
+      `SELECT * FROM installation_reports WHERE service_id = ? ORDER BY id DESC LIMIT 1`,
+      [serviceRecord.service_id],
     );
 
     const installationData = installationRows.length > 0 ? installationRows[0] : null;
