@@ -20,8 +20,8 @@ export const OPEN_INSTALLATION_DETAIL_KPI_STRIP = [
   {
     id: "open-installation-delivery-pending",
     title: "Delivery Pending",
-    subtitle: "Orders with delivery status still pending",
-    countCaption: "No. of orders (delivery_status = 0)",
+    subtitle: "Orders with delivery status stillpending",
+    countCaption: "No. of product delivery pending after dispatch on the way machine",
     countKey: "delivery_pending_after_dispatch",
     accent: "from-sky-500 to-blue-600",
     surface:
