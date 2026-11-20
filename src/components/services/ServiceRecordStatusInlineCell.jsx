@@ -299,6 +299,11 @@ export default function ServiceRecordStatusInlineCell({
               Planned: {formatDate(r.planned_date)}
             </span>
           ) : null}
+          {status.toUpperCase() === "COMPLETED" && r.completed_date ? (
+            <span className="text-[10px] font-medium text-emerald-700">
+              Installed: {formatDate(r.completed_date)}
+            </span>
+          ) : null}
           {(status.toUpperCase() === "PENDING BY CUSTOMER" || isPlanned) &&
           r.status_description ? (
             <span className="text-[10px] text-slate-600 break-words">{r.status_description}</span>

@@ -778,6 +778,7 @@ async function enrichOpenInstallationRowsWithDispatch(conn, rows) {
        GROUP_CONCAT(DISTINCT d.item_code ORDER BY d.item_code SEPARATOR ', ') AS model,
        GROUP_CONCAT(DISTINCT d.item_name ORDER BY d.item_name SEPARATOR ', ') AS name,
        DATE_FORMAT(MAX(COALESCE(d.updated_at, d.created_at)), '%Y-%m-%d') AS dispatch_date,
+       MAX(DATE_FORMAT(wp.installation_date, '%Y-%m-%d')) AS installed_date,
        MAX(CASE WHEN wp.serial_number IS NOT NULL THEN 1 ELSE 0 END) AS warranty_registered,
        NULLIF(
          SUBSTRING_INDEX(
@@ -855,6 +856,7 @@ async function enrichOpenInstallationRowsWithDispatch(conn, rows) {
       model: hit.model || row.model || "",
       name: hit.name || row.name || "",
       dispatch_date: hit.dispatch_date || row.dispatch_date || null,
+      installed_date: hit.installed_date || row.installed_date || null,
       warranty_registered: registered ? 1 : 0,
       registered_at: registered ? hit.registered_at || null : null,
       registered_by: registered ? hit.registered_by || null : null,

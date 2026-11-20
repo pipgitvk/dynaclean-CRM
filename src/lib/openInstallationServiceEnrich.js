@@ -35,7 +35,8 @@ export async function enrichOpenInstallationRowsWithServices(conn, rows) {
              ''
            ),
            COALESCE(sr2.assigned_to, ''),
-           COALESCE(sr2.status_description, '')
+           COALESCE(sr2.status_description, ''),
+           COALESCE(DATE_FORMAT(sr2.completed_date, '%Y-%m-%d'), '')
          )
          ORDER BY sr2.service_id
          SEPARATOR ';;'

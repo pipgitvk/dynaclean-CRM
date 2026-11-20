@@ -2,6 +2,7 @@
 
 import ServiceRecordStatusInlineCell from "@/components/services/ServiceRecordStatusInlineCell";
 import { OPEN_INSTALLATION_INLINE_STATUS_OPTIONS } from "@/lib/serviceRecordStatusPermissions";
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import {
   parseUpcomingInstallationServiceDetails,
   serializeUpcomingInstallationServiceDetails,
@@ -49,10 +50,15 @@ export function patchOpenInstallationRowService(
 function itemToServiceRecord(item, row) {
   const scheduled =
     item.scheduledDate && item.scheduledDate !== "—" ? item.scheduledDate : null;
+  const completed =
+    item.completedDate && item.completedDate !== "—"
+      ? item.completedDate
+      : row.installed_date || row.completed_date || null;
   return {
     service_id: item.serviceId,
     status: item.status && item.status !== "—" ? item.status : "PENDING",
     planned_date: scheduled,
+    completed_date: completed,
     status_description: item.statusDescription || "",
     assigned_to:
       item.assignedTo && item.assignedTo !== "—"
@@ -78,12 +84,21 @@ export default function OpenInstallationStatusColumn({
 
   if (items.length === 0) {
     const fallbackId = String(row?.service_id || "").trim();
+    const installedLabel =
+      row.installed_date || row.completed_date || row.installation_date || null;
     if (!fallbackId) {
       if (orderInstallationDone) {
         return (
-          <span className="inline-flex rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800">
-            Completed (order)
-          </span>
+          <div className="flex flex-col gap-1">
+            <span className="inline-flex w-fit rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800">
+              Completed (order)
+            </span>
+            {installedLabel ? (
+              <span className="text-[10px] font-medium text-emerald-700">
+                Installed: {formatCrmDateOnly(installedLabel, String(installedLabel).slice(0, 10))}
+              </span>
+            ) : null}
+          </div>
         );
       }
       return <span className="text-xs text-slate-400">—</span>;
@@ -92,6 +107,7 @@ export default function OpenInstallationStatusColumn({
       service_id: fallbackId,
       status: row.status || "PENDING",
       planned_date: row.planned_date || null,
+      completed_date: row.completed_date || installedLabel,
       status_description: row.status_description || "",
       assigned_to: row.service_engineer || row.assigned_to || "NOT ASSIGNED",
       third_party_engineer_id: row.third_party_engineer_id,

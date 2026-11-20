@@ -7,13 +7,15 @@ export function parseUpcomingInstallationServiceDetails(blob) {
     .map((part) => part.trim())
     .filter(Boolean)
     .map((part) => {
-      const [id, status, scheduledDate, assignedTo, statusDescription] = part.split("~");
+      const [id, status, scheduledDate, assignedTo, statusDescription, completedDate] =
+        part.split("~");
       return {
         serviceId: id?.trim() || "",
         status: status?.trim() || "—",
         scheduledDate: scheduledDate?.trim() || "—",
         assignedTo: assignedTo?.trim() || "—",
         statusDescription: statusDescription?.trim() || "",
+        completedDate: completedDate?.trim() || "",
       };
     });
 }
@@ -39,6 +41,7 @@ export function serializeUpcomingInstallationServiceDetails(items) {
         it.scheduledDate && it.scheduledDate !== "—" ? it.scheduledDate : "",
         it.assignedTo && it.assignedTo !== "—" ? it.assignedTo : "",
         it.statusDescription || "",
+        it.completedDate || "",
       ].join("~"),
     )
     .join(";;");

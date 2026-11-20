@@ -537,7 +537,7 @@ function exportRowsCsv(rows, segment) {
       "Model",
       "Order / Delivery",
       "Regst. / Registration",
-      "Status",
+      "Status / Installed",
       "Action",
     ],
     "overdue-delayed-installation": [
@@ -550,7 +550,7 @@ function exportRowsCsv(rows, segment) {
       "Model",
       "Order / Delivery",
       "Regst. / Registration",
-      "Status",
+      "Status / Installed",
       "Action",
     ],
     "active-amc": ["Serial", "Company", "Contact", "Status", "AMC Start", "AMC End"],
@@ -1195,10 +1195,20 @@ function openInstallationFollowupProduct(row) {
 function openInstallationServiceStatusExport(row) {
   const items = parseUpcomingInstallationServiceDetails(row?.service_details);
   if (items.length > 0) {
-    return items.map((it) => `${it.serviceId}:${it.status}`).join(" | ");
+    return items
+      .map((it) => {
+        const installed = it.completedDate ? ` installed ${it.completedDate}` : "";
+        return `${it.serviceId}:${it.status}${installed}`;
+      })
+      .join(" | ");
   }
   const fallbackId = String(row?.service_id || "").trim();
-  return fallbackId || "";
+  const installed =
+    row.installed_date || row.completed_date || row.installation_date || "";
+  if (fallbackId) {
+    return installed ? `${fallbackId} installed ${installed}` : fallbackId;
+  }
+  return installed ? `installed ${installed}` : "";
 }
 
 function OpenInstallationActionCell({ row, dashboardBase, ProductFollowupIcons }) {
