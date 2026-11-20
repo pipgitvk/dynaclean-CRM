@@ -5,9 +5,12 @@ import { sqlTrimUtf8EqColumns, sqlUtf8TrimExpr } from "@/lib/sqlUtf8Compare";
  * - Fully dispatched (dispatch_status = 1), or
  * - Partial dispatch (2) with at least one delivery save and shipped serial.
  */
-export function pendingNeworderPredicates(alias = "no_p") {
+export function pendingNeworderPredicates(alias = "no_p", { includeInstalledOrders = false } = {}) {
+  const installationStatusSql = includeInstalledOrders
+    ? `COALESCE(${alias}.installation_status, 0) IN (0, 1)`
+    : `COALESCE(${alias}.installation_status, 0) = 0`;
   return `
-    ${alias}.installation_status = 0
+    ${installationStatusSql}
     AND (${alias}.is_returned = 0 OR ${alias}.is_returned = 2 OR ${alias}.is_returned IS NULL)
     AND (${alias}.is_cancelled = 0 OR ${alias}.is_cancelled IS NULL)
     AND ${alias}.delivery_date IS NOT NULL

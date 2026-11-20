@@ -4,6 +4,7 @@ import {
   dispatchSerialEligibleForInstallation,
   pendingNeworderPredicates,
 } from "@/lib/upcomingInstallationOrderEligibility";
+import { buildNeworderOpenInstallationBucketWhereSql } from "@/lib/openInstallationBucketNeworderSql";
 
 export { pendingNeworderPredicates } from "@/lib/upcomingInstallationOrderEligibility";
 
@@ -53,11 +54,11 @@ const SVC_INSTALLATION_TEAM_AGG_SQL = `
         ) AS third_party_engineer,`;
 
 /** Restrict rows to quotes that still have a pending installation order */
-function joinPendingOrderOnQuote(quoteColumnExpr) {
+function joinPendingOrderOnQuote(quoteColumnExpr, orderEligibility = {}) {
   return `
     INNER JOIN neworder no_p
       ON ${sqlTrimUtf8EqColumns("no_p.quote_number", quoteColumnExpr)}
-      AND ${pendingNeworderPredicates("no_p")}`;
+      AND ${pendingNeworderPredicates("no_p", orderEligibility)}`;
 }
 
 export function dispatchTypeJoin(type) {
@@ -94,6 +95,8 @@ export function resolveUpcomingInstallationType(itemType) {
  *   includeQuoteTotals?: boolean,
  *   includeServiceDetails?: boolean,
  *   includeInnerOrderBy?: boolean,
+ *   includeInstalledOrders?: boolean,
+ *   openInstallationBucket?: string,
  * }} [options]
  */
 export function buildUpcomingInstallationsQuery({
@@ -102,7 +105,11 @@ export function buildUpcomingInstallationsQuery({
   includeQuoteTotals = true,
   includeServiceDetails = true,
   includeInnerOrderBy = true,
+  includeInstalledOrders = false,
+  openInstallationBucket = "",
 } = {}) {
+  const orderEligibility = { includeInstalledOrders };
+  const bucketWhereOnNo = buildNeworderOpenInstallationBucketWhereSql(openInstallationBucket);
   const registrationFilter =
     registration === "unregistered" ? `AND ${UNREGISTERED_PRODUCT_ORDER_SQL}` : "";
   const dispatchType = type === "all" ? null : type;
@@ -153,7 +160,7 @@ export function buildUpcomingInstallationsQuery({
         SUM(qi.total_price) AS pricing_total,
         SUM(qi.quantity) AS total_qty
       FROM quotation_items qi
-      ${joinPendingOrderOnQuote("qi.quote_number")}
+      ${joinPendingOrderOnQuote("qi.quote_number", orderEligibility)}
       GROUP BY quote_key
     ) qtot ON ${sqlTrimUtf8EqColumns("qtot.quote_key", "no.quote_number")}`
     : "";
@@ -187,6 +194,7 @@ export function buildUpcomingInstallationsQuery({
         NULLIF(TRIM(no.booking_by), ''),
         NULLIF(TRIM(no.dispatch_person), '')
       ) AS assigned_by,
+      COALESCE(no.installation_status, 0) AS order_installation_status,
       DATE_FORMAT(no.delivery_date, '%Y-%m-%d') AS delivery_date,
       DATE_FORMAT(no.delivered_on, '%Y-%m-%d') AS delivered_on,
       ${pricingSelect}
@@ -237,7 +245,7 @@ export function buildUpcomingInstallationsQuery({
         ) AS registration_meta,
         DATE_FORMAT(MAX(COALESCE(d.updated_at, d.created_at)), '%Y-%m-%d') AS dispatch_date
       FROM dispatch d
-      ${joinPendingOrderOnQuote("d.quote_number")}
+      ${joinPendingOrderOnQuote("d.quote_number", orderEligibility)}
       ${dispatchTypeJoin(dispatchType)}
       LEFT JOIN warranty_products wp
         ON ${sqlTrimUtf8EqColumns("wp.serial_number", "d.serial_no")}
@@ -267,7 +275,7 @@ export function buildUpcomingInstallationsQuery({
           END
         ) AS no_feedback_collected
       FROM dispatch d2
-      ${joinPendingOrderOnQuote("d2.quote_number")}
+      ${joinPendingOrderOnQuote("d2.quote_number", orderEligibility)}
       INNER JOIN service_records sr2
         ON ${sqlTrimUtf8EqColumns("sr2.serial_number", "d2.serial_no")}
       WHERE 1=1
@@ -275,8 +283,9 @@ export function buildUpcomingInstallationsQuery({
       GROUP BY quote_key
     ) svc ON ${sqlTrimUtf8EqColumns("svc.quote_key", "no.quote_number")}
     ${quoteTotalsJoin}
-    WHERE ${pendingNeworderPredicates("no")}
+    WHERE ${pendingNeworderPredicates("no", orderEligibility)}
       ${registrationFilter}
+      ${bucketWhereOnNo}
     ${orderBy}
   `;
 }
@@ -285,7 +294,13 @@ export function buildUpcomingInstallationsQuery({
  * Fast KPI/count shape: no GROUP_CONCAT lists, no warranty join, no quotation_items.
  * Alias columns match openInstallationKpiSql (`u.delivered_on`, `u.installation_completed`).
  */
-export function buildOpenInstallationKpiInnerQuery({ type = "products" } = {}) {
+export function buildOpenInstallationKpiInnerQuery({
+  type = "products",
+  includeInstalledOrders = false,
+  openInstallationBucket = "",
+} = {}) {
+  const orderEligibility = { includeInstalledOrders };
+  const bucketWhereOnNo = buildNeworderOpenInstallationBucketWhereSql(openInstallationBucket);
   const dispatchType = type === "all" ? null : type;
   const quoteKeyD = sqlUtf8TrimExpr("d.quote_number");
   const quoteKeyD2 = sqlUtf8TrimExpr("d2.quote_number");
@@ -293,6 +308,7 @@ export function buildOpenInstallationKpiInnerQuery({ type = "products" } = {}) {
   return `
     SELECT
       no.quote_number,
+      COALESCE(no.installation_status, 0) AS order_installation_status,
       DATE_FORMAT(no.delivery_date, '%Y-%m-%d') AS delivery_date,
       DATE_FORMAT(no.delivered_on, '%Y-%m-%d') AS delivered_on,
       no.state,
@@ -331,7 +347,7 @@ export function buildOpenInstallationKpiInnerQuery({ type = "products" } = {}) {
           1
         ) AS registration_meta
       FROM dispatch d
-      ${joinPendingOrderOnQuote("d.quote_number")}
+      ${joinPendingOrderOnQuote("d.quote_number", orderEligibility)}
       ${dispatchTypeJoin(dispatchType)}
       LEFT JOIN warranty_products wp
         ON ${sqlTrimUtf8EqColumns("wp.serial_number", "d.serial_no")}
@@ -359,7 +375,7 @@ export function buildOpenInstallationKpiInnerQuery({ type = "products" } = {}) {
           END
         ) AS no_feedback_collected
       FROM dispatch d2
-      ${joinPendingOrderOnQuote("d2.quote_number")}
+      ${joinPendingOrderOnQuote("d2.quote_number", orderEligibility)}
       INNER JOIN service_records sr2
         ON ${sqlTrimUtf8EqColumns("sr2.serial_number", "d2.serial_no")}
       WHERE 1=1
@@ -367,6 +383,7 @@ export function buildOpenInstallationKpiInnerQuery({ type = "products" } = {}) {
         AND UPPER(TRIM(COALESCE(sr2.service_type, ''))) = 'INSTALLATION'
       GROUP BY quote_key
     ) svc ON ${sqlTrimUtf8EqColumns("svc.quote_key", "no.quote_number")}
-    WHERE ${pendingNeworderPredicates("no")}
+    WHERE ${pendingNeworderPredicates("no", orderEligibility)}
+      ${bucketWhereOnNo}
   `;
 }

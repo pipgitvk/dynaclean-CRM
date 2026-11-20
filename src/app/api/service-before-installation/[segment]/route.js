@@ -78,6 +78,7 @@ export async function GET(request, { params }) {
       String(searchParams.get("includeOpenInstallationBreakdown") || "1").trim() !== "0";
     // Default off — full COUNT on ~1k warranty rows is fast; defer showed "10+" only.
     const deferTotal = String(searchParams.get("deferTotal") || "0").trim() === "1";
+    const skipTotal = String(searchParams.get("skipTotal") || "0").trim() === "1";
 
     if (countOnly) {
       const conn = await getDbConnection();
@@ -103,6 +104,7 @@ export async function GET(request, { params }) {
           (segment === "total-registered" ||
             segment === "active-warranty" ||
             segment === "due-warranty-expiry"),
+        skipTotal,
       }),
       wantFilterOptions
         ? fetchServiceBeforeInstallationSegmentFilterOptions(segment, filters)

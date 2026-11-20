@@ -63,17 +63,24 @@ function openInstallationNeedsFullListShape(filters) {
       f.warrantyRegistration ||
       f.orderDeliveryStatus ||
       f.assignedBy ||
-      f.registeredBy,
+      f.registeredBy ||
+      f.serviceStatus,
   );
 }
 
 function buildOpenInstallationInnerQuery(filters, { forList = false } = {}) {
   const parsed = parseSbiFilters(filters);
   const type = resolveUpcomingInstallationType(parsed.itemType);
+  const bucket = parsed.openInstallationBucket;
+  const shared = {
+    type,
+    registration: null,
+    includeInstalledOrders: true,
+    openInstallationBucket: bucket,
+  };
   if (forList) {
     return buildUpcomingInstallationsQuery({
-      type,
-      registration: null,
+      ...shared,
       includeQuoteTotals: false,
       includeServiceDetails: false,
       includeInnerOrderBy: false,
@@ -81,14 +88,13 @@ function buildOpenInstallationInnerQuery(filters, { forList = false } = {}) {
   }
   if (openInstallationNeedsFullListShape(filters)) {
     return buildUpcomingInstallationsQuery({
-      type,
-      registration: null,
+      ...shared,
       includeQuoteTotals: false,
       includeServiceDetails: false,
       includeInnerOrderBy: false,
     });
   }
-  return buildOpenInstallationKpiInnerQuery({ type });
+  return buildOpenInstallationKpiInnerQuery(shared);
 }
 
 async function countUpcomingInstallations(conn, filters, { overdueDelayedOnly = false } = {}) {
@@ -173,7 +179,7 @@ async function countUpcomingInstallationHubTotals(conn, filters) {
 
 function openInstallationBreakdownAggregateSql(inner, listFilter, extraSql) {
   return `SELECT
-    COUNT(*) AS total,
+    SUM(CASE WHEN COALESCE(u.order_installation_status, 0) = 0 THEN 1 ELSE 0 END) AS total,
     SUM(CASE WHEN ${U_DELIVERED_INSTALLATION_PENDING_SQL} THEN 1 ELSE 0 END) AS delivered_installation_pending,
     SUM(CASE WHEN ${U_DELIVERY_PENDING_AFTER_DISPATCH_SQL} THEN 1 ELSE 0 END) AS delivery_pending_after_dispatch,
     SUM(CASE WHEN ${U_INSTALLATION_COMPLETED_SQL} THEN 1 ELSE 0 END) AS completed_installation,
@@ -244,7 +250,7 @@ async function fetchUpcomingInstallationsPage(
   filters,
   limit,
   skip,
-  { overdueDelayedOnly = false, includeBreakdown = false } = {},
+  { overdueDelayedOnly = false, includeBreakdown = false, skipTotal = false } = {},
 ) {
   const parsed = parseSbiFilters(filters);
   const listInner = buildOpenInstallationInnerQuery(filters, { forList: true });
@@ -268,7 +274,7 @@ async function fetchUpcomingInstallationsPage(
 
   // No KPI bucket → reuse breakdown.total for pagination (skip 2nd heavy COUNT).
   const countPromise =
-    includeBreakdown && !hasBucket
+    skipTotal || (includeBreakdown && !hasBucket)
       ? Promise.resolve(null)
       : conn.execute(
           `SELECT COUNT(*) AS cnt FROM (${buildOpenInstallationInnerQuery(filters, {
@@ -284,13 +290,22 @@ async function fetchUpcomingInstallationsPage(
   ]);
 
   const rows = rowsExec[0];
-  const total =
-    includeBreakdown && !hasBucket
-      ? Number(openInstallationBreakdown?.total || 0)
-      : Number(countExec?.[0]?.[0]?.cnt || 0);
+  let total;
+  let hasMore;
+  if (skipTotal) {
+    total = undefined;
+    hasMore = rows.length >= limit;
+  } else if (includeBreakdown && !hasBucket) {
+    total = Number(openInstallationBreakdown?.total || 0);
+    hasMore = skip + rows.length < total;
+  } else {
+    total = Number(countExec?.[0]?.[0]?.cnt || 0);
+    hasMore = skip + rows.length < total;
+  }
 
   return {
     total,
+    hasMore,
     data: rows,
     openInstallationBreakdown: openInstallationBreakdown ?? undefined,
   };
@@ -478,6 +493,7 @@ export async function fetchServiceBeforeInstallationSegmentPage(segment, options
     return fetchUpcomingInstallationsPage(conn, withProducts, safeLimit, safeSkip, {
       overdueDelayedOnly: false,
       includeBreakdown: options.includeOpenInstallationBreakdown !== false,
+      skipTotal: Boolean(options.skipTotal),
     });
   }
 
@@ -530,6 +546,8 @@ export async function fetchServiceBeforeInstallationSegmentPage(segment, options
   if (segment === "overdue-delayed-installation") {
     return fetchUpcomingInstallationsPage(conn, filters, safeLimit, safeSkip, {
       overdueDelayedOnly: true,
+      includeBreakdown: options.includeOpenInstallationBreakdown !== false,
+      skipTotal: Boolean(options.skipTotal),
     });
   }
 

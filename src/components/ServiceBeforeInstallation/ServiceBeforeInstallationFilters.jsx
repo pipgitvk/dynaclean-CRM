@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ListFilter, RotateCcw, Search } from "lucide-react";
+import { ListFilter, Loader2, RotateCcw, Search } from "lucide-react";
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import { EMPTY_SBI_FILTERS } from "@/lib/serviceBeforeInstallationFilters";
@@ -563,8 +563,12 @@ export default function ServiceBeforeInstallationFilters({
           onClick={() => onApply?.()}
           className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-violet-700 disabled:opacity-60"
         >
-          <ListFilter className="h-4 w-4" aria-hidden />
-          Apply Filters
+          {loading ? (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+          ) : (
+            <ListFilter className="h-4 w-4" aria-hidden />
+          )}
+          {loading ? "Loading…" : "Apply Filters"}
         </button>
         <button
           type="button"

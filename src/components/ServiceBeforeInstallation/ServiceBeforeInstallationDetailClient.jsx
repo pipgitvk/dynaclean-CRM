@@ -23,6 +23,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { getSegmentMeta } from "@/lib/serviceBeforeInstallationHub";
+import { openInstallationBucketRecordCount } from "@/lib/openInstallationKpiSql";
 import { defaultSbiSelectFilters } from "@/lib/serviceBeforeInstallationFilters";
 import ServiceBeforeInstallationFilters from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationFilters";
 import ServiceBeforeInstallationDetailKpiStrip from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationDetailKpiStrip";
@@ -772,6 +773,7 @@ function OpenInstallationActionCell({ row, dashboardBase }) {
   const hasService =
     parseUpcomingInstallationServiceDetails(row?.service_details).length > 0 ||
     String(row?.service_id || "").trim();
+  const orderInstallationDone = Number(row?.order_installation_status) === 1;
   return (
     <div className="min-w-[10.5rem] space-y-2">
       {hasService ? (
@@ -779,6 +781,10 @@ function OpenInstallationActionCell({ row, dashboardBase }) {
           record={row}
           serviceDetailsHrefBase={`/${dashboardBase}/view-service-report`}
         />
+      ) : orderInstallationDone ? (
+        <span className="inline-flex rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800">
+          Completed (order)
+        </span>
       ) : (
         <span className="text-xs text-slate-400">No installation service</span>
       )}
@@ -1033,6 +1039,8 @@ export default function ServiceBeforeInstallationDetailClient({
   const [pagination, setPagination] = useState({ total: 0, hasMore: false });
   const [tableFilterOptions, setTableFilterOptions] = useState(null);
   const tableFilterOptionsFetchKeyRef = useRef(null);
+  const listTotalRef = useRef(0);
+  const rowsFetchAbortRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [countLoading, setCountLoading] = useState(false);
   const [installationBreakdown, setInstallationBreakdown] = useState({
@@ -1046,8 +1054,6 @@ export default function ServiceBeforeInstallationDetailClient({
     completed_installation: 0,
     no_feedback_collected: 0,
   });
-  const [openInstallationKpiLoading, setOpenInstallationKpiLoading] = useState(false);
-
   useEffect(() => {
     setPage(0);
     setTableFilterOptions(null);
@@ -1057,46 +1063,24 @@ export default function ServiceBeforeInstallationDetailClient({
     setAppliedFilters(next);
   }, [segment]);
 
-  const openInstallationKpiFilterKey = useMemo(() => {
-    if (segment !== "open-installation") return "";
-    const {
-      openInstallationBucket: _bucket,
-      registeredInstallation: _reg,
-      ...rest
-    } = appliedFilters;
-    return JSON.stringify(rest);
-  }, [segment, appliedFilters]);
-
-  const fetchOpenInstallationKpis = useCallback(async () => {
-    if (segment !== "open-installation") return;
-    setOpenInstallationKpiLoading(true);
-    try {
-      const { openInstallationBucket: _bucket, ...kpiFilters } = appliedFilters;
-      const res = await axios.get(`/api/service-before-installation/${segment}`, {
-        params: {
-          ...kpiFilters,
-          breakdownOnly: "1",
-          limit: 1,
-          skip: 0,
-          includeFilterOptions: "0",
-        },
-        timeout: 20_000,
-      });
-      if (res.data?.success && res.data.openInstallationBreakdown) {
-        setOpenInstallationBreakdown(res.data.openInstallationBreakdown);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setOpenInstallationKpiLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by openInstallationKpiFilterKey
-  }, [segment, openInstallationKpiFilterKey]);
-
   const fetchRows = useCallback(async () => {
+    rowsFetchAbortRef.current?.abort();
+    const controller = new AbortController();
+    rowsFetchAbortRef.current = controller;
+
     setLoading(true);
+    const isOpenInstallationList =
+      segment === "open-installation" || segment === "overdue-delayed-installation";
+    const activeBucket = String(appliedFilters.openInstallationBucket || "").trim();
+    const skipTotal = isOpenInstallationList && (page > 0 || Boolean(activeBucket));
+    const includeOpenInstallationBreakdown =
+      isOpenInstallationList &&
+      page === 0 &&
+      !String(appliedFilters.openInstallationBucket || "").trim()
+        ? "1"
+        : "0";
+
     try {
-      // Open Installation: table first (no KPI query). KPIs load in a follow-up request.
       const res = await axios.get(`/api/service-before-installation/${segment}`, {
         params: {
           ...appliedFilters,
@@ -1104,15 +1088,22 @@ export default function ServiceBeforeInstallationDetailClient({
           skip: page * pageSize,
           includeFilterOptions: "0",
           deferTotal: "0",
-          includeOpenInstallationBreakdown: segment === "open-installation" ? "0" : "1",
+          skipTotal: skipTotal ? "1" : "0",
+          includeOpenInstallationBreakdown,
         },
+        signal: controller.signal,
         timeout: 20_000,
       });
       if (res.data?.success) {
         const data = res.data.data || [];
         const pag = res.data.pagination || { total: 0, hasMore: false };
+        const total =
+          pag.total != null && pag.total !== undefined ? pag.total : listTotalRef.current;
+        if (pag.total != null && pag.total !== undefined) {
+          listTotalRef.current = pag.total;
+        }
         setRows(data);
-        setPagination(pag);
+        setPagination({ total, hasMore: Boolean(pag.hasMore) });
         if (res.data.installationBreakdown) {
           setInstallationBreakdown(res.data.installationBreakdown);
         }
@@ -1122,9 +1113,12 @@ export default function ServiceBeforeInstallationDetailClient({
         setCountLoading(false);
       }
     } catch (e) {
+      if (e?.code === "ERR_CANCELED") return;
       console.error(e);
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
     }
   }, [segment, appliedFilters, page, pageSize]);
 
@@ -1165,13 +1159,13 @@ export default function ServiceBeforeInstallationDetailClient({
   );
 
   useEffect(() => {
-    fetchRows();
-  }, [fetchRows]);
+    listTotalRef.current = 0;
+  }, [segment, appliedFilters]);
 
   useEffect(() => {
-    if (segment !== "open-installation") return;
-    void fetchOpenInstallationKpis();
-  }, [segment, fetchOpenInstallationKpis]);
+    fetchRows();
+    return () => rowsFetchAbortRef.current?.abort();
+  }, [fetchRows]);
 
   const totalPages = pagination.totalPending
     ? Math.max(1, page + (pagination.hasMore ? 2 : 1))
@@ -1207,8 +1201,9 @@ export default function ServiceBeforeInstallationDetailClient({
             dashboardBase={dashboardBase}
             registeredInstallation={appliedFilters.registeredInstallation}
             totals={installationBreakdown}
-            loading={loading && rows.length === 0}
+            loading={loading}
             onCardSelect={(registeredInstallation) => {
+              setLoading(true);
               setPage(0);
               const next = { ...appliedFilters, registeredInstallation };
               setAppliedFilters(next);
@@ -1221,9 +1216,16 @@ export default function ServiceBeforeInstallationDetailClient({
           <ServiceBeforeInstallationOpenInstallationKpiStrip
             openInstallationBucket={appliedFilters.openInstallationBucket}
             totals={openInstallationBreakdown}
-            loading={openInstallationKpiLoading}
+            loading={loading && page === 0}
             onCardSelect={(openInstallationBucket) => {
+              setLoading(true);
               setPage(0);
+              const nextBucket = String(openInstallationBucket || "").trim();
+              const estTotal = nextBucket
+                ? openInstallationBucketRecordCount(nextBucket, openInstallationBreakdown)
+                : openInstallationBreakdown.total ?? listTotalRef.current;
+              listTotalRef.current = estTotal;
+              setPagination({ total: estTotal, hasMore: estTotal > pageSize });
               const next = { ...appliedFilters, openInstallationBucket };
               setAppliedFilters(next);
               setDraftFilters(next);
@@ -1238,14 +1240,16 @@ export default function ServiceBeforeInstallationDetailClient({
           className="mb-5 shadow-[0_4px_20px_-10px_rgba(124,58,237,0.2)]"
           value={draftFilters}
           onChange={setDraftFilters}
-          loading={loading && rows.length === 0}
+          loading={loading}
           onApply={() => {
+            setLoading(true);
             setPage(0);
             setTableFilterOptions(null);
             tableFilterOptionsFetchKeyRef.current = null;
             setAppliedFilters({ ...draftFilters });
           }}
           onClear={() => {
+            setLoading(true);
             setPage(0);
             const next = initialSbiFiltersForSegment(segment);
             applyFilterState(setDraftFilters, setAppliedFilters, next);
@@ -1260,8 +1264,11 @@ export default function ServiceBeforeInstallationDetailClient({
                 : pagination.hasMore
                   ? `${formatNum(rows.length)}+ Records`
                   : `${formatNum(rows.length)} Records`}
-              {loading && rows.length === 0 ? (
-                <Loader2 className="ml-2 inline h-4 w-4 animate-spin text-violet-600" />
+              {loading ? (
+                <Loader2
+                  className="ml-2 inline h-4 w-4 animate-spin text-violet-600"
+                  aria-label="Loading"
+                />
               ) : null}
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -1286,13 +1293,25 @@ export default function ServiceBeforeInstallationDetailClient({
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
+          <div className="relative overflow-x-auto">
+            <table
+              className={`min-w-full text-sm transition-opacity ${loading && rows.length > 0 ? "opacity-50" : ""}`}
+            >
               <thead>
                 <TableHead segment={segment} />
               </thead>
               <tbody className="divide-y divide-slate-100/90">
-                {!loading && rows.length === 0 ? (
+                {loading && rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={colSpan} className="px-4 py-20 text-center">
+                      <Loader2
+                        className="mx-auto h-8 w-8 animate-spin text-violet-600"
+                        aria-hidden
+                      />
+                      <p className="mt-3 text-sm font-medium text-slate-600">Loading records…</p>
+                    </td>
+                  </tr>
+                ) : !loading && rows.length === 0 ? (
                   <tr>
                     <td colSpan={colSpan} className="px-4 py-16 text-center text-slate-500">
                       No records match your filters.
@@ -1309,6 +1328,18 @@ export default function ServiceBeforeInstallationDetailClient({
                 )}
               </tbody>
             </table>
+            {loading && rows.length > 0 ? (
+              <div
+                className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-white/65 backdrop-blur-[1px]"
+                aria-live="polite"
+                aria-busy="true"
+              >
+                <div className="flex flex-col items-center gap-2 rounded-2xl border border-violet-100 bg-white px-6 py-4 shadow-lg">
+                  <Loader2 className="h-8 w-8 animate-spin text-violet-600" aria-hidden />
+                  <p className="text-sm font-semibold text-slate-700">Updating list…</p>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">

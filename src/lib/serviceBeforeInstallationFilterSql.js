@@ -15,6 +15,7 @@ import {
   U_DELIVERY_PENDING_AFTER_DISPATCH_SQL,
   U_INSTALLATION_COMPLETED_SQL,
   U_NO_FEEDBACK_COLLECTED_SQL,
+  U_OPEN_INSTALLATION_ORDER_SQL,
 } from "@/lib/openInstallationKpiSql";
 
 const DISPATCH_ON_ORDER_QUOTE = sqlTrimUtf8EqColumns("d.quote_number", "no.quote_number");
@@ -199,6 +200,10 @@ export function buildUpcomingInstallationListFilterSql(
       )`;
       params.push(f.serviceStatus);
     }
+  }
+
+  if (!omitOpenInstallationBucket && !f.openInstallationBucket) {
+    sql += ` AND ${U_OPEN_INSTALLATION_ORDER_SQL}`;
   }
 
   if (!omitOpenInstallationBucket) {
