@@ -14,7 +14,23 @@ import {
   getDefaultDocumentFromCompany,
   mergeDocumentFromCompany,
 } from "@/lib/documentFromCompany";
+import QuotationLineTypeModal from "@/components/Quotation/QuotationLineTypeModal";
 
+const LINE_TYPES = new Set(["product", "spare", "multi"]);
+
+function createEmptyQuotationItem(gstRate = 18) {
+  return {
+    productCode: "",
+    imageUrl: "",
+    name: "",
+    hsn: "",
+    specification: "",
+    unit: "",
+    quantity: 1,
+    price: 0,
+    gst: gstRate,
+  };
+}
 
 // Remove local generation - will fetch from API
 
@@ -22,6 +38,9 @@ export default function QuotationForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const customerIdFromUrl = searchParams.get("customerId");
+  const lineTypeParam = (searchParams.get("lineType") || "").trim().toLowerCase();
+  const lineType = LINE_TYPES.has(lineTypeParam) ? lineTypeParam : null;
+  const [showLineTypeModal, setShowLineTypeModal] = useState(!lineType);
 
   // console.log("customer id from url:", customerIdFromUrl);
 
@@ -45,19 +64,7 @@ export default function QuotationForm() {
     state_name: true,
   });
 
-  const [items, setItems] = useState([
-    {
-      productCode: "",
-      imageUrl: "",
-      name: "",
-      hsn: "",
-      specification: "",
-      unit: "",
-      quantity: 1,
-      price: 0,
-      gst: 5, // Default GST rate
-    },
-  ]);
+  const [items, setItems] = useState([createEmptyQuotationItem(5)]);
 
   const [form, setForm] = useState({
     company: "",
@@ -124,6 +131,31 @@ export default function QuotationForm() {
     }),
     [],
   );
+
+  const handleLineTypeSelect = (type) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("lineType", type);
+    router.replace(`?${params.toString()}`);
+    setShowLineTypeModal(false);
+    if (type === "multi") {
+      setItems(Array.from({ length: 4 }, () => createEmptyQuotationItem(18)));
+    } else {
+      setItems([createEmptyQuotationItem(18)]);
+    }
+  };
+
+  useEffect(() => {
+    setShowLineTypeModal(!lineType);
+  }, [lineType]);
+
+  useEffect(() => {
+    if (lineType !== "multi") return;
+    setItems((prev) => {
+      const filled = prev.filter((i) => String(i.productCode || "").trim()).length;
+      if (filled > 0 || prev.length >= 4) return prev;
+      return Array.from({ length: 4 }, () => createEmptyQuotationItem(18));
+    });
+  }, [lineType]);
 
   // set from params
   useEffect(() => {
@@ -440,6 +472,47 @@ export default function QuotationForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!lineType) {
+      setShowLineTypeModal(true);
+      toast.error("Please select quotation type first.");
+      return;
+    }
+
+    const filledItems = items.filter((i) => String(i.productCode || "").trim());
+    if (filledItems.length === 0) {
+      toast.error("Add at least one line item.");
+      return;
+    }
+
+    if (lineType === "product") {
+      if (filledItems.length > 3) {
+        toast.error("Product quotation allows at most 3 products.");
+        return;
+      }
+      if (filledItems.some((i) => (i.item_type || "product") === "spare")) {
+        toast.error("Only products are allowed in this quotation type.");
+        return;
+      }
+    }
+
+    if (lineType === "multi") {
+      if (filledItems.length <= 3) {
+        toast.error("Multi Products quotation needs more than 3 products.");
+        return;
+      }
+      if (filledItems.some((i) => (i.item_type || "product") === "spare")) {
+        toast.error("Only products are allowed in this quotation type.");
+        return;
+      }
+    }
+
+    if (lineType === "spare") {
+      if (filledItems.some((i) => (i.item_type || "product") !== "spare")) {
+        toast.error("Only spare parts are allowed in this quotation type.");
+        return;
+      }
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -550,8 +623,13 @@ export default function QuotationForm() {
 
   return (
     <>
+      <QuotationLineTypeModal
+        isOpen={showLineTypeModal}
+        onClose={() => router.push("/admin-dashboard/quotations")}
+        onSelect={handleLineTypeSelect}
+      />
       {/* Customer ID Modal */}
-      {showCustomerModal && (
+      {showCustomerModal && lineType && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 overflow-visible">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">
@@ -872,6 +950,7 @@ export default function QuotationForm() {
           cgstRate={cgstRate}
           sgstRate={sgstRate}
           igstRate={igstRate}
+          lineType={lineType}
         />
 
         {/* Tax Summary */}

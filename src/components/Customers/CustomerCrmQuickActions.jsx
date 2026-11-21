@@ -18,6 +18,7 @@ import {
   Zap,
 } from "lucide-react";
 import CustomerContactsModal from "@/components/Customers/CustomerContactsModal";
+import AdminNewQuotationButton from "@/components/Quotation/AdminNewQuotationButton";
 import CustomerPerformaInvoiceButton from "@/components/invoice/CustomerPerformaInvoiceButton";
 import ScheduleVisitModal from "@/components/scheduleVisit/ScheduleVisitModal";
 import { customerPartyLedgerHref } from "@/lib/customerPartyLedger";
@@ -64,7 +65,7 @@ const quickActions = [
   {
     label: "Add Quotation",
     icon: CirclePlus,
-    href: (id) => `/admin-dashboard/quotations/new?customerId=${id}`,
+    special: "quotation",
     className: "border-orange-600 bg-orange-500 text-white hover:bg-orange-600",
   },
   {
@@ -155,6 +156,20 @@ export default function CustomerCrmQuickActions({
                 triggerClassName={`${actionBtnBase} ${action.className}`}
                 TriggerIcon={action.icon}
               />
+            );
+          }
+          if (action.special === "quotation") {
+            return (
+              <AdminNewQuotationButton
+                key={action.label}
+                customerId={customerId}
+                className={`${actionBtnBase} ${action.className} inline-flex items-center gap-2`}
+              >
+                {action.icon ? (
+                  <action.icon className="h-4 w-4 shrink-0" strokeWidth={2.25} />
+                ) : null}
+                <span>{action.label}</span>
+              </AdminNewQuotationButton>
             );
           }
           if (action.special === "performa") {

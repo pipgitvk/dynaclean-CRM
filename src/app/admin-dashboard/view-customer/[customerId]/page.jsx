@@ -9,6 +9,7 @@ import CustomerContactHierarchyList from "@/components/Customers/CustomerContact
 import ViewCustomerQuotationsLink from "@/components/Customers/ViewCustomerQuotationsLink";
 import CustomerWhatsAppLink from "@/components/Customers/CustomerWhatsAppLink";
 import CustomerPerformaInvoiceButton from "@/components/invoice/CustomerPerformaInvoiceButton";
+import AdminNewQuotationButton from "@/components/Quotation/AdminNewQuotationButton";
 import ScheduleVisitModal from "@/components/scheduleVisit/ScheduleVisitModal";
 import { canShowScheduleVisitOnCustomerProfile } from "@/lib/scheduleVisitScope";
 import { userHasModuleKey } from "@/lib/userModuleAccessServer";
@@ -467,14 +468,12 @@ export default async function CustomerPage({ params, searchParams }) {
                 dashboardBase="admin-dashboard"
                 variant="admin"
               />
-              <Link
-                href={dashHref(
-                  `/admin-dashboard/quotations/new?customerId=${customerId}`,
-                )}
+              <AdminNewQuotationButton
+                customerId={customerId}
                 className="btn w-full md:w-auto md:flex-shrink-0 whitespace-nowrap text-white bg-amber-900 hover:bg-amber-950 py-2 px-4 rounded-md text-center transition duration-300"
               >
                 add Quotation
-              </Link>
+              </AdminNewQuotationButton>
               {canCreatePerformaInvoice && (
                 <CustomerPerformaInvoiceButton
                   quotationNumber={latestQuoteNumber}

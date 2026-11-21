@@ -21,9 +21,7 @@ import {
   Shield,
   ShieldCheck,
   Wrench,
-  FileText,
 } from "lucide-react";
-import ServiceAttachmentLink from "@/components/services/ServiceAttachmentLink";
 import { getSegmentMeta } from "@/lib/serviceBeforeInstallationHub";
 import { openInstallationBucketRecordCount } from "@/lib/openInstallationKpiSql";
 import { defaultSbiSelectFilters } from "@/lib/serviceBeforeInstallationFilters";
@@ -45,6 +43,9 @@ import {
   parseUpcomingInstallationServiceDetails,
 } from "@/components/installation/UpcomingInstallationServiceStatusColumn";
 import OpenInstallationStatusColumn from "@/components/installation/OpenInstallationStatusColumn";
+import OpenInstallationReportButton from "@/components/installation/OpenInstallationReportButton";
+import OpenInstallationServicesModal from "@/components/installation/OpenInstallationServicesModal";
+import { parseOpenInstallationDispatchItems } from "@/lib/openInstallationDispatchItems";
 import { useWarrantyProductFollowup } from "@/components/warranty/WarrantyProductFollowupControls";
 
 const DEFAULT_PAGE_SIZE = 10;
@@ -437,37 +438,6 @@ function modelPillClass(model) {
   return MODEL_PILL_CLASSES[h];
 }
 
-/** Split dispatch GROUP_CONCAT model codes + product names into readable line items. */
-function parseOpenInstallationDispatchItems(modelStr, nameStr) {
-  const codes = String(modelStr || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const names = String(nameStr || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-  if (!codes.length && !names.length) return [];
-
-  const pairCount = Math.max(codes.length, names.length);
-  const items = [];
-  for (let i = 0; i < pairCount; i += 1) {
-    const code = codes[i] ?? "";
-    const name = names[i] ?? "";
-    if (!code && !name) continue;
-    items.push({ code, name });
-  }
-
-  const seen = new Set();
-  return items.filter((it) => {
-    const key = `${it.code.toLowerCase()}|${it.name.toLowerCase()}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
 function openInstallationModelExport(row) {
   return parseOpenInstallationDispatchItems(row.model, row.name)
     .map((it) => {
@@ -477,28 +447,68 @@ function openInstallationModelExport(row) {
     .join(" | ");
 }
 
-function OpenInstallationModelCell({ row }) {
+const OPEN_INSTALLATION_MODEL_PREVIEW = 3;
+
+function OpenInstallationDispatchItemLine({ it, itemKey }) {
+  return (
+    <li key={itemKey} className="space-y-0.5">
+      {it.code ? (
+        <span
+          className={`inline-flex rounded-md border px-1.5 py-0.5 text-[11px] font-bold leading-tight ${modelPillClass(it.code)}`}
+        >
+          {it.code}
+        </span>
+      ) : null}
+      {it.name ? <p className="text-xs leading-snug text-slate-700">{it.name}</p> : null}
+    </li>
+  );
+}
+
+function OpenInstallationModelCell({ row, dashboardBase = "" }) {
+  const [allOpen, setAllOpen] = useState(false);
   const items = parseOpenInstallationDispatchItems(row.model, row.name);
   if (!items.length) {
     return <span className="text-slate-400">—</span>;
   }
+
+  const hasMore = items.length > OPEN_INSTALLATION_MODEL_PREVIEW;
+  const visible = hasMore ? items.slice(0, OPEN_INSTALLATION_MODEL_PREVIEW) : items;
+  const hiddenCount = items.length - OPEN_INSTALLATION_MODEL_PREVIEW;
+
   return (
-    <ul className="min-w-[10.5rem] max-w-[16rem] list-none space-y-2">
-      {items.map((it, idx) => (
-        <li key={`${it.code}-${idx}`} className="space-y-0.5">
-          {it.code ? (
-            <span
-              className={`inline-flex rounded-md border px-1.5 py-0.5 text-[11px] font-bold leading-tight ${modelPillClass(it.code)}`}
+    <>
+      <ul className="min-w-[10.5rem] max-w-[16rem] list-none space-y-2">
+        {visible.map((it, idx) => (
+          <OpenInstallationDispatchItemLine
+            key={`${it.code}-${idx}`}
+            itemKey={`${it.code}-${idx}`}
+            it={it}
+          />
+        ))}
+        {hasMore ? (
+          <li>
+            <button
+              type="button"
+              onClick={() => setAllOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-violet-700 shadow-sm hover:border-violet-200 hover:bg-violet-50"
+              title={`View all ${items.length} products`}
             >
-              {it.code}
-            </span>
-          ) : null}
-          {it.name ? (
-            <p className="text-xs leading-snug text-slate-700">{it.name}</p>
-          ) : null}
-        </li>
-      ))}
-    </ul>
+              <Eye className="h-3.5 w-3.5" aria-hidden />
+              <span>+{hiddenCount} more</span>
+            </button>
+          </li>
+        ) : null}
+      </ul>
+
+      <OpenInstallationServicesModal
+        isOpen={allOpen}
+        onClose={() => setAllOpen(false)}
+        title={`Products & services (${items.length})`}
+        row={row}
+        dashboardBase={dashboardBase}
+        showStatusEditor={false}
+      />
+    </>
   );
 }
 
@@ -1045,133 +1055,57 @@ function openInstallationPrimaryServiceId(row) {
   );
 }
 
-function openInstallationServiceReportCompleted(row, serviceId) {
-  const items = parseUpcomingInstallationServiceDetails(row?.service_details);
-  const id = String(serviceId || "").trim();
-  const match = items.find((it) => it.serviceId === id);
-  if (match && String(match.status || "").trim().toUpperCase() === "COMPLETED") {
-    return true;
-  }
-  return (
-    items.some((it) => String(it.status || "").trim().toUpperCase() === "COMPLETED") ||
-    Number(row?.order_installation_status) === 1
-  );
-}
-
-function openInstallationReportAttachment(row) {
-  const finalPath = String(row.final_report_path || "").trim();
-  if (finalPath) {
-    return {
-      kind: "external",
-      href: finalPath.startsWith("http")
-        ? finalPath
-        : `https://service.dynacleanindustries.com/${finalPath.replace(/^\/+/, "")}`,
-    };
-  }
-  const inst = String(row.installation_report || "").trim();
-  if (!inst || inst === "uploadFO") return null;
-  const files = inst
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (!files.length) return null;
-  return { kind: "file", path: files[0] };
-}
-
-const openInstallationReportBtnClass =
-  "inline-flex items-center gap-1 rounded bg-emerald-700 px-2 py-1 text-xs font-medium text-white whitespace-nowrap hover:bg-emerald-800";
-
-function OpenInstallationReportButton({
-  row,
-  dashboardBase,
-  serviceId: serviceIdProp,
-  compactLabel = false,
-}) {
-  const items = parseUpcomingInstallationServiceDetails(row?.service_details);
-  const serviceId = serviceIdProp || openInstallationPrimaryServiceId(row);
-  const item = items.find((it) => it.serviceId === serviceId);
-  const attachment =
-    serviceIdProp || items.length <= 1 ? openInstallationReportAttachment(row) : null;
-
-  const label = compactLabel && serviceId ? `Report ${serviceId}` : "Installation Report";
-
-  if (attachment?.kind === "external") {
-    return (
-      <a
-        href={attachment.href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={openInstallationReportBtnClass}
-      >
-        <FileText className="h-3 w-3 shrink-0" aria-hidden />
-        {label}
-      </a>
-    );
-  }
-
-  if (attachment?.kind === "file") {
-    return (
-      <ServiceAttachmentLink
-        filePath={attachment.path}
-        fileName={label}
-        className={openInstallationReportBtnClass}
-      />
-    );
-  }
-
-  if (!serviceId) {
-    return null;
-  }
-
-  const instFlag = String(row.installation_report || "").trim();
-  const itemCompleted =
-    item && String(item.status || "").trim().toUpperCase() === "COMPLETED";
-  const reportDone =
-    itemCompleted ||
-    openInstallationServiceReportCompleted(row, serviceId) ||
-    instFlag === "uploadFO";
-
-  if (reportDone) {
-    return (
-      <Link
-        href={`/${dashboardBase}/complete-service/${encodeURIComponent(serviceId)}`}
-        className={openInstallationReportBtnClass}
-      >
-        <FileText className="h-3 w-3 shrink-0" aria-hidden />
-        {label}
-      </Link>
-    );
-  }
-
-  return (
-    <Link
-      href={`/${dashboardBase}/installation-completion-video/${encodeURIComponent(serviceId)}`}
-      className="inline-flex items-center gap-1 rounded bg-slate-600 px-2 py-1 text-xs font-medium text-white whitespace-nowrap hover:bg-slate-700"
-    >
-      <FileText className="h-3 w-3 shrink-0" aria-hidden />
-      {label}
-    </Link>
-  );
-}
-
 function OpenInstallationReportButtons({ row, dashboardBase }) {
+  const [allOpen, setAllOpen] = useState(false);
   const serviceIds = listUpcomingInstallationServiceIds(row);
   if (!serviceIds.length) return null;
   if (serviceIds.length === 1) {
     return <OpenInstallationReportButton row={row} dashboardBase={dashboardBase} />;
   }
+
+  const hasMore = serviceIds.length > OPEN_INSTALLATION_MODEL_PREVIEW;
+  const visibleIds = hasMore
+    ? serviceIds.slice(0, OPEN_INSTALLATION_MODEL_PREVIEW)
+    : serviceIds;
+  const hiddenCount = serviceIds.length - OPEN_INSTALLATION_MODEL_PREVIEW;
+
+  const renderReportButtons = (ids) =>
+    ids.map((id) => (
+      <OpenInstallationReportButton
+        key={id}
+        row={row}
+        dashboardBase={dashboardBase}
+        serviceId={id}
+        compactLabel
+      />
+    ));
+
   return (
-    <div className="flex w-full flex-col items-stretch gap-1">
-      {serviceIds.map((id) => (
-        <OpenInstallationReportButton
-          key={id}
-          row={row}
-          dashboardBase={dashboardBase}
-          serviceId={id}
-          compactLabel
-        />
-      ))}
-    </div>
+    <>
+      <div className="flex w-full flex-col items-stretch gap-1">
+        {renderReportButtons(visibleIds)}
+        {hasMore ? (
+          <button
+            type="button"
+            onClick={() => setAllOpen(true)}
+            className="inline-flex items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-violet-700 shadow-sm hover:border-violet-200 hover:bg-violet-50"
+            title={`View all ${serviceIds.length} reports`}
+          >
+            <Eye className="h-3 w-3" aria-hidden />
+            <span>+{hiddenCount} more</span>
+          </button>
+        ) : null}
+      </div>
+
+      <OpenInstallationServicesModal
+        isOpen={allOpen}
+        onClose={() => setAllOpen(false)}
+        title={`Services & reports (${serviceIds.length})`}
+        row={row}
+        dashboardBase={dashboardBase}
+        showStatusEditor={false}
+      />
+    </>
   );
 }
 
@@ -1341,7 +1275,7 @@ function OpenInstallationRows({
           <OpenInstallationAssignedByEngineerCell row={row} />
         </td>
         <td className="px-4 py-3.5 align-top xl:max-w-none">
-          <OpenInstallationModelCell row={row} />
+          <OpenInstallationModelCell row={row} dashboardBase={dashboardBase} />
         </td>
         <td className="px-4 py-3.5 align-top">
           <OpenInstallationOrderDeliveryCell row={row} />
@@ -1354,6 +1288,7 @@ function OpenInstallationRows({
             row={row}
             role={userRole}
             onRowPatched={onOpenInstallationRowPatch}
+            dashboardBase={dashboardBase}
           />
         </td>
         <td className="px-4 py-3.5 align-top">

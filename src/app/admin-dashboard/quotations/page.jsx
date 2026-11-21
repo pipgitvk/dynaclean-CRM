@@ -3,6 +3,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import QuotationTableClient from "./QuotationClientTable";
+import AdminNewQuotationButton from "@/components/Quotation/AdminNewQuotationButton";
 import { userHasModuleKey } from "@/lib/userModuleAccessServer";
 
 export const dynamic = "force-dynamic";
@@ -34,16 +35,7 @@ export default async function QuotationPage({ searchParams }) {
           Quotation Management{serviceSupportOnly ? " · Service Support" : ""}
         </h1>
         <div className="flex items-center gap-3">
-          <a
-            href={
-              customerId
-                ? `/admin-dashboard/quotations/new?customerId=${encodeURIComponent(customerId)}`
-                : "/admin-dashboard/quotations/new"
-            }
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-          >
-            New Quotation
-          </a>
+          <AdminNewQuotationButton customerId={customerId} />
           {canPerformaInvoice ? (
             <Link
               href="/admin-dashboard/invoices/performa"

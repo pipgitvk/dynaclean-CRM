@@ -1,18 +1,13 @@
-import Link from "next/link";
-import { listUpcomingInstallationServiceIds } from "@/components/installation/UpcomingInstallationServiceStatusColumn";
+"use client";
 
-function listSerialNumbers(record) {
-  const raw = String(record?.serial_number || "").trim();
-  if (!raw) return [];
-  return [
-    ...new Set(
-      raw
-        .split(/[,|;]+/)
-        .map((s) => s.trim())
-        .filter(Boolean),
-    ),
-  ];
-}
+import Link from "next/link";
+import { useState } from "react";
+import { Eye } from "lucide-react";
+import { listUpcomingInstallationServiceIds } from "@/components/installation/UpcomingInstallationServiceStatusColumn";
+import { listOpenInstallationSerialNumbers } from "@/lib/openInstallationServiceLineItems";
+import OpenInstallationServicesModal from "@/components/installation/OpenInstallationServicesModal";
+
+const LIST_PREVIEW_COUNT = 3;
 
 /** Invoice, order, service IDs, and serial numbers for upcoming installation rows. */
 export default function UpcomingInstallationReferenceIds({
@@ -21,10 +16,43 @@ export default function UpcomingInstallationReferenceIds({
   serviceIdActions = null,
   dashboardBase = "",
 }) {
+  const [servicesModalOpen, setServicesModalOpen] = useState(false);
+  const [serialModalOpen, setSerialModalOpen] = useState(false);
+
   const invoice = record?.invoice_number?.trim() || "—";
   const orderId = record?.order_id ?? "—";
   const serviceIds = listUpcomingInstallationServiceIds(record);
-  const serials = listSerialNumbers(record);
+  const serials = listOpenInstallationSerialNumbers(record);
+
+  const renderServiceIdRow = (id, idx) =>
+    dashboardBase ? (
+      <div key={`${id}-${idx}`}>
+        <Link
+          href={`/${dashboardBase}/complete-service/${encodeURIComponent(id)}`}
+          className="font-semibold text-violet-700 hover:underline"
+        >
+          {id}
+        </Link>
+      </div>
+    ) : (
+      <div key={`${id}-${idx}`} className="font-semibold text-slate-800">
+        {id}
+      </div>
+    );
+
+  const visibleServiceIds =
+    serviceIds.length > LIST_PREVIEW_COUNT
+      ? serviceIds.slice(0, LIST_PREVIEW_COUNT)
+      : serviceIds;
+  const serviceHidden =
+    serviceIds.length > LIST_PREVIEW_COUNT
+      ? serviceIds.length - LIST_PREVIEW_COUNT
+      : 0;
+
+  const visibleSerials =
+    serials.length > LIST_PREVIEW_COUNT ? serials.slice(0, LIST_PREVIEW_COUNT) : serials;
+  const serialHidden =
+    serials.length > LIST_PREVIEW_COUNT ? serials.length - LIST_PREVIEW_COUNT : 0;
 
   return (
     <div className={`space-y-1 text-xs ${className}`}>
@@ -44,38 +72,64 @@ export default function UpcomingInstallationReferenceIds({
             <span className="ml-1">—</span>
           ) : (
             <div className="mt-0.5 space-y-0.5">
-              {serviceIds.map((id) =>
-                dashboardBase ? (
-                  <div key={id}>
-                    <Link
-                      href={`/${dashboardBase}/complete-service/${encodeURIComponent(id)}`}
-                      className="font-semibold text-violet-700 hover:underline"
-                    >
-                      {id}
-                    </Link>
-                  </div>
-                ) : (
-                  <div key={id} className="font-semibold text-slate-800">
-                    {id}
-                  </div>
-                ),
-              )}
+              {visibleServiceIds.map((id, idx) => renderServiceIdRow(id, idx))}
+              {serviceHidden > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setServicesModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-violet-700 shadow-sm hover:border-violet-200 hover:bg-violet-50"
+                  title={`View all ${serviceIds.length} services`}
+                >
+                  <Eye className="h-3 w-3" aria-hidden />
+                  <span>+{serviceHidden} more</span>
+                </button>
+              ) : null}
             </div>
           )}
         </div>
       </div>
+
       <div>
         <span className="text-amber-700 font-bold">S/N:</span>
         {serials.length === 0 ? (
           <span className="ml-1">—</span>
         ) : (
           <div className="mt-0.5 space-y-0.5 font-mono text-slate-800">
-            {serials.map((sn) => (
-              <div key={sn}>{sn}</div>
+            {visibleSerials.map((sn, idx) => (
+              <div key={`${sn}-${idx}`}>{sn}</div>
             ))}
+            {serialHidden > 0 ? (
+              <button
+                type="button"
+                onClick={() => setSerialModalOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-0.5 font-sans text-[11px] font-semibold text-violet-700 shadow-sm hover:border-violet-200 hover:bg-violet-50"
+                title={`View all ${serials.length} serial numbers`}
+              >
+                <Eye className="h-3 w-3" aria-hidden />
+                <span>+{serialHidden} more</span>
+              </button>
+            ) : null}
           </div>
         )}
       </div>
+
+      <OpenInstallationServicesModal
+        isOpen={servicesModalOpen}
+        onClose={() => setServicesModalOpen(false)}
+        title={`Services (${serviceIds.length})`}
+        row={record}
+        dashboardBase={dashboardBase}
+        showStatusEditor={false}
+      />
+      <OpenInstallationServicesModal
+        isOpen={serialModalOpen}
+        onClose={() => setSerialModalOpen(false)}
+        title={`Serial numbers & services (${serials.length})`}
+        row={record}
+        dashboardBase={dashboardBase}
+        showStatusEditor={false}
+        showSerial
+      />
     </div>
   );
 }

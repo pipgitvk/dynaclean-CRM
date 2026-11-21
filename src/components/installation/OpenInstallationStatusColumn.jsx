@@ -1,5 +1,8 @@
 "use client";
 
+import { useState } from "react";
+import { Eye } from "lucide-react";
+import OpenInstallationServicesModal from "@/components/installation/OpenInstallationServicesModal";
 import ServiceRecordStatusInlineCell from "@/components/services/ServiceRecordStatusInlineCell";
 import { OPEN_INSTALLATION_INLINE_STATUS_OPTIONS } from "@/lib/serviceRecordStatusPermissions";
 import { formatCrmDateOnly } from "@/lib/crmDateFormat";
@@ -7,6 +10,8 @@ import {
   parseUpcomingInstallationServiceDetails,
   serializeUpcomingInstallationServiceDetails,
 } from "@/components/installation/UpcomingInstallationServiceStatusColumn";
+
+const OPEN_INSTALLATION_STATUS_PREVIEW = 3;
 
 export function patchOpenInstallationRowService(
   row,
@@ -74,13 +79,27 @@ export default function OpenInstallationStatusColumn({
   row,
   role,
   onRowPatched,
+  dashboardBase = "admin-dashboard",
 }) {
+  const [allStatusesOpen, setAllStatusesOpen] = useState(false);
   const items = parseUpcomingInstallationServiceDetails(row?.service_details);
   const orderInstallationDone = Number(row?.order_installation_status) === 1;
 
   const handlePatch = (serviceId, patch) => {
     onRowPatched?.(patchOpenInstallationRowService(row, serviceId, patch));
   };
+
+  const renderStatusCells = (list) =>
+    list.map((item) => (
+      <ServiceRecordStatusInlineCell
+        key={item.serviceId}
+        record={itemToServiceRecord(item, row)}
+        role={role}
+        serviceIdLabel={`ID: ${item.serviceId}`}
+        statusOptions={OPEN_INSTALLATION_INLINE_STATUS_OPTIONS}
+        onRecordUpdated={(patch) => handlePatch(item.serviceId, patch)}
+      />
+    ));
 
   if (items.length === 0) {
     const fallbackId = String(row?.service_id || "").trim();
@@ -125,18 +144,39 @@ export default function OpenInstallationStatusColumn({
     );
   }
 
+  const hasMore = items.length > OPEN_INSTALLATION_STATUS_PREVIEW;
+  const visibleItems = hasMore
+    ? items.slice(0, OPEN_INSTALLATION_STATUS_PREVIEW)
+    : items;
+  const hiddenCount = items.length - OPEN_INSTALLATION_STATUS_PREVIEW;
+
   return (
-    <div className="space-y-3">
-      {items.map((item) => (
-        <ServiceRecordStatusInlineCell
-          key={item.serviceId}
-          record={itemToServiceRecord(item, row)}
-          role={role}
-          serviceIdLabel={`ID: ${item.serviceId}`}
-          statusOptions={OPEN_INSTALLATION_INLINE_STATUS_OPTIONS}
-          onRecordUpdated={(patch) => handlePatch(item.serviceId, patch)}
-        />
-      ))}
-    </div>
+    <>
+      <div className="space-y-3">
+        {renderStatusCells(visibleItems)}
+        {hasMore ? (
+          <button
+            type="button"
+            onClick={() => setAllStatusesOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-violet-700 shadow-sm hover:border-violet-200 hover:bg-violet-50"
+            title={`View all ${items.length} service statuses`}
+          >
+            <Eye className="h-3 w-3" aria-hidden />
+            <span>+{hiddenCount} more</span>
+          </button>
+        ) : null}
+      </div>
+
+      <OpenInstallationServicesModal
+        isOpen={allStatusesOpen}
+        onClose={() => setAllStatusesOpen(false)}
+        title={`Services (${items.length})`}
+        row={row}
+        dashboardBase={dashboardBase}
+        role={role}
+        onRowPatched={onRowPatched}
+        showStatusEditor
+      />
+    </>
   );
 }

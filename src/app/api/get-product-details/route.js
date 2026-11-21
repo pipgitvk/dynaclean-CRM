@@ -73,6 +73,9 @@ export async function GET(req) {
   const code = searchParams.get("code")?.trim();
   const mode = searchParams.get("mode") || "full"; // 'suggestion' or 'full'
   const customerId = searchParams.get("customerId")?.trim() || "";
+  const sourceFilter = (searchParams.get("source") || "")
+    .trim()
+    .toLowerCase();
 
   if (!code) {
     return new Response(JSON.stringify({ error: "Missing product code" }), {
@@ -86,61 +89,63 @@ export async function GET(req) {
 
     if (mode === "suggestion") {
       const likeCode = `%${code}%`;
-      // Fetch suggestions from both tables
-      [rows] = await conn.execute(
-        `
-        (SELECT
-          p.item_code,
-          p.item_name,
-          p.product_image as image_path,
-          'product' AS source
-        FROM
-          products_list p
-        LEFT JOIN
-          product_images pi ON p.item_code = pi.item_code
-        WHERE
-          p.item_code LIKE ? OR p.item_name LIKE ?)
-        UNION
-        (SELECT
-          sl.spare_number AS item_code,
-          sl.item_name,
-          sl.image AS image_path,
-          'spare' AS source
-        FROM
-          spare_list sl
-        WHERE
-          sl.spare_number LIKE ? OR sl.item_name LIKE ?)
-        LIMIT 10`,
-        [likeCode, likeCode, likeCode, likeCode]
-      );
-    } else {
-      // Full product fetch (exact code, then case-insensitive item_code / product_number)
-      [rows] = await conn.execute(
-        `
-        SELECT
-          p.id,
-          p.item_code,
-          p.item_name,
-          p.product_number,
-          p.hsn_sac,
-          p.specification,
-          p.unit,
-          p.price_per_unit,
-          p.gst_rate,
-          p.last_negotiation_price,
-          p.product_image as image_path,
-          'product' AS item_type
-        FROM
-          products_list p
-        WHERE
-          p.item_code = ?
-        LIMIT 1`,
-        [code]
-      );
-
-      if (rows.length === 0) {
-        const codeLower = code.toLowerCase();
+      if (sourceFilter === "product") {
         [rows] = await conn.execute(
+          `SELECT
+            p.item_code,
+            p.item_name,
+            p.product_image as image_path,
+            'product' AS source
+          FROM products_list p
+          LEFT JOIN product_images pi ON p.item_code = pi.item_code
+          WHERE p.item_code LIKE ? OR p.item_name LIKE ?
+          LIMIT 10`,
+          [likeCode, likeCode]
+        );
+      } else if (sourceFilter === "spare") {
+        [rows] = await conn.execute(
+          `SELECT
+            sl.spare_number AS item_code,
+            sl.item_name,
+            sl.image AS image_path,
+            'spare' AS source
+          FROM spare_list sl
+          WHERE sl.spare_number LIKE ? OR sl.item_name LIKE ?
+          LIMIT 10`,
+          [likeCode, likeCode]
+        );
+      } else {
+        [rows] = await conn.execute(
+          `
+          (SELECT
+            p.item_code,
+            p.item_name,
+            p.product_image as image_path,
+            'product' AS source
+          FROM
+            products_list p
+          LEFT JOIN
+            product_images pi ON p.item_code = pi.item_code
+          WHERE
+            p.item_code LIKE ? OR p.item_name LIKE ?)
+          UNION
+          (SELECT
+            sl.spare_number AS item_code,
+            sl.item_name,
+            sl.image AS image_path,
+            'spare' AS source
+          FROM
+            spare_list sl
+          WHERE
+            sl.spare_number LIKE ? OR sl.item_name LIKE ?)
+          LIMIT 10`,
+          [likeCode, likeCode, likeCode, likeCode]
+        );
+      }
+    } else {
+      const fetchProductFull = async () => {
+        let productRows;
+        [productRows] = await conn.execute(
           `
           SELECT
             p.id,
@@ -155,18 +160,41 @@ export async function GET(req) {
             p.last_negotiation_price,
             p.product_image as image_path,
             'product' AS item_type
-          FROM
-            products_list p
-          WHERE
-            LOWER(TRIM(p.item_code)) = ?
-            OR CAST(p.product_number AS CHAR) = ?
+          FROM products_list p
+          WHERE p.item_code = ?
           LIMIT 1`,
-          [codeLower, codeLower]
+          [code]
         );
-      }
 
-      if (rows.length === 0) {
-        [rows] = await conn.execute(
+        if (productRows.length === 0) {
+          const codeLower = code.toLowerCase();
+          [productRows] = await conn.execute(
+            `
+            SELECT
+              p.id,
+              p.item_code,
+              p.item_name,
+              p.product_number,
+              p.hsn_sac,
+              p.specification,
+              p.unit,
+              p.price_per_unit,
+              p.gst_rate,
+              p.last_negotiation_price,
+              p.product_image as image_path,
+              'product' AS item_type
+            FROM products_list p
+            WHERE LOWER(TRIM(p.item_code)) = ?
+              OR CAST(p.product_number AS CHAR) = ?
+            LIMIT 1`,
+            [codeLower, codeLower]
+          );
+        }
+        return productRows;
+      };
+
+      const fetchSpareFull = async () => {
+        const [spareRows] = await conn.execute(
           `
           SELECT
             T1.spare_number AS item_code,
@@ -179,14 +207,24 @@ export async function GET(req) {
             T1.last_negotiation_price,
             T1.image AS image_path,
             'spare' AS item_type
-          FROM
-            spare_list AS T1
-          WHERE
-            CAST(T1.spare_number AS CHAR) = ?
+          FROM spare_list AS T1
+          WHERE CAST(T1.spare_number AS CHAR) = ?
             OR LOWER(TRIM(CAST(T1.spare_number AS CHAR))) = ?
           LIMIT 1`,
           [code, code.toLowerCase()]
         );
+        return spareRows;
+      };
+
+      if (sourceFilter === "product") {
+        rows = await fetchProductFull();
+      } else if (sourceFilter === "spare") {
+        rows = await fetchSpareFull();
+      } else {
+        rows = await fetchProductFull();
+        if (rows.length === 0) {
+          rows = await fetchSpareFull();
+        }
       }
     }
 

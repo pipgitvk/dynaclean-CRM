@@ -37,6 +37,18 @@ async function resolvePriceWithSpecial(customerId, productCode, basePrice, itemT
   return { finalPrice: basePrice, specialPrice: null };
 }
 
+const LINE_TYPE_LABELS = {
+  product: "Product (max 3)",
+  spare: "Spare",
+  multi: "Multi Products",
+};
+
+function apiSourceForLineType(lineType) {
+  if (lineType === "spare") return "spare";
+  if (lineType === "product" || lineType === "multi") return "product";
+  return null;
+}
+
 export default function QuotationTable({
   items,
   setItems,
@@ -45,7 +57,10 @@ export default function QuotationTable({
   sgstRate = 9,
   igstRate = 0,
   editableSpecification = true,
+  lineType = null,
 }) {
+  const apiSource = apiSourceForLineType(lineType);
+  const maxRows = lineType === "product" ? 3 : null;
   const [productSuggestions, setProductSuggestions] = useState([]);
   const [activeRowIndex, setActiveRowIndex] = useState(null);
   const itemsRef = useRef(items);
@@ -87,8 +102,9 @@ export default function QuotationTable({
       const customerParam = customerId
         ? `&customerId=${encodeURIComponent(customerId)}`
         : "";
+      const sourceParam = apiSource ? `&source=${encodeURIComponent(apiSource)}` : "";
       const res = await fetch(
-        `/api/get-product-details?code=${encodeURIComponent(code)}&mode=${isSuggestion ? "suggestion" : "full"}${customerParam}`,
+        `/api/get-product-details?code=${encodeURIComponent(code)}&mode=${isSuggestion ? "suggestion" : "full"}${customerParam}${sourceParam}`,
       );
       const data = await res.json();
       if (!res.ok || !Array.isArray(data) || data.length === 0) {
@@ -99,15 +115,23 @@ export default function QuotationTable({
       }
 
       if (isSuggestion) {
-        setProductSuggestions(data);
+        const filtered = apiSource
+          ? data.filter((row) => (row.source || row.item_type || "product") === apiSource)
+          : data;
+        setProductSuggestions(filtered);
         setActiveRowIndex(index);
         return;
       }
 
       const item = data[0];
+      const resolvedRowType =
+        itemType || item?.item_type || item?.source || "product";
+      if (apiSource && resolvedRowType !== apiSource) {
+        return;
+      }
       const resolvedCode = item.item_code || code;
       const resolvedType =
-        itemType || item.item_type || item.source || "product";
+        itemType || resolvedRowType || item.item_type || item.source || "product";
       const basePrice = parseFloat(item.price_per_unit) || 0;
 
       let specialPrice = null;
@@ -190,6 +214,10 @@ export default function QuotationTable({
   }, [customerId, reapplySpecialPrices]);
 
   const addRow = () => {
+    if (maxRows != null && items.length >= maxRows) {
+      alert(`You can add at most ${maxRows} products in this quotation type.`);
+      return;
+    }
     // Use combined rate from form (cgstRate + sgstRate for intrastate, or igstRate for interstate)
     const itemGstRate = igstRate > 0 ? igstRate : (cgstRate + sgstRate);
     
@@ -226,8 +254,18 @@ export default function QuotationTable({
     { totalQty: 0, totalTaxable: 0, totalGst: 0, grandTotal: 0 }
   );
 
+  const addLabel =
+    lineType === "spare" ? "+ Add Spare" : "+ Add Product";
+
   return (
     <div className="overflow-x-auto border mt-4 rounded">
+      {lineType && LINE_TYPE_LABELS[lineType] ? (
+        <p className="px-3 py-2 text-xs font-medium text-gray-700 bg-gray-50 border-b">
+          Quotation type: {LINE_TYPE_LABELS[lineType]}
+          {lineType === "product" ? " — maximum 3 product lines." : null}
+          {lineType === "multi" ? " — add more than 3 products." : null}
+        </p>
+      ) : null}
       <table className="min-w-[900px] w-full text-sm text-left border">
         <thead className="bg-gray-100 text-xs font-semibold text-gray-700">
           <tr>
@@ -396,15 +434,17 @@ export default function QuotationTable({
         </tbody>
       </table>
 
-      <div className="mt-3 text-center">
-        <button
-          type="button"
-          onClick={addRow}
-          className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-700 text-sm"
-        >
-          + Add Product
-        </button>
-      </div>
+      {(maxRows == null || items.length < maxRows) && (
+        <div className="mt-3 text-center">
+          <button
+            type="button"
+            onClick={addRow}
+            className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-700 text-sm"
+          >
+            {addLabel}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
