@@ -16,6 +16,8 @@ function VchBadge({ type }) {
     Spare:         "bg-cyan-100 text-cyan-700",
     "Spare Purchase": "bg-cyan-100 text-cyan-800",
     Receipt:       "bg-green-100 text-green-700",
+    "Party Payment In": "bg-emerald-100 text-emerald-800",
+    "Party Payment Out": "bg-amber-100 text-amber-800",
     Journal:       "bg-blue-100 text-blue-700",
     Sales:         "bg-purple-100 text-purple-700",
     Purchase:      "bg-red-100 text-red-700",
