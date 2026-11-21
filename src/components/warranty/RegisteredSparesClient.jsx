@@ -22,6 +22,8 @@ const TABLE_HEADERS = [
   "Installed by",
   "Site",
   "Invoice",
+  "Completed by",
+  "Completed date",
   "Actions",
 ];
 
@@ -73,12 +75,26 @@ function installedByCell(row) {
   );
 }
 
+function completedByDisplay(row) {
+  const by = String(
+    row.installation_completed_by || row.completed_by || "",
+  ).trim();
+  return by || "—";
+}
+
+function completedDateDisplay(row) {
+  const raw = row.installation_completed_date || row.completed_date;
+  if (!raw) return "—";
+  return formatDate(raw);
+}
+
 export default function RegisteredSparesClient() {
   const [searchQuery, setSearchQuery] = useState("");
   const [modelFilter, setModelFilter] = useState("");
   const [stateFilter, setStateFilter] = useState("");
   const [registrationFilter, setRegistrationFilter] = useState("all");
   const [serialFilter, setSerialFilter] = useState("");
+  const [completedByFilter, setCompletedByFilter] = useState("all");
   const [allRows, setAllRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState("");
@@ -115,7 +131,27 @@ export default function RegisteredSparesClient() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, modelFilter, stateFilter, registrationFilter, serialFilter]);
+  }, [
+    searchQuery,
+    modelFilter,
+    stateFilter,
+    registrationFilter,
+    serialFilter,
+    completedByFilter,
+  ]);
+
+  const completedByOptions = useMemo(() => {
+    const names = new Set();
+    for (const row of allRows) {
+      const by = String(
+        row.installation_completed_by || row.completed_by || "",
+      ).trim();
+      if (by) names.add(by);
+    }
+    return [...names].sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: "base" }),
+    );
+  }, [allRows]);
 
   const serialStats = useMemo(() => {
     let missingSerial = 0;
@@ -147,6 +183,15 @@ export default function RegisteredSparesClient() {
       const st = String(row.state || "").toLowerCase();
       if (stateQ && !st.includes(stateQ)) return false;
 
+      const completedBy = String(
+        row.installation_completed_by || row.completed_by || "",
+      ).trim();
+      if (completedByFilter === "none") {
+        if (completedBy) return false;
+      } else if (completedByFilter !== "all") {
+        if (completedBy !== completedByFilter) return false;
+      }
+
       if (!q) return true;
       const hay = [
         row.product_name,
@@ -161,6 +206,8 @@ export default function RegisteredSparesClient() {
         row.contact,
         row.email,
         row.customer_address,
+        row.installation_completed_by,
+        row.completed_by,
       ]
         .filter(Boolean)
         .join(" ")
@@ -174,6 +221,7 @@ export default function RegisteredSparesClient() {
     stateFilter,
     registrationFilter,
     serialFilter,
+    completedByFilter,
   ]);
 
   const total = filteredRows.length;
@@ -338,6 +386,20 @@ export default function RegisteredSparesClient() {
           <option value="with">With serial number</option>
           <option value="without">Without serial number</option>
         </select>
+        <select
+          value={completedByFilter}
+          onChange={(e) => setCompletedByFilter(e.target.value)}
+          className="min-w-[10rem] w-full rounded border px-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 md:w-auto"
+          aria-label="Filter by completed by"
+        >
+          <option value="all">Completed by — All</option>
+          <option value="none">Not completed</option>
+          {completedByOptions.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="hidden w-full flex-grow overflow-hidden md:block">
@@ -476,6 +538,12 @@ export default function RegisteredSparesClient() {
                             ) : null}
                           </div>
                         </td>
+                        <td className="border-b border-gray-200 p-3 text-xs whitespace-nowrap">
+                          {completedByDisplay(r)}
+                        </td>
+                        <td className="border-b border-gray-200 p-3 text-xs whitespace-nowrap">
+                          {completedDateDisplay(r)}
+                        </td>
                         <td className="space-y-1 border-b border-gray-200 p-3">
                           {canOnSiteInstall(r) ? (
                             <button
@@ -572,6 +640,14 @@ function MotionCard({ row: r }) {
         {r.installed_by
           ? INSTALLED_BY_LABELS[r.installed_by] || r.installed_by
           : "—"}
+      </div>
+      <div>
+        <span className="font-semibold">Completed by:</span>{" "}
+        {completedByDisplay(r)}
+      </div>
+      <div>
+        <span className="font-semibold">Completed date:</span>{" "}
+        {completedDateDisplay(r)}
       </div>
       {r.order_id ? (
         <Link

@@ -74,6 +74,19 @@ function spareRecordSearchText(record) {
     .toLowerCase();
 }
 
+function ymdForInput(value) {
+  if (!value) return "";
+  const s = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
+}
+
+function todayYmd() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 function thirdPartyIdFromRecord(record) {
   const tpId =
     record?.third_party_engineer_id ??
@@ -99,6 +112,13 @@ export default function SpareRecordsClient() {
   const [assignedFilter, setAssignedFilter] = useState("all");
   const [submittedDateFrom, setSubmittedDateFrom] = useState("");
   const [submittedDateTo, setSubmittedDateTo] = useState("");
+
+  const [statusModal, setStatusModal] = useState(null);
+  const [statusModalPlannedDate, setStatusModalPlannedDate] = useState("");
+  const [statusModalCompletedBy, setStatusModalCompletedBy] = useState("");
+  const [statusModalCompletedDate, setStatusModalCompletedDate] = useState("");
+  const [statusModalError, setStatusModalError] = useState("");
+  const [statusModalSubmitting, setStatusModalSubmitting] = useState(false);
 
   const loadEngineers = useCallback(async () => {
     try {
@@ -210,29 +230,136 @@ export default function SpareRecordsClient() {
     return serviceEngineers;
   };
 
-  async function handleStatusChange(id, nextStatus) {
+  async function patchStatus(id, payload) {
     setSavingId(id);
-    setItems((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, status: nextStatus } : r)),
-    );
     try {
       const res = await fetch(`/api/warranty/spare-installation/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: nextStatus }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) {
         toast.error(data.message || "Update failed");
         load();
-        return;
+        return false;
       }
-      toast.success("Status updated");
+      return true;
     } catch {
       toast.error("Update failed");
       load();
+      return false;
     } finally {
       setSavingId(null);
+    }
+  }
+
+  function handleStatusSelect(row, nextStatus) {
+    const current = normalizeStatus(row.status);
+    const next = normalizeStatus(nextStatus);
+    if (current === "COMPLETED") return;
+    if (next === current) return;
+
+    if (next === "PLANNED") {
+      setStatusModal({ row, mode: "PLANNED" });
+      setStatusModalPlannedDate(ymdForInput(row.planned_date) || todayYmd());
+      setStatusModalError("");
+      return;
+    }
+    if (next === "COMPLETED") {
+      const assigned = engineerSelectValue(row.assigned_to);
+      setStatusModal({ row, mode: "COMPLETED" });
+      setStatusModalCompletedBy(
+        String(row.completed_by || "").trim() ||
+          (assigned !== "NOT ASSIGNED" ? assigned : ""),
+      );
+      setStatusModalCompletedDate(
+        ymdForInput(row.completed_date) || todayYmd(),
+      );
+      setStatusModalError("");
+      return;
+    }
+    void (async () => {
+      const ok = await patchStatus(row.id, { status: "PENDING" });
+      if (ok) {
+        setItems((prev) =>
+          prev.map((r) =>
+            r.id === row.id
+              ? { ...r, status: "PENDING", planned_date: null }
+              : r,
+          ),
+        );
+        toast.success("Status updated");
+      }
+    })();
+  }
+
+  function closeStatusModal() {
+    if (statusModalSubmitting) return;
+    setStatusModal(null);
+    setStatusModalError("");
+  }
+
+  async function submitStatusModal() {
+    if (!statusModal) return;
+    const { row, mode } = statusModal;
+
+    if (mode === "PLANNED") {
+      const plannedDate = statusModalPlannedDate.trim();
+      if (!plannedDate) {
+        setStatusModalError("Please select a planned date.");
+        return;
+      }
+      setStatusModalSubmitting(true);
+      setStatusModalError("");
+      const ok = await patchStatus(row.id, {
+        status: "PLANNED",
+        planned_date: plannedDate,
+      });
+      setStatusModalSubmitting(false);
+      if (ok) {
+        setItems((prev) =>
+          prev.map((r) =>
+            r.id === row.id
+              ? { ...r, status: "PLANNED", planned_date: plannedDate }
+              : r,
+          ),
+        );
+        toast.success("Planned date saved");
+        setStatusModal(null);
+      }
+      return;
+    }
+
+    const completedBy = statusModalCompletedBy.trim();
+    const completedDate = statusModalCompletedDate.trim();
+    if (!completedBy || !completedDate) {
+      setStatusModalError("Completed by and completed date are required.");
+      return;
+    }
+    setStatusModalSubmitting(true);
+    setStatusModalError("");
+    const ok = await patchStatus(row.id, {
+      status: "COMPLETED",
+      completed_by: completedBy,
+      completed_date: completedDate,
+    });
+    setStatusModalSubmitting(false);
+    if (ok) {
+      setItems((prev) =>
+        prev.map((r) =>
+          r.id === row.id
+            ? {
+                ...r,
+                status: "COMPLETED",
+                completed_by: completedBy,
+                completed_date: completedDate,
+              }
+            : r,
+        ),
+      );
+      toast.success("Marked completed");
+      setStatusModal(null);
     }
   }
 
@@ -499,26 +626,30 @@ export default function SpareRecordsClient() {
                       )}
                     </td>
                     <td className="p-3 text-xs">
-                      <select
-                        value={value}
-                        disabled={savingId === r.id}
-                        onChange={(e) =>
-                          handleStatusChange(r.id, e.target.value)
-                        }
-                        className={`min-w-[7.5rem] rounded border px-2 py-1.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                          value === "COMPLETED"
-                            ? "border-green-300 bg-green-50 text-green-800"
-                            : value === "PLANNED"
+                      {completed ? (
+                        <span className="inline-block min-w-[7.5rem] rounded border border-green-300 bg-green-50 px-2 py-1.5 text-xs font-semibold text-green-800">
+                          Completed
+                        </span>
+                      ) : (
+                        <select
+                          value={value}
+                          disabled={savingId === r.id}
+                          onChange={(e) =>
+                            handleStatusSelect(r, e.target.value)
+                          }
+                          className={`min-w-[7.5rem] rounded border px-2 py-1.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                            value === "PLANNED"
                               ? "border-amber-300 bg-amber-50 text-amber-900"
                               : "border-gray-300 bg-gray-50 text-gray-800"
-                        }`}
-                      >
-                        {STATUS_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
+                          }`}
+                        >
+                          {STATUS_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </td>
                     <td className="p-3 text-xs whitespace-nowrap">
                       {r.created_at
@@ -637,6 +768,100 @@ export default function SpareRecordsClient() {
                   disabled={assignSubmitting}
                 >
                   {assignSubmitting ? "Assigning..." : "Assign"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {statusModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm">
+          <div className="relative w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+            <button
+              type="button"
+              onClick={closeStatusModal}
+              className="absolute right-3 top-3 text-gray-400 hover:text-gray-700"
+              aria-label="Close"
+            >
+              ✕
+            </button>
+            <h3 className="mb-1 text-lg font-semibold text-gray-800">
+              {statusModal.mode === "PLANNED"
+                ? "Planned visit"
+                : "Complete installation"}
+            </h3>
+            <p className="mb-4 text-xs text-gray-500">
+              {statusModal.row.spare_item_name ||
+                statusModal.row.rs_product_name ||
+                "Spare"}{" "}
+              · {statusModal.row.serial_number || "—"}
+            </p>
+            <div className="space-y-4">
+              {statusModal.mode === "PLANNED" ? (
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    Planned date <span className="text-red-500">*</span>
+                  </label>
+                  <TypeableDateFilterInput
+                    value={statusModalPlannedDate}
+                    onChange={setStatusModalPlannedDate}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                      Completed by (service engineer){" "}
+                      <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                      value={statusModalCompletedBy}
+                      onChange={(e) =>
+                        setStatusModalCompletedBy(e.target.value)
+                      }
+                    >
+                      <option value="">— Select —</option>
+                      {engineerOptionsForRow(statusModal.row).map((eng) => (
+                        <option key={eng} value={eng}>
+                          {eng}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                      Completed date <span className="text-red-500">*</span>
+                    </label>
+                    <TypeableDateFilterInput
+                      value={statusModalCompletedDate}
+                      onChange={setStatusModalCompletedDate}
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    />
+                  </div>
+                </>
+              )}
+              {statusModalError ? (
+                <p className="text-sm text-red-600">{statusModalError}</p>
+              ) : null}
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={closeStatusModal}
+                  className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  disabled={statusModalSubmitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={submitStatusModal}
+                  className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-60"
+                  disabled={statusModalSubmitting}
+                >
+                  {statusModalSubmitting ? "Saving…" : "Save"}
                 </button>
               </div>
             </div>

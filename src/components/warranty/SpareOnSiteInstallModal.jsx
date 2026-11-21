@@ -5,7 +5,8 @@ import { X } from "lucide-react";
 import toast from "react-hot-toast";
 
 export default function SpareOnSiteInstallModal({ spare, onClose, onSuccess }) {
-  const [repList, setRepList] = useState([]);
+  const [engineers, setEngineers] = useState([]);
+  const [loadingEngineers, setLoadingEngineers] = useState(true);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     installation_address: spare?.customer_address || "",
@@ -23,10 +24,16 @@ export default function SpareOnSiteInstallModal({ spare, onClose, onSuccess }) {
   }, []);
 
   useEffect(() => {
-    fetch("/api/reps")
+    setLoadingEngineers(true);
+    fetch("/api/service-engineers/active", { cache: "no-store" })
       .then((r) => r.json())
-      .then((d) => setRepList(d.users || []))
-      .catch(() => setRepList([]));
+      .then((d) => {
+        const names =
+          d.users?.map((u) => u.username).filter(Boolean) || [];
+        setEngineers(names);
+      })
+      .catch(() => setEngineers([]))
+      .finally(() => setLoadingEngineers(false));
   }, []);
 
   function handleChange(e) {
@@ -155,18 +162,23 @@ export default function SpareOnSiteInstallModal({ spare, onClose, onSuccess }) {
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-semibold">Assign to User</label>
+            <label className="mb-1 block text-sm font-semibold">
+              Assign to (Service Engineer)
+            </label>
             <select
               name="username"
               value={form.username}
               onChange={handleChange}
               required
-              className="w-full rounded border border-gray-300 px-3 py-2"
+              disabled={loadingEngineers}
+              className="w-full rounded border border-gray-300 px-3 py-2 disabled:bg-gray-100"
             >
-              <option value="">-- Select User --</option>
-              {repList.map((rep) => (
-                <option key={rep.username} value={rep.username}>
-                  {rep.username}
+              <option value="">
+                {loadingEngineers ? "Loading…" : "-- Select engineer --"}
+              </option>
+              {engineers.map((name) => (
+                <option key={name} value={name}>
+                  {name}
                 </option>
               ))}
             </select>

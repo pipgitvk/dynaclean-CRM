@@ -1,3 +1,5 @@
+import { ensureSpareInstallationStatusColumns } from "@/lib/ensureSpareInstallationStatusColumns";
+
 let tableReady = false;
 
 export async function ensureSpareInstallationRecordsTable(conn) {
@@ -30,6 +32,8 @@ export async function ensureSpareInstallationRecordsTable(conn) {
       KEY idx_sir_status (status)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+
+  await ensureSpareInstallationStatusColumns(conn);
 
   tableReady = true;
 }
