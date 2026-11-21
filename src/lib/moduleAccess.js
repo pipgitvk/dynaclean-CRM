@@ -116,6 +116,7 @@ export const MODULE_TREE = [
     children: [
       { key: "warranty-console", label: "Register Product" },
       { key: "registered-products", label: "Registered Products" },
+      { key: "registered-spares", label: "Registered Spares" },
       { key: "service-followups", label: "Machine Follow-ups" },
       { key: "service-support-report", label: "Service Support Report" },
       { key: "warranty-map", label: "Map View" },
@@ -360,6 +361,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
     children: [
       { kind: "leaf", key: "warranty-console", label: "Register Product" },
       { kind: "leaf", key: "registered-products", label: "Registered Products" },
+      { kind: "leaf", key: "registered-spares", label: "Registered Spares" },
       { kind: "leaf", key: "service-followups", label: "Machine Follow-ups" },
       { kind: "leaf", key: "service-support-report", label: "Service Support Report" },
       { kind: "leaf", key: "service-records", label: "Service History" },

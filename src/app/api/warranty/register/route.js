@@ -3,8 +3,14 @@ import path from "path";
 import fs from "fs/promises";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { ensureWarrantySpareColumns } from "@/lib/ensureWarrantySpareColumns";
+import { insertRegisteredSpare } from "@/lib/insertRegisteredSpare";
 
 const SPARE_INSTALLED_BY = new Set(["videocall", "self_customer", "on_site"]);
+
+function isoDateOnly(d = new Date()) {
+  return d.toISOString().slice(0, 10);
+}
 
 export async function POST(req) {
   try {
@@ -123,13 +129,54 @@ export async function POST(req) {
 
     const installedBy = isSpareRegistration ? requiredFields.installed_by : null;
 
+    let installationCompletedBy = null;
+    let installationCompletedDate = null;
+    let spareInstallationStatus = null;
+    let installationDate = null;
+
+    if (isSpareRegistration && requiredFields.installed_by === "videocall") {
+      installationCompletedBy = String(f.installation_completed_by || "").trim();
+      installationCompletedDate = String(
+        f.installation_completed_date || "",
+      ).trim();
+      if (!installationCompletedBy || !installationCompletedDate) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Completed by (name) and completed date are required for videocall",
+          },
+          { status: 400 },
+        );
+      }
+    }
+
+    if (isSpareRegistration) {
+      if (requiredFields.installed_by === "on_site") {
+        spareInstallationStatus = "pending";
+      } else {
+        spareInstallationStatus = "completed";
+        if (requiredFields.installed_by === "self_customer") {
+          installationCompletedBy = String(f.contact_person || "Self customer").trim();
+          installationCompletedDate = String(f.invoice_date || "").trim() || isoDateOnly();
+        }
+        installationDate =
+          installationCompletedDate ||
+          String(f.invoice_date || "").trim() ||
+          isoDateOnly();
+      }
+    }
+
     const conn = await getDbConnection();
+    await ensureWarrantySpareColumns(conn);
     const sql = `INSERT INTO warranty_products
       (product_name, specification, model, serial_number, gstin, warranty_period,
        customer_name, email, contact, customer_address, state, invoice_number,
        invoice_date, invoice_file, report_file, quantity, contact_person, installed_by,
+       installation_completed_by, installation_completed_date, spare_installation_status,
+       installation_date,
        created_by, created_at, updated_by, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
     const now = new Date();
     const values = [
@@ -151,18 +198,37 @@ export async function POST(req) {
       f.quantity,
       f.contact_person,
       installedBy,
+      installationCompletedBy,
+      installationCompletedDate,
+      spareInstallationStatus,
+      installationDate,
       username,
       now,
       null,
       null,
     ].map((v) => (v === undefined ? null : v));
 
-    await conn.execute(sql, values);
+    const [insertResult] = await conn.execute(sql, values);
+    const warrantyProductId = Number(insertResult?.insertId) || null;
+
+    if (isSpareRegistration && warrantyProductId) {
+      await insertRegisteredSpare(conn, {
+        warrantyProductId,
+        form: f,
+        username,
+        spareInstallationStatus,
+        installationCompletedBy,
+        installationCompletedDate,
+      });
+    }
+
     console.log("Form Data:", f);
 
-    // await conn.end();
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      spare_installation_status: spareInstallationStatus,
+      warranty_product_id: warrantyProductId,
+    });
   } catch (err) {
     console.error("Error in POST /api/warranty/register:", err);
     return NextResponse.json(

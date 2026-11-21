@@ -69,6 +69,7 @@ export const MODULE_KEY_TO_URL = {
   // Service & After-Sales
   "warranty-console": "/admin-dashboard/warranty",
   "registered-products": "/admin-dashboard/warranty/products",
+  "registered-spares": "/admin-dashboard/warranty/spares",
   "service-followups": "/admin-dashboard/service-followups",
   "service-support-report": "/admin-dashboard/service-support-report",
   "warranty-map": "/admin-dashboard/warranty/map",

@@ -172,6 +172,9 @@ export default function WarrantyForm() {
         serial_number: d.serial_number,
         customer_name: d.customer_name,
         item_kind: d.item_kind,
+        dispatch_id: d.dispatch_id,
+        order_id: orderId.trim(),
+        quote_number: d.quote_number || orderDispatches[0]?.quote_number || "",
       },
       initialForm: dispatchToForm(d),
     }));
@@ -346,6 +349,12 @@ export default function WarrantyForm() {
             >
               Fill from Order ID
             </button>
+            <Link
+              href="/admin-dashboard/warranty/spares"
+              className="inline-block rounded-lg border border-indigo-200 bg-white px-5 py-3 text-indigo-700 shadow-sm transition-all duration-300 hover:bg-indigo-50"
+            >
+              Show Spares
+            </Link>
             <Link
               href="/admin-dashboard/warranty/products"
               className="inline-block rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 text-white shadow-md transition-all duration-300 hover:scale-105 hover:shadow-xl"

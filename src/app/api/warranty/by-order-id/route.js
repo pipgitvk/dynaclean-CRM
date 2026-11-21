@@ -102,6 +102,7 @@ export async function GET(req) {
          no.company_address AS customer_address,
          no.invoice_number AS invoice_number,
          no.invoice_date AS invoice_date,
+         no.quote_number AS quote_number,
          CASE
            WHEN EXISTS (
              SELECT 1 FROM products_list pl

@@ -59,8 +59,19 @@ export default function WarrantyRegistrationFormCard({
   const isSpareRegistration =
     itemMeta?.item_kind != null && itemMeta.item_kind !== "product";
 
+  const isVideocallSpare =
+    isSpareRegistration && form.installed_by === "videocall";
+
   const handleChange = (e) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    setForm((prev) => {
+      const next = { ...prev, [name]: value };
+      if (name === "installed_by" && value !== "videocall") {
+        next.installation_completed_by = "";
+        next.installation_completed_date = "";
+      }
+      return next;
+    });
   };
 
   const resetCard = () => {
@@ -73,6 +84,16 @@ export default function WarrantyRegistrationFormCard({
       toast.error("Installed by is required");
       return;
     }
+    if (isVideocallSpare) {
+      if (!String(form.installation_completed_by || "").trim()) {
+        toast.error("Completed by (name) is required for videocall");
+        return;
+      }
+      if (!String(form.installation_completed_date || "").trim()) {
+        toast.error("Completed date is required for videocall");
+        return;
+      }
+    }
     setSubmitting(true);
     try {
       const fd = new FormData();
@@ -83,6 +104,15 @@ export default function WarrantyRegistrationFormCard({
       fd.set("quantity", "1");
       if (itemMeta?.item_kind) {
         fd.set("item_kind", itemMeta.item_kind);
+      }
+      if (itemMeta?.dispatch_id != null && itemMeta.dispatch_id !== "") {
+        fd.set("dispatch_id", String(itemMeta.dispatch_id));
+      }
+      if (itemMeta?.order_id) {
+        fd.set("order_id", String(itemMeta.order_id));
+      }
+      if (itemMeta?.quote_number) {
+        fd.set("quote_number", String(itemMeta.quote_number));
       }
       if (isSpareRegistration) {
         fd.set("warranty_period", "");
@@ -100,7 +130,13 @@ export default function WarrantyRegistrationFormCard({
           form.product_name ||
           title ||
           "Product";
-        toast.success(`Registered: ${label}`);
+        if (isSpareRegistration && data.spare_installation_status === "completed") {
+          toast.success(`Spare registered & installation completed: ${label}`);
+        } else if (isSpareRegistration && data.spare_installation_status === "pending") {
+          toast.success(`Spare saved — on-site installation pending: ${label}`);
+        } else {
+          toast.success(`Registered: ${label}`);
+        }
         onRegistered?.();
       } else {
         toast.error("Error: " + (data.error || "Registration failed"));
@@ -221,6 +257,29 @@ export default function WarrantyRegistrationFormCard({
             </div>
           </fieldset>
         )}
+        {isVideocallSpare ? (
+          <>
+            <input
+              name="installation_completed_by"
+              value={form.installation_completed_by || ""}
+              onChange={handleChange}
+              placeholder="Completed by (name) *"
+              required
+              className="input-sleek rounded-md border border-gray-300 p-2 focus:border-blue-500 focus:ring-blue-500"
+            />
+            <TypeableDateFilterInput
+              value={form.installation_completed_date || ""}
+              onChange={(v) =>
+                handleChange({
+                  target: { name: "installation_completed_date", value: v },
+                })
+              }
+              placeholder="Completed date *"
+              required
+              className="input-sleek rounded-md border border-gray-300 p-2 focus:border-blue-500 focus:ring-blue-500"
+            />
+          </>
+        ) : null}
         <input name="quantity" type="hidden" value="1" readOnly />
         <input
           name="customer_name"
@@ -296,7 +355,10 @@ export default function WarrantyRegistrationFormCard({
             type="submit"
             disabled={
               submitting ||
-              (isSpareRegistration && !String(form.installed_by || "").trim())
+              (isSpareRegistration && !String(form.installed_by || "").trim()) ||
+              (isVideocallSpare &&
+                (!String(form.installation_completed_by || "").trim() ||
+                  !String(form.installation_completed_date || "").trim()))
             }
             className="w-full rounded-md bg-blue-600 px-6 py-2 font-medium text-white transition hover:bg-blue-700 disabled:opacity-60 sm:w-auto"
           >

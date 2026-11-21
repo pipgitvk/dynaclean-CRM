@@ -499,6 +499,13 @@ const allMenuItems = [
           icon: "ShieldCheck",
         },
         {
+          path: "/admin-dashboard/warranty/spares",
+          name: "Registered Spares",
+          moduleKey: "registered-spares",
+          roles: ["SUPERADMIN", "SERVICE SUPPORT"],
+          icon: "ShieldCheck",
+        },
+        {
           path: "/admin-dashboard/service-followups",
           name: "Machine Follow-ups",
           accessKey: "service-followups",
