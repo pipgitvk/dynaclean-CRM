@@ -6,6 +6,7 @@ import { Eye } from "lucide-react";
 import { listUpcomingInstallationServiceIds } from "@/components/installation/UpcomingInstallationServiceStatusColumn";
 import { listOpenInstallationSerialNumbers } from "@/lib/openInstallationServiceLineItems";
 import OpenInstallationServicesModal from "@/components/installation/OpenInstallationServicesModal";
+import { openInstallationViewMoreBtnClassCompact } from "@/components/installation/openInstallationViewMoreBtnClass";
 
 const LIST_PREVIEW_COUNT = 3;
 
@@ -77,7 +78,7 @@ export default function UpcomingInstallationReferenceIds({
                 <button
                   type="button"
                   onClick={() => setServicesModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-violet-700 shadow-sm hover:border-violet-200 hover:bg-violet-50"
+                  className={openInstallationViewMoreBtnClassCompact}
                   title={`View all ${serviceIds.length} services`}
                 >
                   <Eye className="h-3 w-3" aria-hidden />
@@ -102,7 +103,7 @@ export default function UpcomingInstallationReferenceIds({
               <button
                 type="button"
                 onClick={() => setSerialModalOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-0.5 font-sans text-[11px] font-semibold text-violet-700 shadow-sm hover:border-violet-200 hover:bg-violet-50"
+                className={`${openInstallationViewMoreBtnClassCompact} font-sans`}
                 title={`View all ${serials.length} serial numbers`}
               >
                 <Eye className="h-3 w-3" aria-hidden />

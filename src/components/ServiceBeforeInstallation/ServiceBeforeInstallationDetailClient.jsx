@@ -46,6 +46,10 @@ import OpenInstallationStatusColumn from "@/components/installation/OpenInstalla
 import OpenInstallationReportButton from "@/components/installation/OpenInstallationReportButton";
 import OpenInstallationServicesModal from "@/components/installation/OpenInstallationServicesModal";
 import { parseOpenInstallationDispatchItems } from "@/lib/openInstallationDispatchItems";
+import {
+  openInstallationViewMoreBtnClass,
+  openInstallationViewMoreBtnClassCompact,
+} from "@/components/installation/openInstallationViewMoreBtnClass";
 import { useWarrantyProductFollowup } from "@/components/warranty/WarrantyProductFollowupControls";
 
 const DEFAULT_PAGE_SIZE = 10;
@@ -490,7 +494,7 @@ function OpenInstallationModelCell({ row, dashboardBase = "" }) {
             <button
               type="button"
               onClick={() => setAllOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-violet-700 shadow-sm hover:border-violet-200 hover:bg-violet-50"
+              className={`${openInstallationViewMoreBtnClass} text-xs`}
               title={`View all ${items.length} products`}
             >
               <Eye className="h-3.5 w-3.5" aria-hidden />
@@ -1088,7 +1092,7 @@ function OpenInstallationReportButtons({ row, dashboardBase }) {
           <button
             type="button"
             onClick={() => setAllOpen(true)}
-            className="inline-flex items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-violet-700 shadow-sm hover:border-violet-200 hover:bg-violet-50"
+            className={`${openInstallationViewMoreBtnClass} justify-center`}
             title={`View all ${serviceIds.length} reports`}
           >
             <Eye className="h-3 w-3" aria-hidden />

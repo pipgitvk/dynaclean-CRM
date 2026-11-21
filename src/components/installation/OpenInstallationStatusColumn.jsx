@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Eye } from "lucide-react";
 import OpenInstallationServicesModal from "@/components/installation/OpenInstallationServicesModal";
+import { openInstallationViewMoreBtnClass } from "@/components/installation/openInstallationViewMoreBtnClass";
 import ServiceRecordStatusInlineCell from "@/components/services/ServiceRecordStatusInlineCell";
 import { OPEN_INSTALLATION_INLINE_STATUS_OPTIONS } from "@/lib/serviceRecordStatusPermissions";
 import { formatCrmDateOnly } from "@/lib/crmDateFormat";
@@ -158,7 +159,7 @@ export default function OpenInstallationStatusColumn({
           <button
             type="button"
             onClick={() => setAllStatusesOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-violet-700 shadow-sm hover:border-violet-200 hover:bg-violet-50"
+            className={openInstallationViewMoreBtnClass}
             title={`View all ${items.length} service statuses`}
           >
             <Eye className="h-3 w-3" aria-hidden />

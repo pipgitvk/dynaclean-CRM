@@ -1,4 +1,10 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
+import { Eye } from "lucide-react";
+import OpenInstallationServicesModal from "@/components/installation/OpenInstallationServicesModal";
+import { openInstallationViewMoreBtnClassCompact } from "@/components/installation/openInstallationViewMoreBtnClass";
 
 export function parseUpcomingInstallationServiceDetails(blob) {
   if (blob == null || String(blob).trim() === "") return [];
@@ -78,11 +84,48 @@ function formatScheduledDate(ymd) {
   });
 }
 
+const STATUS_PREVIEW_COUNT = 3;
+
+function ServiceStatusPreviewBlock({ item, serviceDetailsHrefBase }) {
+  return (
+    <div className="border-b border-gray-100 last:border-0 pb-1.5 last:pb-0">
+      <div>
+        <span className="text-gray-500 font-medium">ID:</span>{" "}
+        <Link
+          href={`${serviceDetailsHrefBase}/${item.serviceId}`}
+          className="text-purple-700 font-semibold hover:underline"
+        >
+          {item.serviceId}
+        </Link>
+      </div>
+      {item.status && item.status !== "—" ? (
+        <div className="mt-0.5">
+          <span
+            className={`inline-flex rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${serviceStatusBadgeClass(item.status)}`}
+          >
+            {item.status}
+          </span>
+        </div>
+      ) : null}
+      <div>
+        <span className="text-gray-500 font-medium">S Date:</span>{" "}
+        {formatScheduledDate(item.scheduledDate)}
+      </div>
+      <div>
+        <span className="text-gray-500 font-medium">Assigned:</span>{" "}
+        <span className="text-gray-800">{item.assignedTo}</span>
+      </div>
+    </div>
+  );
+}
+
 /** Service ID, status, scheduled date, assigned person from service_records. */
 export default function UpcomingInstallationServiceStatusColumn({
   record,
   serviceDetailsHrefBase = "/admin-dashboard/complete-service",
+  dashboardBase = "admin-dashboard",
 }) {
+  const [allOpen, setAllOpen] = useState(false);
   const items = parseUpcomingInstallationServiceDetails(record?.service_details);
 
   if (items.length === 0) {
@@ -105,41 +148,40 @@ export default function UpcomingInstallationServiceStatusColumn({
     );
   }
 
+  const hasMore = items.length > STATUS_PREVIEW_COUNT;
+  const visible = hasMore ? items.slice(0, STATUS_PREVIEW_COUNT) : items;
+  const hiddenCount = items.length - STATUS_PREVIEW_COUNT;
+
   return (
-    <div className="space-y-2 text-xs sm:text-sm leading-snug min-w-[11rem]">
-      {items.map((item) => (
-        <div
-          key={item.serviceId}
-          className="border-b border-gray-100 last:border-0 pb-1.5 last:pb-0"
-        >
-          <div>
-            <span className="text-gray-500 font-medium">ID:</span>{" "}
-            <Link
-              href={`${serviceDetailsHrefBase}/${item.serviceId}`}
-              className="text-purple-700 font-semibold hover:underline"
-            >
-              {item.serviceId}
-            </Link>
-          </div>
-          {item.status && item.status !== "—" ? (
-            <div className="mt-0.5">
-              <span
-                className={`inline-flex rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${serviceStatusBadgeClass(item.status)}`}
-              >
-                {item.status}
-              </span>
-            </div>
-          ) : null}
-          <div>
-            <span className="text-gray-500 font-medium">S Date:</span>{" "}
-            {formatScheduledDate(item.scheduledDate)}
-          </div>
-          <div>
-            <span className="text-gray-500 font-medium">Assigned:</span>{" "}
-            <span className="text-gray-800">{item.assignedTo}</span>
-          </div>
-        </div>
-      ))}
-    </div>
+    <>
+      <div className="space-y-2 text-xs sm:text-sm leading-snug min-w-[11rem]">
+        {visible.map((item) => (
+          <ServiceStatusPreviewBlock
+            key={item.serviceId}
+            item={item}
+            serviceDetailsHrefBase={serviceDetailsHrefBase}
+          />
+        ))}
+        {hasMore ? (
+          <button
+            type="button"
+            onClick={() => setAllOpen(true)}
+            className={openInstallationViewMoreBtnClassCompact}
+            title={`View all ${items.length} services`}
+          >
+            <Eye className="h-3 w-3" aria-hidden />
+            <span>+{hiddenCount} more</span>
+          </button>
+        ) : null}
+      </div>
+      <OpenInstallationServicesModal
+        isOpen={allOpen}
+        onClose={() => setAllOpen(false)}
+        title={`Services (${items.length})`}
+        row={record}
+        dashboardBase={dashboardBase}
+        showStatusEditor={false}
+      />
+    </>
   );
 }

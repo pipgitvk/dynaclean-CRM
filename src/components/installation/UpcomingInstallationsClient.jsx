@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Eye } from "lucide-react";
 import UpcomingInstallationStatusFilter from "@/components/installation/UpcomingInstallationStatusFilter";
 import UpcomingInstallationReferenceIds from "@/components/installation/UpcomingInstallationReferenceIds";
+import UpcomingInstallationProductsCell from "@/components/installation/UpcomingInstallationProductsCell";
 import UpcomingInstallationServiceStatusColumn from "@/components/installation/UpcomingInstallationServiceStatusColumn";
 import {
   getUpcomingInstallationExpectedDateDisplay,
@@ -39,11 +40,20 @@ function UpcomingInstallationDeliveryColumn({ record }) {
 
 export default function UpcomingInstallationsClient({
   orderLinkBase = "/admin-dashboard",
+  initialTypeFilter = "products",
+  registrationFilter = "",
+  pageTitle = "",
+  showTypeFilter = true,
 }) {
   const orderHref = (orderId) => `${orderLinkBase}/order/${orderId}`;
+  const dashboardBase = useMemo(
+    () => String(orderLinkBase || "/admin-dashboard").replace(/^\/+/, "").split("/")[0] || "admin-dashboard",
+    [orderLinkBase],
+  );
+  const serviceDetailsHrefBase = `${orderLinkBase.replace(/\/$/, "")}/complete-service`;
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState("products");
+  const [typeFilter, setTypeFilter] = useState(initialTypeFilter);
   const [statusFilter, setStatusFilter] = useState("all");
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -161,7 +171,12 @@ export default function UpcomingInstallationsClient({
     setLoading(true);
     setFetchError("");
     try {
-      const res = await fetch(`/api/installation/upcoming?type=${filter}`, {
+      const params = new URLSearchParams({ type: filter || "products" });
+      if (registrationFilter === "unregistered") {
+        params.set("registration", "unregistered");
+        params.set("type", "products");
+      }
+      const res = await fetch(`/api/installation/upcoming?${params.toString()}`, {
         cache: "no-store",
       });
       const isJson = (res.headers.get("content-type") || "").includes(
@@ -197,7 +212,7 @@ export default function UpcomingInstallationsClient({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [registrationFilter]);
 
   useEffect(() => {
     fetchData(typeFilter);
@@ -218,6 +233,7 @@ export default function UpcomingInstallationsClient({
         String(r.order_id),
         String(r.invoice_number ?? ""),
         String(r.service_id ?? ""),
+        String(r.serial_number ?? ""),
       ].some((val) => val && String(val).toLowerCase().includes(q));
     });
   }, [records, searchQuery, statusFilter]);
@@ -227,7 +243,16 @@ export default function UpcomingInstallationsClient({
   return (
     <div className="w-full max-w-full p-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-3xl font-bold">Upcoming Installations</h2>
+        <div>
+          <h2 className="text-3xl font-bold">
+            {pageTitle || "Upcoming Installations"}
+          </h2>
+          {registrationFilter === "unregistered" ? (
+            <p className="mt-1 text-sm text-amber-600">
+              Showing only unregistered products
+            </p>
+          ) : null}
+        </div>
         <p className="text-sm text-gray-600">
           Total: {filteredRecords.length}
           {searchQuery || statusFilter !== "all"
@@ -245,6 +270,7 @@ export default function UpcomingInstallationsClient({
           className="px-4 py-2 border rounded shadow-sm"
         />
 
+        {showTypeFilter ? (
         <div className="flex gap-3">
           <button
             type="button"
@@ -280,6 +306,7 @@ export default function UpcomingInstallationsClient({
             Spares
           </button>
         </div>
+        ) : null}
 
         <UpcomingInstallationStatusFilter
           value={statusFilter}
@@ -331,16 +358,16 @@ export default function UpcomingInstallationsClient({
                 <UpcomingInstallationReferenceIds
                   record={r}
                   className="text-sm"
+                  dashboardBase={dashboardBase}
                 />
               </div>
 
               <div className="space-y-1 text-sm">
-                <p>
-                  <b>Model:</b> {r.model}
-                </p>
-                <p>
-                  <b>Name:</b> {r.name}
-                </p>
+                <h4 className="text-xs font-semibold text-slate-600">Products</h4>
+                <UpcomingInstallationProductsCell
+                  record={r}
+                  dashboardBase={dashboardBase}
+                />
                 <p>
                   <b>Company:</b> {r.company_name}
                 </p>
@@ -359,7 +386,11 @@ export default function UpcomingInstallationsClient({
                 </div>
                 <div className="mt-1">
                   <b>Status:</b>
-                  <UpcomingInstallationServiceStatusColumn record={r} />
+                  <UpcomingInstallationServiceStatusColumn
+                    record={r}
+                    serviceDetailsHrefBase={serviceDetailsHrefBase}
+                    dashboardBase={dashboardBase}
+                  />
                 </div>
                 <p className={`${dateColor(r.installation_status)}`}>
                   <b>Days:</b> {formatUpcomingInstallationDays(r)}
@@ -396,8 +427,7 @@ export default function UpcomingInstallationsClient({
             <thead className="bg-gray-800 text-white">
               <tr>
                 <th className="p-3">Inv | Ord | Ser | S/N</th>
-                <th className="p-3">Model</th>
-                <th className="p-3">Name</th>
+                <th className="p-3">Products</th>
                 <th className="p-3">Delivery Address</th>
                 <th className="p-3">Company</th>
                 <th className="p-3">Contact</th>
@@ -420,10 +450,17 @@ export default function UpcomingInstallationsClient({
               {filteredRecords.map((r, i) => (
                 <tr key={i} className={getUpcomingInstallationRowClass(r)}>
                   <td className="p-3 font-semibold">
-                    <UpcomingInstallationReferenceIds record={r} />
+                    <UpcomingInstallationReferenceIds
+                      record={r}
+                      dashboardBase={dashboardBase}
+                    />
                   </td>
-                  <td className="p-3">{r.model}</td>
-                  <td className="p-3">{r.name}</td>
+                  <td className="p-3 align-top">
+                    <UpcomingInstallationProductsCell
+                      record={r}
+                      dashboardBase={dashboardBase}
+                    />
+                  </td>
                   <td className="p-3">{r.delivery_address}</td>
                   <td className="p-3">{r.company_name}</td>
                   <td className="p-3">{r.contact}</td>
@@ -435,7 +472,11 @@ export default function UpcomingInstallationsClient({
                     {formatUpcomingInstallationDays(r)}
                   </td>
                   <td className="p-3 align-top">
-                    <UpcomingInstallationServiceStatusColumn record={r} />
+                    <UpcomingInstallationServiceStatusColumn
+                    record={r}
+                    serviceDetailsHrefBase={serviceDetailsHrefBase}
+                    dashboardBase={dashboardBase}
+                  />
                   </td>
                   <td className="p-3 text-center">
                     {Number(r.warranty_registered) === 1 ? (
