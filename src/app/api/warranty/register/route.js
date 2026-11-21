@@ -4,6 +4,8 @@ import fs from "fs/promises";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 
+const SPARE_INSTALLED_BY = new Set(["videocall", "self_customer", "on_site"]);
+
 export async function POST(req) {
   try {
     const payload = await getSessionPayload();
@@ -52,11 +54,13 @@ export async function POST(req) {
     // Insert form data to DB
     const f = Object.fromEntries(formData.entries());
     
+    const itemKind = String(f.item_kind || "product").trim().toLowerCase();
+    const isSpareRegistration = itemKind !== "product";
+
     // Validation: Check for all required fields
     const requiredFields = {
       product_name: f.product_name?.trim(),
       serial_number: f.serial_number?.trim(),
-      warranty_period: f.warranty_period?.toString().trim(),
       customer_name: f.customer_name?.trim(),
       email: f.email?.trim(),
       contact_person: f.contact_person?.trim(),
@@ -66,6 +70,12 @@ export async function POST(req) {
       invoice_number: f.invoice_number?.trim(),
       invoice_date: f.invoice_date?.trim(),
     };
+
+    if (!isSpareRegistration) {
+      requiredFields.warranty_period = f.warranty_period?.toString().trim();
+    } else {
+      requiredFields.installed_by = String(f.installed_by || "").trim();
+    }
 
     // Check if any required fields are empty
     const missingFields = Object.keys(requiredFields).filter(
@@ -92,22 +102,34 @@ export async function POST(req) {
       );
     }
 
-    // Warranty period validation
-    const warrantyPeriod = parseInt(f.warranty_period);
-    if (isNaN(warrantyPeriod) || warrantyPeriod < 0) {
+    let warrantyPeriod = null;
+    if (!isSpareRegistration) {
+      warrantyPeriod = parseInt(f.warranty_period, 10);
+      if (Number.isNaN(warrantyPeriod) || warrantyPeriod < 0) {
+        return NextResponse.json(
+          { success: false, error: "Warranty period must be a positive number" },
+          { status: 400 },
+        );
+      }
+    } else if (!SPARE_INSTALLED_BY.has(requiredFields.installed_by)) {
       return NextResponse.json(
-        { success: false, error: "Warranty period must be a positive number" },
-        { status: 400 }
+        {
+          success: false,
+          error: "Installed by must be videocall, self customer, or on site",
+        },
+        { status: 400 },
       );
     }
+
+    const installedBy = isSpareRegistration ? requiredFields.installed_by : null;
 
     const conn = await getDbConnection();
     const sql = `INSERT INTO warranty_products
       (product_name, specification, model, serial_number, gstin, warranty_period,
        customer_name, email, contact, customer_address, state, invoice_number,
-       invoice_date, invoice_file, report_file, quantity, contact_person,
+       invoice_date, invoice_file, report_file, quantity, contact_person, installed_by,
        created_by, created_at, updated_by, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
     const now = new Date();
     const values = [
@@ -116,7 +138,7 @@ export async function POST(req) {
       f.model,
       f.serial_number,
       f.gstin || "",
-      f.warranty_period,
+      warrantyPeriod,
       f.customer_name,
       f.email,
       f.contact,
@@ -128,6 +150,7 @@ export async function POST(req) {
       reportNames.join(","),
       f.quantity,
       f.contact_person,
+      installedBy,
       username,
       now,
       null,
