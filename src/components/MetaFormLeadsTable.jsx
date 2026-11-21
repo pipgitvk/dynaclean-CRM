@@ -19,7 +19,17 @@ function ProductInterestBadge({ value, className = '' }) {
   );
 }
 
-export default function MetaFormLeadsTable({ formIds, productInterestByFormId = {}, appearance = 'default' }) {
+function getAssignedEmployeeName(lead) {
+  const name = String(lead?.employee_name || lead?.employeeName || '').trim();
+  if (name) return name;
+  return String(lead?.assigned_to || lead?.assignedTo || '').trim() || 'N/A';
+}
+
+export default function MetaFormLeadsTable({
+  formIds,
+  productInterestByFormId = {},
+  appearance = 'default',
+}) {
   const isHub = appearance === 'hub';
   const accentText = isHub ? 'text-violet-600' : 'text-blue-600';
   const focusRing = isHub ? 'focus:ring-violet-500' : 'focus:ring-blue-500';
@@ -29,27 +39,55 @@ export default function MetaFormLeadsTable({ formIds, productInterestByFormId = 
   const [leadCounts, setLeadCounts] = useState({});
   const [loading, setLoading] = useState({});
   const [importFilter, setImportFilter] = useState('all');
+  const [assignedToFilter, setAssignedToFilter] = useState('');
+  const [assigneeOptions, setAssigneeOptions] = useState([]);
   const [startDate, setStartDate] = useState(todayDefault.from);
   const [endDate, setEndDate] = useState(todayDefault.to);
   const [pagination, setPagination] = useState({});
   const [currentPage, setCurrentPage] = useState(0);
 
   useEffect(() => {
-    if (formIds && formIds.length > 0) {
-      // Load leads for all forms
-      formIds.forEach(formId => {
-        fetchLeadsForForm(formId);
-      });
+    if (!formIds?.length) {
+      setAssigneeOptions([]);
+      return;
     }
-  }, [formIds]);
+    let cancelled = false;
+    const params = {
+      assigneesOnly: '1',
+      formIds: formIds.join(','),
+    };
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    if (importFilter !== 'all') {
+      params.isImported = importFilter === 'imported';
+    }
+    axios
+      .get('/api/meta-leads', { params })
+      .then((res) => {
+        if (cancelled) return;
+        if (res.data?.success && Array.isArray(res.data.assignees)) {
+          setAssigneeOptions(res.data.assignees);
+        } else {
+          setAssigneeOptions([]);
+        }
+      })
+      .catch((err) => {
+        console.error('Error loading table assignees:', err);
+        if (!cancelled) setAssigneeOptions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [formIds, startDate, endDate, importFilter]);
 
   useEffect(() => {
     if (formIds && formIds.length > 0) {
-      formIds.forEach(formId => {
+      formIds.forEach((formId) => {
         fetchLeadsForForm(formId);
       });
     }
-  }, [importFilter, startDate, endDate, currentPage]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch when filters / page change
+  }, [formIds, importFilter, assignedToFilter, startDate, endDate, currentPage]);
 
   const fetchLeadsForForm = async (formId) => {
     try {
@@ -63,6 +101,9 @@ export default function MetaFormLeadsTable({ formIds, productInterestByFormId = 
       }
       if (endDate) {
         params.endDate = endDate;
+      }
+      if (assignedToFilter) {
+        params.assignedTo = assignedToFilter;
       }
       const response = await axios.get('/api/meta-leads', { params });
       if (response.data.success) {
@@ -135,6 +176,7 @@ export default function MetaFormLeadsTable({ formIds, productInterestByFormId = 
 
   const clearFilters = () => {
     setImportFilter('all');
+    setAssignedToFilter('');
     const today = resolveLeadsHubRange("today");
     setStartDate(today.from);
     setEndDate(today.to);
@@ -144,6 +186,12 @@ export default function MetaFormLeadsTable({ formIds, productInterestByFormId = 
   const formTotalsSum = useMemo(() => {
     return formIds.reduce((sum, formId) => sum + (pagination[formId]?.total ?? 0), 0);
   }, [formIds, pagination]);
+
+  const assigneeTotalLeads = useMemo(
+    () =>
+      assigneeOptions.reduce((sum, row) => sum + (Number(row.leadCount) || 0), 0),
+    [assigneeOptions],
+  );
 
   const handleNextPage = () => {
     setCurrentPage(prev => prev + 1);
@@ -199,12 +247,40 @@ export default function MetaFormLeadsTable({ formIds, productInterestByFormId = 
           <Filter className="w-4 h-4 text-gray-600" />
           <span className="font-medium text-gray-900">Filters</span>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="flex flex-col min-w-0">
+            <label className="text-xs font-medium text-gray-600 mb-1">Employee</label>
+            <select
+              value={assignedToFilter}
+              onChange={(e) => {
+                setAssignedToFilter(e.target.value);
+                setCurrentPage(0);
+              }}
+              className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${focusRing}`}
+            >
+              <option value="">All employees</option>
+              {assigneeOptions.map((row) => {
+                const value = String(row.assignedTo || '').trim();
+                const label = String(row.employeeName || value).trim();
+                const count = Number(row.leadCount) || 0;
+                if (!value) return null;
+                return (
+                  <option key={value} value={value}>
+                    {label} — {count.toLocaleString('en-IN')} lead
+                    {count === 1 ? '' : 's'}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
           <div className="flex flex-col min-w-0">
             <label className="text-xs font-medium text-gray-600 mb-1">Import Status</label>
             <select
               value={importFilter}
-              onChange={(e) => setImportFilter(e.target.value)}
+              onChange={(e) => {
+                setImportFilter(e.target.value);
+                setCurrentPage(0);
+              }}
               className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${focusRing}`}
             >
               <option value="all">All</option>
@@ -214,11 +290,25 @@ export default function MetaFormLeadsTable({ formIds, productInterestByFormId = 
           </div>
           <div className="flex flex-col min-w-0">
             <label className="text-xs font-medium text-gray-600 mb-1">Start Date</label>
-            <TypeableDateFilterInput value={startDate} onChange={setStartDate} className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${focusRing}`}/>
+            <TypeableDateFilterInput
+              value={startDate}
+              onChange={(v) => {
+                setStartDate(v);
+                setCurrentPage(0);
+              }}
+              className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${focusRing}`}
+            />
           </div>
           <div className="flex flex-col min-w-0">
             <label className="text-xs font-medium text-gray-600 mb-1">End Date</label>
-            <TypeableDateFilterInput value={endDate} onChange={setEndDate} className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${focusRing}`}/>
+            <TypeableDateFilterInput
+              value={endDate}
+              onChange={(v) => {
+                setEndDate(v);
+                setCurrentPage(0);
+              }}
+              className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${focusRing}`}
+            />
           </div>
           <button
             onClick={clearFilters}
@@ -228,6 +318,63 @@ export default function MetaFormLeadsTable({ formIds, productInterestByFormId = 
             Clear Filters
           </button>
         </div>
+        {assigneeOptions.length > 0 ? (
+          <div className="mt-3 border-t border-violet-100/80 pt-3">
+            <p className="mb-2 text-xs font-semibold text-slate-600">
+              Leads by employee
+              {assigneeTotalLeads > 0 ? (
+                <span className="ml-1 font-normal text-slate-500">
+                  ({assigneeTotalLeads.toLocaleString('en-IN')} total in range
+                  {formIds.length > 1 ? ', all linked forms' : ''})
+                </span>
+              ) : null}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setAssignedToFilter('');
+                  setCurrentPage(0);
+                }}
+                className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition ${
+                  !assignedToFilter
+                    ? isHub
+                      ? 'border-violet-400 bg-violet-600 text-white'
+                      : 'border-blue-500 bg-blue-600 text-white'
+                    : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                }`}
+              >
+                All — {assigneeTotalLeads.toLocaleString('en-IN')}
+              </button>
+              {assigneeOptions.map((row) => {
+                const value = String(row.assignedTo || '').trim();
+                const label = String(row.employeeName || value).trim();
+                const count = Number(row.leadCount) || 0;
+                if (!value) return null;
+                const active = assignedToFilter === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => {
+                      setAssignedToFilter(value);
+                      setCurrentPage(0);
+                    }}
+                    className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition ${
+                      active
+                        ? isHub
+                          ? 'border-violet-400 bg-violet-600 text-white'
+                          : 'border-blue-500 bg-blue-600 text-white'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                    }`}
+                  >
+                    {label} — {count.toLocaleString('en-IN')}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
         {formIds.length > 1 && formTotalsSum > 0 && (
           <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mt-3">
             Har form ka count alag hai — sab forms ko add karne se overlap ho sakta hai. Leads Manage →
@@ -309,7 +456,7 @@ export default function MetaFormLeadsTable({ formIds, productInterestByFormId = 
                             </p>
                             <p>
                               <span className="font-medium text-gray-500">Assigned: </span>
-                              {lead.assigned_to || lead.employee_name || 'N/A'}
+                              {getAssignedEmployeeName(lead)}
                             </p>
                             <p>
                               <span className="font-medium text-gray-500">Created: </span>
@@ -354,7 +501,7 @@ export default function MetaFormLeadsTable({ formIds, productInterestByFormId = 
                                 <ProductInterestBadge value={getLeadProductInterest(lead)} />
                               </td>
                               <td className="p-2 border font-semibold">
-                                {lead.assigned_to || lead.employee_name || 'N/A'}
+                                {getAssignedEmployeeName(lead)}
                               </td>
                               <td className="p-2 border">{renderLeadStatus(lead)}</td>
                               <td className="p-2 border text-xs whitespace-nowrap">

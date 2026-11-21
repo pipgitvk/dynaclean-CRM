@@ -49,18 +49,26 @@ function MetaCardDetailRow({
   valueClassName = "",
   labelClassName = "",
   rowClassName = "",
+  tone = "light",
 }) {
+  const isDark = tone === "dark";
   return (
     <div
-      className={`grid grid-cols-1 gap-0.5 border-b border-slate-100 py-2.5 last:border-0 sm:grid-cols-[10.5rem_minmax(0,1fr)] sm:items-center sm:gap-4 ${rowClassName}`}
+      className={`grid grid-cols-1 gap-0.5 border-b py-2.5 last:border-0 sm:grid-cols-[10.5rem_minmax(0,1fr)] sm:items-center sm:gap-4 ${
+        isDark ? "border-violet-500/35" : "border-slate-100"
+      } ${rowClassName}`}
     >
       <dt
-        className={`text-sm font-bold leading-snug text-slate-700 ${labelClassName}`}
+        className={`text-sm font-bold leading-snug ${
+          isDark ? "text-violet-100" : "text-slate-700"
+        } ${labelClassName}`}
       >
         {label}
       </dt>
       <dd
-        className={`min-w-0 text-[15px] font-semibold leading-snug text-slate-900 sm:text-base ${valueClassName}`}
+        className={`min-w-0 text-[15px] font-semibold leading-snug sm:text-base ${
+          isDark ? "text-white" : "text-slate-900"
+        } ${valueClassName}`}
       >
         {children}
       </dd>
@@ -135,7 +143,9 @@ export default function LeadsManageMetaCredentialCards({
   const [credentials, setCredentials] = useState(null);
   const [loading, setLoading] = useState(true);
   const [statsById, setStatsById] = useState({});
+  const [todayStatsById, setTodayStatsById] = useState({});
   const [statsLoading, setStatsLoading] = useState(false);
+  const todayRange = useMemo(() => resolveLeadsHubRange("today"), []);
 
   const [range, setRange] = useState("month");
   const monthDefaultResolved = useMemo(() => resolveLeadsHubRange("month"), []);
@@ -215,6 +225,28 @@ export default function LeadsManageMetaCredentialCards({
       cancelled = true;
     };
   }, [startDate, endDate]);
+
+  useEffect(() => {
+    let cancelled = false;
+    axios
+      .get("/api/leads-manage/meta-credential-stats", {
+        params: { from: todayRange.from, to: todayRange.to },
+      })
+      .then((res) => {
+        if (cancelled) return;
+        if (res.data?.success && res.data.byCredentialId) {
+          setTodayStatsById(res.data.byCredentialId);
+        } else {
+          setTodayStatsById({});
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setTodayStatsById({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [todayRange.from, todayRange.to]);
 
   const summaryTotals = useMemo(() => {
     return Object.values(statsById).reduce(
@@ -334,11 +366,16 @@ export default function LeadsManageMetaCredentialCards({
       </div>
 
       {isPage && !loading && credentials?.length ? (
-        <MetaSummaryKpiCard
-          rangeLabel={rangeLabel}
-          statsLoading={statsLoading}
-          summaryTotals={summaryTotals}
-        />
+        <>
+          <MetaSummaryKpiCard
+            rangeLabel={rangeLabel}
+            statsLoading={statsLoading}
+            summaryTotals={summaryTotals}
+          />
+          <p className="mb-1 text-xs text-slate-500">
+            Orange-tinted cards = leads received today (IST).
+          </p>
+        </>
       ) : null}
 
       {loading ? (
@@ -365,37 +402,91 @@ export default function LeadsManageMetaCredentialCards({
               distributed: 0,
               duplicate: 0,
             };
+            const todayStats = todayStatsById[credId] || { total: 0 };
+            const todayLeadCount = Number(todayStats.total) || 0;
+            const periodTotal = Number(stats.total) || 0;
+            const hasLeadsToday =
+              todayLeadCount > 0 || (range === "today" && periodTotal > 0);
+            const displayTodayCount =
+              todayLeadCount > 0 ? todayLeadCount : range === "today" ? periodTotal : 0;
+            const cardTone = "light";
             const leadStart = formatLeadReceivingStart(cred.leadReceivingStartAt);
 
             return (
               <Link
                 key={credId}
                 href={href}
-                className="group flex flex-col rounded-xl border border-violet-100/90 bg-gradient-to-br from-white to-violet-50/40 p-4 shadow-sm transition hover:border-violet-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+                className={
+                  hasLeadsToday
+                    ? "group flex flex-col rounded-xl border-2 border-orange-400/85 bg-gradient-to-br from-orange-200/90 via-orange-300/55 to-amber-300/65 p-4 shadow-md shadow-orange-400/30 ring-2 ring-orange-400/40 transition hover:border-orange-500 hover:from-orange-200 hover:to-amber-300/80 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-orange-400/45"
+                    : "group flex flex-col rounded-xl border border-violet-100/90 bg-gradient-to-br from-white to-violet-50/40 p-4 shadow-sm transition hover:border-violet-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+                }
               >
                 <div className="mb-3 flex items-start justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700 group-hover:bg-violet-200">
+                    <span
+                      className={
+                        hasLeadsToday
+                          ? "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-orange-600 text-white shadow-md shadow-orange-700/25"
+                          : "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700 group-hover:bg-violet-200"
+                      }
+                    >
                       <FileText className="h-4 w-4" aria-hidden />
                     </span>
                     <div className="min-w-0">
-                      <p className="truncate text-base font-bold text-slate-900 group-hover:text-violet-900">
+                      <p
+                        className={`truncate text-base font-bold ${
+                          hasLeadsToday
+                            ? "text-orange-950"
+                            : "text-slate-900 group-hover:text-violet-900"
+                        }`}
+                      >
                         {title}
                       </p>
-                      <p className="text-sm font-medium text-slate-600">
+                      <p
+                        className={`text-sm font-medium ${
+                          hasLeadsToday ? "text-orange-900/85" : "text-slate-600"
+                        }`}
+                      >
                         Leads in selected period:{" "}
-                        <span className="font-bold tabular-nums text-slate-900">
+                        <span
+                          className={`font-bold tabular-nums ${
+                            hasLeadsToday ? "text-orange-950" : "text-slate-900"
+                          }`}
+                        >
                           {statsLoading ? "…" : formatCount(stats.total)}
                         </span>
                       </p>
+                      {hasLeadsToday ? (
+                        <p className="mt-0.5 text-xs font-bold text-orange-800">
+                          Today:{" "}
+                          <span className="tabular-nums text-orange-950">
+                            {formatCount(displayTodayCount)}
+                          </span>{" "}
+                          lead{displayTodayCount === 1 ? "" : "s"} received
+                        </p>
+                      ) : null}
                     </div>
                   </div>
-                  <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-emerald-800">
-                    Active
-                  </span>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    {hasLeadsToday ? (
+                      <span className="rounded-full bg-orange-600 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm">
+                        Leads today
+                      </span>
+                    ) : null}
+                    <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-emerald-800">
+                      Active
+                    </span>
+                  </div>
                 </div>
 
-                <dl className="rounded-lg border border-slate-100 bg-white/95 px-3 py-0.5">
+                <dl
+                  className={
+                    hasLeadsToday
+                      ? "rounded-lg border border-orange-300/90 bg-orange-50/75 px-3 py-0.5 shadow-inner shadow-orange-200/40"
+                      : "rounded-lg border border-slate-100 bg-white/95 px-3 py-0.5"
+                  }
+                >
                   {formIds.length > 0 ? (
                     formIds.map((formId, idx) => (
                       <div
@@ -411,13 +502,21 @@ export default function LeadsManageMetaCredentialCards({
                             Form {idx + 1} of {formIds.length}
                           </p>
                         ) : null}
-                        <MetaCardDetailRow label="Form name">
-                          <span className="break-all font-mono text-sm font-bold text-violet-900">
+                        <MetaCardDetailRow label="Form name" tone={cardTone}>
+                          <span
+                            className={`break-all font-mono text-sm font-bold ${
+                              hasLeadsToday ? "text-orange-900" : "text-violet-900"
+                            }`}
+                          >
                             {formId}
                           </span>
                         </MetaCardDetailRow>
-                        <MetaCardDetailRow label="Product">
-                          <span className="break-words font-bold text-indigo-950">
+                        <MetaCardDetailRow label="Product" tone={cardTone}>
+                          <span
+                            className={`break-words font-bold ${
+                              hasLeadsToday ? "text-orange-950" : "text-indigo-950"
+                            }`}
+                          >
                             {resolveModelName(cred, formId)}
                           </span>
                         </MetaCardDetailRow>
@@ -425,19 +524,37 @@ export default function LeadsManageMetaCredentialCards({
                     ))
                   ) : (
                     <>
-                      <MetaCardDetailRow label="Form name">—</MetaCardDetailRow>
-                      <MetaCardDetailRow label="Product">—</MetaCardDetailRow>
+                      <MetaCardDetailRow label="Form name" tone={cardTone}>
+                        —
+                      </MetaCardDetailRow>
+                      <MetaCardDetailRow label="Product" tone={cardTone}>
+                        —
+                      </MetaCardDetailRow>
                     </>
                   )}
 
-                  <MetaCardDetailRow label="First lead received">
-                    <span className="font-bold tabular-nums text-slate-900">{leadStart}</span>
+                  <MetaCardDetailRow label="First lead received" tone={cardTone}>
+                    <span className="font-bold tabular-nums text-slate-900">
+                      {leadStart}
+                    </span>
                   </MetaCardDetailRow>
 
                   {rangeLabel ? (
-                    <p className="border-b border-slate-100 py-2.5 text-xs font-semibold text-slate-600">
+                    <p
+                      className={`border-b py-2.5 text-xs font-semibold ${
+                        hasLeadsToday
+                          ? "border-orange-200/80 text-orange-900/80"
+                          : "border-slate-100 text-slate-600"
+                      }`}
+                    >
                       Distribution counts for{" "}
-                      <span className="font-bold text-violet-800">{rangeLabel}</span>
+                      <span
+                        className={`font-bold ${
+                          hasLeadsToday ? "text-orange-800" : "text-violet-800"
+                        }`}
+                      >
+                        {rangeLabel}
+                      </span>
                     </p>
                   ) : null}
 

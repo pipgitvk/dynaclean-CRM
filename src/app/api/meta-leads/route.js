@@ -3,7 +3,8 @@ import {
   getAllLeads,
   countLeads,
   createLead,
-  getLeadByLeadgenId
+  getLeadByLeadgenId,
+  listDistinctAssigneesForFormIds,
 } from '@/lib/mysql/metaLeadModel';
 
 // GET all leads with optional filters
@@ -12,9 +13,33 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const assignedTo = searchParams.get('assignedTo');
     const formId = searchParams.get('formId');
+    const formIdsParam = searchParams.get('formIds');
+    const assigneesOnly = searchParams.get('assigneesOnly') === '1';
     const isImported = searchParams.get('isImported');
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
+
+    if (assigneesOnly) {
+      const formIds = formIdsParam
+        ? formIdsParam.split(',').map((id) => id.trim()).filter(Boolean)
+        : formId
+          ? [formId]
+          : [];
+      if (!formIds.length) {
+        return NextResponse.json(
+          { success: false, error: 'formId or formIds required' },
+          { status: 400 },
+        );
+      }
+      const assigneeFilters = {};
+      if (startDate) assigneeFilters.startDate = startDate;
+      if (endDate) assigneeFilters.endDate = endDate;
+      if (isImported !== null && isImported !== '') {
+        assigneeFilters.isImported = isImported === 'true';
+      }
+      const assignees = await listDistinctAssigneesForFormIds(formIds, assigneeFilters);
+      return NextResponse.json({ success: true, assignees });
+    }
     const limit = parseInt(searchParams.get('limit')) || 100;
     const skip = parseInt(searchParams.get('skip')) || 0;
     

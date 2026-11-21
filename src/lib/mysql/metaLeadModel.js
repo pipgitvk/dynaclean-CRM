@@ -424,6 +424,57 @@ async function markLeadAsImported(leadgenId, customerId) {
   return getLeadByLeadgenId(leadgenId);
 }
 
+async function listDistinctAssigneesForFormIds(formIds, filters = {}) {
+  const ids = [
+    ...new Set(
+      (Array.isArray(formIds) ? formIds : [])
+        .map((id) => String(id || '').trim())
+        .filter(Boolean),
+    ),
+  ];
+  if (!ids.length) return [];
+
+  const conn = await getDbConnection();
+  let query = `
+    SELECT assigned_to,
+           MAX(NULLIF(TRIM(employee_name), '')) AS employee_name,
+           COUNT(DISTINCT leadgen_id) AS lead_count
+    FROM meta_leads
+    WHERE form_id IN (${ids.map(() => '?').join(',')})
+      AND leadgen_id IS NOT NULL
+      AND TRIM(leadgen_id) != ''
+      AND assigned_to IS NOT NULL
+      AND TRIM(assigned_to) != ''
+  `;
+  const values = [...ids];
+
+  if (filters.isImported !== undefined) {
+    query += ' AND is_imported_to_crm = ?';
+    values.push(filters.isImported ? 1 : 0);
+  }
+  if (filters.startDate) {
+    query += ' AND DATE(created_at) >= ?';
+    values.push(filters.startDate);
+  }
+  if (filters.endDate) {
+    query += ' AND DATE(created_at) <= ?';
+    values.push(filters.endDate);
+  }
+
+  query += ' GROUP BY assigned_to ORDER BY lead_count DESC, employee_name ASC, assigned_to ASC';
+
+  const [rows] = await conn.execute(query, values);
+  return rows.map((row) => {
+    const assignedTo = String(row.assigned_to || '').trim();
+    const employeeName = String(row.employee_name || '').trim();
+    return {
+      assignedTo,
+      employeeName: employeeName || assignedTo,
+      leadCount: Number(row.lead_count) || 0,
+    };
+  });
+}
+
 async function findCredentialByFormId(formId) {
   const conn = await getDbConnection();
   const [rows] = await conn.execute(
@@ -452,4 +503,5 @@ module.exports = {
   pickLatestProductInterest,
   getEarliestLeadReceivedMap,
   pickEarliestLeadReceivedAt,
+  listDistinctAssigneesForFormIds,
 };
