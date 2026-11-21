@@ -44,13 +44,13 @@ export default function LeadsManageMetaFormViewClient({
   const [credential, setCredential] = useState(null);
   const [activeTab, setActiveTab] = useState("leads");
 
-  const [range, setRange] = useState("today");
-  const todayResolved = useMemo(() => resolveLeadsHubRange("today"), []);
-  const [customFrom, setCustomFrom] = useState(todayResolved.from);
-  const [customTo, setCustomTo] = useState(todayResolved.to);
+  const [range, setRange] = useState("month");
+  const monthDefaultResolved = useMemo(() => resolveLeadsHubRange("month"), []);
+  const [customFrom, setCustomFrom] = useState(monthDefaultResolved.from);
+  const [customTo, setCustomTo] = useState(monthDefaultResolved.to);
   const [appliedCustom, setAppliedCustom] = useState({
-    from: todayResolved.from,
-    to: todayResolved.to,
+    from: monthDefaultResolved.from,
+    to: monthDefaultResolved.to,
   });
 
   const [stats, setStats] = useState({ total: 0, distributed: 0, duplicate: 0 });

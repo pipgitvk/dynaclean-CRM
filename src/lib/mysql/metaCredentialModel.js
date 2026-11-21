@@ -1,5 +1,11 @@
 const { getDbConnection } = require('../db');
-const { countLeadsByCredentialId, getLatestProductInterestMap, pickLatestProductInterest } = require('./metaLeadModel');
+const {
+  countLeadsByCredentialId,
+  getLatestProductInterestMap,
+  pickLatestProductInterest,
+  getEarliestLeadReceivedMap,
+  pickEarliestLeadReceivedAt,
+} = require('./metaLeadModel');
 
 /**
  * Meta Credential Model (MySQL)
@@ -106,14 +112,28 @@ async function getAllCredentials(activeOnly = false) {
   }));
   const allFormIds = parsedRows.flatMap(({ formIds }) => formIds);
   let latestByFormId = new Map();
+  let earliestByFormId = new Map();
   try {
     latestByFormId = await getLatestProductInterestMap(allFormIds);
   } catch (error) {
     console.error('Error fetching latest product interest:', error);
   }
-  
+  try {
+    earliestByFormId = await getEarliestLeadReceivedMap(allFormIds);
+  } catch (error) {
+    console.error('Error fetching earliest lead received:', error);
+  }
+
   const credentials = await Promise.all(parsedRows.map(async ({ row, formIds }) => {
     const latestProductInterest = pickLatestProductInterest(formIds, latestByFormId);
+    const productInterestByFormId = {};
+    for (const fid of formIds) {
+      const entry = latestByFormId.get(String(fid));
+      if (entry?.products_interest) {
+        productInterestByFormId[fid] = entry.products_interest;
+      }
+    }
+    const leadReceivingStartAt = pickEarliestLeadReceivedAt(formIds, earliestByFormId);
     try {
       const leadsCount = await countLeadsByCredentialId(row.id);
       return {
@@ -128,6 +148,8 @@ async function getAllCredentials(activeOnly = false) {
         lastSyncStatus: row.last_sync_status,
         lastSyncMessage: row.last_sync_message,
         latestProductInterest,
+        productInterestByFormId,
+        leadReceivingStartAt,
         totalLeadsFetched: row.total_leads_fetched,
         totalLeadsImported: leadsCount,
         createdAt: row.created_at,
@@ -148,6 +170,8 @@ async function getAllCredentials(activeOnly = false) {
         lastSyncStatus: row.last_sync_status,
         lastSyncMessage: row.last_sync_message,
         latestProductInterest: null,
+        productInterestByFormId: {},
+        leadReceivingStartAt: null,
         totalLeadsFetched: row.total_leads_fetched,
         totalLeadsImported: 0,
         createdAt: row.created_at,

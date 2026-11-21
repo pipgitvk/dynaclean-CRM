@@ -57,6 +57,21 @@ export function getLeadsManageCards(dashboardBase) {
       chartColor: "#06b6d4",
     },
     {
+      id: "meta_leads",
+      title: "meta_leads",
+      subtitle: "Lead forms by Meta credential",
+      countKey: null,
+      href: `${base}/leads-manage/meta-leads`,
+      noTrend: true,
+      staticMetric: "Forms",
+      accent: "from-indigo-500 to-violet-600",
+      surface:
+        "bg-white/80 backdrop-blur-xl border-violet-200/50 shadow-[0_8px_30px_-8px_rgba(99,102,241,0.35)]",
+      glow: "bg-indigo-400/25",
+      iconSurface: "bg-gradient-to-br from-indigo-500 to-violet-600",
+      chartColor: "#6366f1",
+    },
+    {
       id: "bulk_reassign",
       title: "Bulk Reassign",
       subtitle: "Transfer leads between salespeople",

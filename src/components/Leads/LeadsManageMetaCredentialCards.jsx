@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import axios from "axios";
-import { CalendarDays, ChevronDown, FileText, Loader2, Tag } from "lucide-react";
+import { CalendarDays, ChevronDown, FileText, Loader2 } from "lucide-react";
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { metaCredentialsBase } from "@/lib/metaCredentialsPaths";
 import { LEADS_HUB_RANGE_OPTIONS, resolveLeadsHubRange } from "@/lib/leadsManageHubRange";
+import { formatCrmDatetimeForISTDisplay } from "@/lib/timezone";
 
 function credentialViewHref(dashboardBase, id) {
   return `/${dashboardBase}/leads-manage/meta-forms/${encodeURIComponent(String(id))}`;
@@ -16,23 +17,133 @@ function formatCount(n) {
   return Number(n || 0).toLocaleString("en-IN");
 }
 
+function formatLeadReceivingStart(value) {
+  if (!value) return "—";
+  return formatCrmDatetimeForISTDisplay(value) || "—";
+}
+
+function formatProductLabel(raw) {
+  if (raw == null || raw === "") return "—";
+  let s = String(raw).trim();
+  s = s.replace(/^[-–—\s]+/, "");
+  return s || "—";
+}
+
+function resolveModelName(cred, formId) {
+  const byForm = cred.productInterestByFormId || {};
+  const fromForm = byForm[formId] || byForm[String(formId)];
+  if (fromForm) return formatProductLabel(fromForm);
+  if (formIdsLength(cred) === 1 && cred.latestProductInterest) {
+    return formatProductLabel(cred.latestProductInterest);
+  }
+  return "—";
+}
+
+function formIdsLength(cred) {
+  return Array.isArray(cred.formIds) ? cred.formIds.length : 0;
+}
+
+function MetaCardDetailRow({
+  label,
+  children,
+  valueClassName = "",
+  labelClassName = "",
+  rowClassName = "",
+}) {
+  return (
+    <div
+      className={`grid grid-cols-1 gap-0.5 border-b border-slate-100 py-2.5 last:border-0 sm:grid-cols-[10.5rem_minmax(0,1fr)] sm:items-center sm:gap-4 ${rowClassName}`}
+    >
+      <dt
+        className={`text-sm font-bold leading-snug text-slate-700 ${labelClassName}`}
+      >
+        {label}
+      </dt>
+      <dd
+        className={`min-w-0 text-[15px] font-semibold leading-snug text-slate-900 sm:text-base ${valueClassName}`}
+      >
+        {children}
+      </dd>
+    </div>
+  );
+}
+
 const META_FORM_RANGE_OPTIONS = LEADS_HUB_RANGE_OPTIONS;
+
+function MetaSummaryKpiCard({ rangeLabel, statsLoading, summaryTotals }) {
+  const items = [
+    {
+      label: "Total lead received",
+      value: summaryTotals.total,
+      valueClass: "text-slate-900",
+      borderClass: "border-slate-200",
+    },
+    {
+      label: "Distribute to sales",
+      value: summaryTotals.distributed,
+      valueClass: "text-emerald-800",
+      borderClass: "border-emerald-300",
+      surfaceClass: "bg-emerald-50",
+      labelClass: "text-emerald-900",
+    },
+    {
+      label: "Duplicate leads",
+      value: summaryTotals.duplicate,
+      valueClass: "text-red-700",
+      borderClass: "border-red-300",
+      surfaceClass: "bg-red-50",
+      labelClass: "text-red-900",
+    },
+  ];
+
+  return (
+    <div className="mb-5 rounded-xl border border-violet-200/80 bg-gradient-to-br from-violet-50/60 to-white p-4 sm:p-5">
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-base font-bold text-slate-900 sm:text-lg">Summary</h2>
+        {rangeLabel ? (
+          <p className="text-sm font-semibold text-violet-800">{rangeLabel}</p>
+        ) : null}
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {items.map((item) => (
+          <div
+            key={item.label}
+            className={`rounded-xl border-2 px-4 py-4 text-center shadow-sm ${item.borderClass} ${item.surfaceClass || "bg-white"}`}
+          >
+            <p
+              className={`text-sm font-bold leading-snug sm:text-[15px] ${item.labelClass || "text-slate-700"}`}
+            >
+              {item.label}
+            </p>
+            <p
+              className={`mt-2 text-3xl font-bold tabular-nums tracking-tight sm:text-4xl ${item.valueClass}`}
+            >
+              {statsLoading ? "…" : formatCount(item.value)}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function LeadsManageMetaCredentialCards({
   dashboardBase = "admin-dashboard",
+  variant = "embedded",
 }) {
+  const isPage = variant === "page";
   const [credentials, setCredentials] = useState(null);
   const [loading, setLoading] = useState(true);
   const [statsById, setStatsById] = useState({});
   const [statsLoading, setStatsLoading] = useState(false);
 
-  const [range, setRange] = useState("today");
-  const todayResolved = useMemo(() => resolveLeadsHubRange("today"), []);
-  const [customFrom, setCustomFrom] = useState(todayResolved.from);
-  const [customTo, setCustomTo] = useState(todayResolved.to);
+  const [range, setRange] = useState("month");
+  const monthDefaultResolved = useMemo(() => resolveLeadsHubRange("month"), []);
+  const [customFrom, setCustomFrom] = useState(monthDefaultResolved.from);
+  const [customTo, setCustomTo] = useState(monthDefaultResolved.to);
   const [appliedCustom, setAppliedCustom] = useState({
-    from: todayResolved.from,
-    to: todayResolved.to,
+    from: monthDefaultResolved.from,
+    to: monthDefaultResolved.to,
   });
 
   const activeRange = useMemo(() => {
@@ -105,22 +216,63 @@ export default function LeadsManageMetaCredentialCards({
     };
   }, [startDate, endDate]);
 
+  const summaryTotals = useMemo(() => {
+    return Object.values(statsById).reduce(
+      (acc, row) => ({
+        total: acc.total + (Number(row?.total) || 0),
+        distributed: acc.distributed + (Number(row?.distributed) || 0),
+        duplicate: acc.duplicate + (Number(row?.duplicate) || 0),
+      }),
+      { total: 0, distributed: 0, duplicate: 0 },
+    );
+  }, [statsById]);
+
   if (!loading && credentials === null) {
-    return null;
+    if (!isPage) return null;
+    return (
+      <p className="py-8 text-center text-sm text-rose-600">
+        Could not load Meta credentials. Try again or check Meta credentials setup.
+      </p>
+    );
   }
 
   if (!loading && credentials?.length === 0) {
-    return null;
+    if (!isPage) return null;
+    return (
+      <p className="py-8 text-center text-sm text-slate-500">
+        No active Meta credentials. Add credentials under{" "}
+        <Link
+          href={metaCredentialsBase(`/${dashboardBase}/leads-manage`)}
+          className="font-medium text-violet-700 hover:underline"
+        >
+          Meta credentials
+        </Link>
+        .
+      </p>
+    );
   }
 
   return (
-    <div className="mt-6 border-t border-slate-200/90 pt-5">
+    <div
+      className={
+        isPage ? "space-y-1" : "mt-6 border-t border-slate-200/90 pt-5"
+      }
+    >
       <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h4 className="text-base font-bold text-slate-900">Meta lead forms</h4>
+          {!isPage ? (
+            <h4 className="text-base font-bold text-slate-900">Meta lead forms</h4>
+          ) : null}
           {rangeLabel ? (
-            <p className="mt-0.5 text-xs text-slate-500">
-              Counts for <span className="font-medium text-violet-700">{rangeLabel}</span>
+            <p
+              className={
+                isPage
+                  ? "text-sm text-slate-600"
+                  : "mt-0.5 text-xs text-slate-500"
+              }
+            >
+              Counts for{" "}
+              <span className="font-medium text-violet-700">{rangeLabel}</span>
             </p>
           ) : null}
         </div>
@@ -181,13 +333,27 @@ export default function LeadsManageMetaCredentialCards({
         </div>
       </div>
 
+      {isPage && !loading && credentials?.length ? (
+        <MetaSummaryKpiCard
+          rangeLabel={rangeLabel}
+          statsLoading={statsLoading}
+          summaryTotals={summaryTotals}
+        />
+      ) : null}
+
       {loading ? (
         <div className="flex items-center gap-2 py-6 text-sm text-slate-500">
           <Loader2 className="h-4 w-4 animate-spin text-violet-600" />
           Loading forms…
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div
+          className={
+            isPage
+              ? "grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
+              : "grid grid-cols-1 gap-3 sm:grid-cols-2"
+          }
+        >
           {credentials.map((cred) => {
             const credId = String(cred._id ?? cred.id ?? "");
             const href = credentialViewHref(dashboardBase, credId);
@@ -199,6 +365,7 @@ export default function LeadsManageMetaCredentialCards({
               distributed: 0,
               duplicate: 0,
             };
+            const leadStart = formatLeadReceivingStart(cred.leadReceivingStartAt);
 
             return (
               <Link
@@ -206,82 +373,97 @@ export default function LeadsManageMetaCredentialCards({
                 href={href}
                 className="group flex flex-col rounded-xl border border-violet-100/90 bg-gradient-to-br from-white to-violet-50/40 p-4 shadow-sm transition hover:border-violet-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-violet-500/30"
               >
-                <div className="mb-3 grid grid-cols-3 gap-2 rounded-lg border border-slate-100 bg-white/90 p-2 text-center">
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                      Total
-                    </p>
-                    <p className="text-lg font-bold tabular-nums text-slate-900">
-                      {statsLoading ? "…" : formatCount(stats.total)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600">
-                      Distributed
-                    </p>
-                    <p className="text-lg font-bold tabular-nums text-emerald-700">
-                      {statsLoading ? "…" : formatCount(stats.distributed)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-rose-600">
-                      Duplicate
-                    </p>
-                    <p className="text-lg font-bold tabular-nums text-rose-600">
-                      {statsLoading ? "…" : formatCount(stats.duplicate)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start justify-between gap-2">
+                <div className="mb-3 flex items-start justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2">
                     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700 group-hover:bg-violet-200">
                       <FileText className="h-4 w-4" aria-hidden />
                     </span>
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-slate-900 group-hover:text-violet-900">
+                      <p className="truncate text-base font-bold text-slate-900 group-hover:text-violet-900">
                         {title}
                       </p>
-                      <p className="text-xs text-slate-500">
-                        {formIds.length} form{formIds.length === 1 ? "" : "s"}
+                      <p className="text-sm font-medium text-slate-600">
+                        Leads in selected period:{" "}
+                        <span className="font-bold tabular-nums text-slate-900">
+                          {statsLoading ? "…" : formatCount(stats.total)}
+                        </span>
                       </p>
                     </div>
                   </div>
-                  <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800">
+                  <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-emerald-800">
                     Active
                   </span>
                 </div>
 
-                {formIds.length > 0 ? (
-                  <div className="mt-3 flex flex-wrap gap-1">
-                    {formIds.slice(0, 4).map((formId) => (
-                      <span
+                <dl className="rounded-lg border border-slate-100 bg-white/95 px-3 py-0.5">
+                  {formIds.length > 0 ? (
+                    formIds.map((formId, idx) => (
+                      <div
                         key={formId}
-                        className="max-w-full truncate rounded-md bg-violet-100/80 px-2 py-0.5 font-mono text-[10px] text-violet-900"
-                        title={formId}
+                        className={
+                          idx > 0
+                            ? "border-t border-dashed border-violet-100 pt-1"
+                            : ""
+                        }
                       >
-                        {formId}
-                      </span>
-                    ))}
-                    {formIds.length > 4 ? (
-                      <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">
-                        +{formIds.length - 4} more
-                      </span>
-                    ) : null}
-                  </div>
-                ) : (
-                  <p className="mt-3 text-xs text-slate-400">No form IDs</p>
-                )}
+                        {formIds.length > 1 ? (
+                          <p className="pb-0.5 pt-2 text-xs font-bold uppercase tracking-wide text-violet-700">
+                            Form {idx + 1} of {formIds.length}
+                          </p>
+                        ) : null}
+                        <MetaCardDetailRow label="Form name">
+                          <span className="break-all font-mono text-sm font-bold text-violet-900">
+                            {formId}
+                          </span>
+                        </MetaCardDetailRow>
+                        <MetaCardDetailRow label="Product">
+                          <span className="break-words font-bold text-indigo-950">
+                            {resolveModelName(cred, formId)}
+                          </span>
+                        </MetaCardDetailRow>
+                      </div>
+                    ))
+                  ) : (
+                    <>
+                      <MetaCardDetailRow label="Form name">—</MetaCardDetailRow>
+                      <MetaCardDetailRow label="Product">—</MetaCardDetailRow>
+                    </>
+                  )}
 
-                {cred.latestProductInterest ? (
-                  <p
-                    className="mt-2 flex items-center gap-1 truncate text-xs text-indigo-700"
-                    title={cred.latestProductInterest}
+                  <MetaCardDetailRow label="First lead received">
+                    <span className="font-bold tabular-nums text-slate-900">{leadStart}</span>
+                  </MetaCardDetailRow>
+
+                  {rangeLabel ? (
+                    <p className="border-b border-slate-100 py-2.5 text-xs font-semibold text-slate-600">
+                      Distribution counts for{" "}
+                      <span className="font-bold text-violet-800">{rangeLabel}</span>
+                    </p>
+                  ) : null}
+
+                  <MetaCardDetailRow
+                    label="Distributed to sales"
+                    labelClassName="text-emerald-900"
+                    rowClassName="-mx-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2"
+                    valueClassName="text-lg font-bold tabular-nums text-emerald-800"
                   >
-                    <Tag className="h-3 w-3 shrink-0" aria-hidden />
-                    <span className="truncate">{cred.latestProductInterest}</span>
-                  </p>
-                ) : null}
+                    {statsLoading ? "…" : formatCount(stats.distributed)}
+                  </MetaCardDetailRow>
+
+                  <MetaCardDetailRow
+                    label="Not distributed"
+                    labelClassName="text-red-900"
+                    rowClassName="-mx-1 rounded-lg border border-red-200 bg-red-50 px-2"
+                    valueClassName="text-lg font-bold tabular-nums text-red-700"
+                  >
+                    <span>
+                      {statsLoading ? "…" : formatCount(stats.duplicate)}
+                      <span className="ml-1 text-sm font-semibold text-red-600/90">
+                        (duplicate / pending)
+                      </span>
+                    </span>
+                  </MetaCardDetailRow>
+                </dl>
               </Link>
             );
           })}

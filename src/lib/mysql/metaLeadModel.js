@@ -371,6 +371,50 @@ function pickLatestProductInterest(formIds, latestByFormId) {
   return best?.products_interest || null;
 }
 
+/**
+ * Earliest meta_leads.created_at per form_id.
+ * @param {string[]} formIds
+ * @returns {Promise<Map<string, Date|string>>}
+ */
+async function getEarliestLeadReceivedMap(formIds = []) {
+  const unique = [
+    ...new Set(
+      (formIds || []).map((id) => String(id || "").trim()).filter(Boolean),
+    ),
+  ];
+  const map = new Map();
+  if (unique.length === 0) return map;
+
+  const conn = await getDbConnection();
+  const placeholders = unique.map(() => "?").join(",");
+  const [rows] = await conn.execute(
+    `SELECT form_id, MIN(created_at) AS first_at
+     FROM meta_leads
+     WHERE form_id IN (${placeholders})
+     GROUP BY form_id`,
+    unique,
+  );
+
+  for (const row of rows) {
+    if (row.first_at) {
+      map.set(String(row.form_id), row.first_at);
+    }
+  }
+  return map;
+}
+
+function pickEarliestLeadReceivedAt(formIds, earliestByFormId) {
+  let best = null;
+  for (const formId of formIds || []) {
+    const at = earliestByFormId.get(String(formId));
+    if (!at) continue;
+    if (!best || new Date(at) < new Date(best)) {
+      best = at;
+    }
+  }
+  return best;
+}
+
 async function markLeadAsImported(leadgenId, customerId) {
   const conn = await getDbConnection();
   await conn.execute(
@@ -405,5 +449,7 @@ module.exports = {
   countLeadsStatsForFormIds,
   countLeadsByCredentialId,
   getLatestProductInterestMap,
-  pickLatestProductInterest
+  pickLatestProductInterest,
+  getEarliestLeadReceivedMap,
+  pickEarliestLeadReceivedAt,
 };

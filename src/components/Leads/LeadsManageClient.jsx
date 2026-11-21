@@ -12,6 +12,7 @@ import {
   MousePointerClick,
   Store,
   ArrowLeftRight,
+  FileText,
   Target,
   TrendingDown,
   TrendingUp,
@@ -33,9 +34,7 @@ import {
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { getCurrentMonthThroughTodayIso } from "@/lib/crmDateFormat";
 import { getLeadsManageCards } from "@/lib/leadsManageHub";
-import { LEADS_HUB_RANGE_OPTIONS } from "@/lib/leadsManageHubRange";
-import LeadsManageMetaCredentialCards from "@/components/Leads/LeadsManageMetaCredentialCards";
-
+import { LEADS_HUB_RANGE_OPTIONS, resolveLeadsHubRange } from "@/lib/leadsManageHubRange";
 const CARD_ICONS = {
   social_media: Megaphone,
   google_ads: Globe,
@@ -43,6 +42,7 @@ const CARD_ICONS = {
   website_direct: MousePointerClick,
   manager_assigned: UserCheck,
   manager_assign: UserCog,
+  meta_leads: FileText,
   bulk_reassign: ArrowLeftRight,
 };
 
@@ -101,7 +101,15 @@ function CardWave({ color = "#8b5cf6", gradientId = "hub-wave" }) {
   );
 }
 
-function SourceKpiCard({ card, total, changePct, Icon, className = "", compact = false }) {
+function SourceKpiCard({
+  card,
+  total,
+  changePct,
+  Icon,
+  className = "",
+  compact = false,
+  compactHint = "",
+}) {
   if (compact) {
     return (
       <Link
@@ -120,11 +128,19 @@ function SourceKpiCard({ card, total, changePct, Icon, className = "", compact =
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-sm font-bold text-slate-900">{card.title}</h2>
+            {compactHint ? (
+              <p className="truncate text-[10px] font-semibold text-violet-700/90">{compactHint}</p>
+            ) : null}
             <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
               <span className="text-2xl font-bold tabular-nums leading-none tracking-tight text-slate-900">
                 {formatNum(total)}
               </span>
-              <ChangePill value={changePct} className="bg-white/95 px-2 py-0.5 text-xs shadow-sm" />
+              {changePct != null ? (
+                <ChangePill
+                  value={changePct}
+                  className="bg-white/95 px-2 py-0.5 text-xs shadow-sm"
+                />
+              ) : null}
             </div>
           </div>
         </div>
@@ -203,7 +219,17 @@ export default function LeadsManageClient({
     [cards],
   );
   const sourceCards = useMemo(
-    () => cards.filter((c) => c.id !== "manager_assigned" && c.id !== "bulk_reassign"),
+    () =>
+      cards.filter(
+        (c) =>
+          c.id !== "manager_assigned" &&
+          c.id !== "bulk_reassign" &&
+          c.id !== "meta_leads",
+      ),
+    [cards],
+  );
+  const metaLeadsCard = useMemo(
+    () => cards.find((c) => c.id === "meta_leads"),
     [cards],
   );
   const bulkReassignCard = useMemo(
@@ -214,6 +240,8 @@ export default function LeadsManageClient({
   const [range, setRange] = useState(initialDashboard?.range || "month");
   const [data, setData] = useState(initialDashboard);
   const [loading, setLoading] = useState(false);
+  const [metaLeadsMonthTotal, setMetaLeadsMonthTotal] = useState(null);
+  const [pendingReassignCount, setPendingReassignCount] = useState(null);
   const skipInitialFetch = useRef(Boolean(initialDashboard));
   const [customFrom, setCustomFrom] = useState(
     initialDashboard?.from || monthDefault.from,
@@ -256,6 +284,51 @@ export default function LeadsManageClient({
     if (range === "custom") return;
     loadDashboard();
   }, [range, loadDashboard]);
+
+  const metaMonthRange = useMemo(() => resolveLeadsHubRange("month"), []);
+
+  useEffect(() => {
+    let cancelled = false;
+    axios
+      .get("/api/leads-manage/meta-credential-stats", {
+        params: { from: metaMonthRange.from, to: metaMonthRange.to },
+      })
+      .then((res) => {
+        if (cancelled) return;
+        const byId = res.data?.byCredentialId || {};
+        const sum = Object.values(byId).reduce(
+          (acc, row) => acc + (Number(row?.total) || 0),
+          0,
+        );
+        setMetaLeadsMonthTotal(sum);
+      })
+      .catch(() => {
+        if (!cancelled) setMetaLeadsMonthTotal(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [metaMonthRange.from, metaMonthRange.to]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/pending-lead-reassign?summary=1")
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data?.success) {
+          setPendingReassignCount(Number(data.total || 0));
+        } else {
+          setPendingReassignCount(0);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPendingReassignCount(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const applyCustomRange = useCallback(() => {
     const { from, to } = customDraftRef.current;
@@ -314,12 +387,26 @@ export default function LeadsManageClient({
             </div>
           </div>
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+            {metaLeadsCard ? (
+              <SourceKpiCard
+                compact
+                card={metaLeadsCard}
+                total={metaLeadsMonthTotal ?? 0}
+                changePct={null}
+                compactHint={
+                  metaMonthRange.rangeLabel || "Current month (till today)"
+                }
+                Icon={FileText}
+                className="w-full sm:w-auto sm:min-w-[11rem] sm:max-w-[15rem]"
+              />
+            ) : null}
             {bulkReassignCard ? (
               <SourceKpiCard
                 compact
                 card={bulkReassignCard}
-                total={0}
+                total={pendingReassignCount ?? 0}
                 changePct={null}
+                compactHint="Pending re-assign"
                 Icon={ArrowLeftRight}
                 className="w-full sm:w-auto sm:min-w-[11rem] sm:max-w-[15rem]"
               />
@@ -371,7 +458,6 @@ export default function LeadsManageClient({
               rangeLabel={rangeLabel}
               loading={loading}
             />
-            <LeadsManageMetaCredentialCards dashboardBase={dashboardBase} />
           </CardPanel>
           <CardPanel className="xl:col-span-5">
             <LeadsSourcePie pieData={pieData} pieTotal={pieTotal} loading={loading} />
