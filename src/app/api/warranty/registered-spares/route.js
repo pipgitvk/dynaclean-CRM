@@ -1,6 +1,19 @@
 import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { getDbConnection } from "@/lib/db";
+import { ensureSpareInstallationRecordsTable } from "@/lib/ensureSpareInstallationRecordsTable";
+
+const SPARE_LIST_SELECT = `
+  SELECT rs.*,
+    CASE WHEN rs.warranty_product_id IS NOT NULL THEN 1 ELSE 0 END AS warranty_registered,
+    (
+      SELECT sir.id FROM spare_installation_records sir
+      WHERE sir.registered_spare_id = rs.id
+      ORDER BY sir.id DESC
+      LIMIT 1
+    ) AS install_request_id
+  FROM registered_spares rs
+`;
 
 const MAX_LIMIT = 500;
 
@@ -54,11 +67,8 @@ export async function GET(req) {
 
     if (all) {
       const [rows] = await pool.execute(
-        `SELECT *,
-          CASE WHEN warranty_product_id IS NOT NULL THEN 1 ELSE 0 END AS warranty_registered
-         FROM registered_spares
-         ${where}
-         ${orderBy}`,
+        `${SPARE_LIST_SELECT} ${where}
+         ORDER BY rs.warranty_product_id IS NULL DESC, rs.id DESC`,
         params,
       );
       let registered = 0;

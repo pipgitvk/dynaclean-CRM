@@ -24,6 +24,7 @@
     "migrate:registered-spares": "node scripts/migrate-registered-spares.js",
     "backfill:registered-spares": "node scripts/backfill-registered-spares.js",
     "sync:pending-registered-spares": "node scripts/sync-pending-registered-spares.js",
+    "migrate:spare-installation-records": "node scripts/migrate-spare-installation-records.js",
     "backfill:bulk-lead-reassign-history": "node scripts/backfill-bulk-lead-reassign-history.js",
     "build": "next build --turbopack",
     "build:webpack": "next build --webpack",

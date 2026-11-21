@@ -74,6 +74,7 @@ export const MODULE_KEY_TO_URL = {
   "service-support-report": "/admin-dashboard/service-support-report",
   "warranty-map": "/admin-dashboard/warranty/map",
   "service-records": "/admin-dashboard/view_service_reports",
+  "spare-installation-records": "/admin-dashboard/view_service_reports/spare-records",
   "upcoming-installations": "/admin-dashboard/view_service_reports/upcoming-installation",
   "service-map": "/admin-dashboard/view_service_reports/map",
   "amc-cmc": "/admin-dashboard/amc-cmc",

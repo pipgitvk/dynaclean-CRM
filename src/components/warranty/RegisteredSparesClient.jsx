@@ -3,6 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
+import { Toaster } from "react-hot-toast";
+import SpareOnSiteInstallModal from "@/components/warranty/SpareOnSiteInstallModal";
+
+const INSTALLED_BY_LABELS = {
+  videocall: "On videocall",
+  self_customer: "On self customer",
+  on_site: "On site",
+};
 
 const TABLE_HEADERS = [
   "Product / Model",
@@ -11,6 +19,7 @@ const TABLE_HEADERS = [
   "Order",
   "Company",
   "Registration",
+  "Installed by",
   "Site",
   "Invoice",
   "Actions",
@@ -46,6 +55,24 @@ function warrantyCell(row) {
   return <span className="font-semibold text-red-600">Not registered</span>;
 }
 
+function canOnSiteInstall(row) {
+  return (
+    String(row.installed_by || "").trim() === "on_site" &&
+    Number(row.warranty_registered) === 1 &&
+    !row.install_request_id
+  );
+}
+
+function installedByCell(row) {
+  const raw = String(row.installed_by || "").trim();
+  if (!raw) return <span className="text-gray-400">—</span>;
+  return (
+    <span className="text-gray-900">
+      {INSTALLED_BY_LABELS[raw] || raw.replace(/_/g, " ")}
+    </span>
+  );
+}
+
 export default function RegisteredSparesClient() {
   const [searchQuery, setSearchQuery] = useState("");
   const [modelFilter, setModelFilter] = useState("");
@@ -56,6 +83,7 @@ export default function RegisteredSparesClient() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [installSpare, setInstallSpare] = useState(null);
   const pageSize = 50;
 
   const loadOnce = useCallback(async () => {
@@ -233,6 +261,14 @@ export default function RegisteredSparesClient() {
 
   return (
     <div className="w-full max-w-full overflow-hidden p-6">
+      <Toaster position="top-center" />
+      {installSpare ? (
+        <SpareOnSiteInstallModal
+          spare={installSpare}
+          onClose={() => setInstallSpare(null)}
+          onSuccess={loadOnce}
+        />
+      ) : null}
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-3xl font-bold">Registered Spares</h2>
         <div className="text-right text-sm text-gray-600">
@@ -398,6 +434,9 @@ export default function RegisteredSparesClient() {
                         <td className="border-b border-gray-200 p-3">
                           {warrantyCell(r)}
                         </td>
+                        <td className="border-b border-gray-200 p-3 text-xs whitespace-nowrap">
+                          {installedByCell(r)}
+                        </td>
                         <td className="border-b border-gray-200 p-3">
                           <div className="space-y-1 text-xs">
                             {r.contact_person ? (
@@ -438,6 +477,23 @@ export default function RegisteredSparesClient() {
                           </div>
                         </td>
                         <td className="space-y-1 border-b border-gray-200 p-3">
+                          {canOnSiteInstall(r) ? (
+                            <button
+                              type="button"
+                              onClick={() => setInstallSpare(r)}
+                              className="mb-1 block w-full rounded-md bg-green-500 px-2 py-1 text-center text-xs text-white hover:bg-green-600"
+                            >
+                              Install
+                            </button>
+                          ) : null}
+                          {r.install_request_id ? (
+                            <Link
+                              href="/admin-dashboard/view_service_reports/spare-records"
+                              className="mb-1 block w-full rounded-md bg-slate-600 px-2 py-1 text-center text-xs text-white hover:bg-slate-700"
+                            >
+                              Spare Records
+                            </Link>
+                          ) : null}
                           {Number(r.warranty_registered) !== 1 && r.order_id ? (
                             <Link
                               href={`/admin-dashboard/warranty?order_id=${encodeURIComponent(r.order_id)}&mode=order`}
@@ -511,6 +567,12 @@ function MotionCard({ row: r }) {
         {r.serial_number || "Missing"}
       </div>
       <div>{warrantyCell(r)}</div>
+      <div>
+        <span className="font-semibold">Installed by:</span>{" "}
+        {r.installed_by
+          ? INSTALLED_BY_LABELS[r.installed_by] || r.installed_by
+          : "—"}
+      </div>
       {r.order_id ? (
         <Link
           href={`/admin-dashboard/warranty?order_id=${encodeURIComponent(r.order_id)}&mode=order`}

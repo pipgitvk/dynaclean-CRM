@@ -87,6 +87,14 @@ function isCompletedServiceStatus(status) {
   return s === "COMPLETED" || s === "COMPLETE";
 }
 
+function prefillField(service, key, fallback = "") {
+  const pf = service?.reportPrefill || {};
+  if (pf[key] !== undefined && pf[key] !== null && String(pf[key]).trim() !== "") {
+    return pf[key];
+  }
+  return fallback;
+}
+
 export default function ServiceForm({ service }) {
   const isNewReport = Boolean(service.isNewReport);
   const isReportLocked =
@@ -139,29 +147,46 @@ export default function ServiceForm({ service }) {
       : service.completed_date || dayjs().format("YYYY-MM-DD"),
     checklist: isNewReport ? [] : service.checklist?.split(",") || [],
     nature_of_complaint: isNewReport
-      ? ""
+      ? prefillField(service, "nature_of_complaint", "")
       : service.nature_of_complaint || service.nature_of_complaints || "",
-    observation: isNewReport ? "" : service.observation || "",
-    action_taken: isNewReport ? "" : service.action_taken || "",
+    observation: isNewReport
+      ? prefillField(service, "observation", "")
+      : service.observation || "",
+    action_taken: isNewReport
+      ? prefillField(service, "action_taken", "")
+      : service.action_taken || "",
     service_rating: isNewReport ? "" : service.service_rating || "",
     customer_feedback: isNewReport ? "" : service.customer_feedback || "",
     authorized_person_name: isNewReport
-      ? ""
+      ? prefillField(service, "authorized_person_name", "")
       : service.authorized_person_name || "",
     authorized_person_designation: isNewReport
       ? ""
       : service.authorized_person_designation || "",
     authorized_person_mobile: isNewReport
-      ? ""
+      ? prefillField(service, "authorized_person_mobile", "")
       : service.authorized_person_mobile || "",
-    customer_name: isNewReport ? "" : service.customer_name || "",
+    customer_name: isNewReport
+      ? prefillField(service, "customer_name", "")
+      : service.customer_name || "",
     customer_designation: isNewReport ? "" : service.customer_designation || "",
-    customer_mobile: isNewReport ? "" : service.customer_mobile || "",
+    customer_mobile: isNewReport
+      ? prefillField(service, "customer_mobile", "")
+      : service.customer_mobile || "",
     defects_found: isNewReport ? "" : service.defects_found || "",
-    engineers_remark: isNewReport ? "" : service.engineers_remark || "",
+    engineers_remark: isNewReport
+      ? prefillField(service, "engineers_remark", "")
+      : service.engineers_remark || "",
     // NEW: Fields for completion status
     completion_engineer_name: isNewReport
-      ? ""
+      ? prefillField(
+          service,
+          "completion_engineer_name",
+          service.assigned_to &&
+            String(service.assigned_to).toUpperCase() !== "NOT ASSIGNED"
+            ? service.assigned_to
+            : "",
+        )
       : service.completion_engineer_name ||
         service.authorized_person_name ||
         "",
@@ -176,7 +201,11 @@ export default function ServiceForm({ service }) {
         service.authorized_person_mobile ||
         "",
     completion_customer_name: isNewReport
-      ? ""
+      ? prefillField(
+          service,
+          "completion_customer_name",
+          prefillField(service, "customer_name", ""),
+        )
       : service.completion_customer_name || service.customer_name || "",
     completion_customer_designation: isNewReport
       ? ""
@@ -184,7 +213,11 @@ export default function ServiceForm({ service }) {
         service.customer_designation ||
         "",
     completion_customer_mobile: isNewReport
-      ? ""
+      ? prefillField(
+          service,
+          "completion_customer_mobile",
+          prefillField(service, "customer_mobile", ""),
+        )
       : service.completion_customer_mobile || service.customer_mobile || "",
     // NEW: Location fields
     latitude: "",
@@ -194,7 +227,14 @@ export default function ServiceForm({ service }) {
 
   const [spareParts, setSpareParts] = useState(
     isNewReport
-      ? [{ replaced: "", tobereplaced: "" }]
+      ? Array.isArray(service?.reportPrefill?.spareParts) &&
+        service.reportPrefill.spareParts.length > 0
+        ? service.reportPrefill.spareParts.map((p, index) => ({
+            replaced: p.replaced || "",
+            tobereplaced: p.tobereplaced || "",
+            id: index,
+          }))
+        : [{ replaced: "", tobereplaced: "" }]
       : service.spare_replaced && service.spare_to_be_replaced
         ? service.spare_replaced.split(",").map((replaced, index) => ({
             replaced,

@@ -526,6 +526,13 @@ const allMenuItems = [
           icon: "BookOpen",
         },
         {
+          path: "/admin-dashboard/view_service_reports/spare-records",
+          name: "Spare Records",
+          moduleKey: "spare-installation-records",
+          roles: ["SUPERADMIN", "SERVICE SUPPORT"],
+          icon: "BookOpen",
+        },
+        {
           path: "/admin-dashboard/view_service_reports/upcoming-installation",
           name: "Upcoming Installations",
           moduleKey: "upcoming-installations",
