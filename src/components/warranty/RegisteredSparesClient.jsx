@@ -326,8 +326,8 @@ export default function RegisteredSparesClient() {
           className="w-full rounded border px-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 md:w-auto"
         >
           <option value="all">All</option>
-          <option value="registered">Warranty registered</option>
-          <option value="unregistered">Not registered yet</option>
+          <option value="registered">Registered</option>
+          <option value="unregistered">Not registered</option>
         </select>
         <select
           value={serialFilter}
