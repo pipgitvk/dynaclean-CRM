@@ -1183,7 +1183,6 @@ export default function OrderTable({
         dateTo: appliedDateTo,
         createdBy: appliedCreatedByFilter,
         leadCampaign: appliedLeadCampaignFilter,
-        approvalStatus: appliedApprovalStatusFilter,
         itemLineType: appliedItemLineTypeFilter,
       };
 
@@ -1196,7 +1195,6 @@ export default function OrderTable({
         if (f.dateTo) params.set("dateTo", f.dateTo);
         if (f.createdBy) params.set("createdBy", f.createdBy);
         if (f.leadCampaign) params.set("leadCampaign", f.leadCampaign);
-        if (f.approvalStatus) params.set("approvalStatus", f.approvalStatus);
         if (f.itemLineType) params.set("itemLineType", f.itemLineType);
 
         const res = await fetch(
@@ -1223,7 +1221,6 @@ export default function OrderTable({
       appliedDateTo,
       appliedCreatedByFilter,
       appliedLeadCampaignFilter,
-      appliedApprovalStatusFilter,
       appliedItemLineTypeFilter,
       serviceSupportOnly,
     ],
@@ -1294,7 +1291,6 @@ export default function OrderTable({
         dateTo: nextTo,
         createdBy: createdByFilter,
         leadCampaign: leadCampaignFilter,
-        approvalStatus: approvalStatusFilter,
         itemLineType: itemLineTypeFilter,
       });
     }
@@ -1345,7 +1341,6 @@ export default function OrderTable({
     appliedDateTo,
     appliedCreatedByFilter,
     appliedLeadCampaignFilter,
-    appliedApprovalStatusFilter,
     appliedItemLineTypeFilter,
     fetchProductSpareTotals,
   ]);
@@ -2116,6 +2111,7 @@ export default function OrderTable({
   const amountSummaryScopeLabel = isRejectedOnlyView
     ? "Rejected orders only"
     : `Approved orders · ${statCardsDateLabel}`;
+  const productSpareScopeLabel = `Approved (excl. cancelled & rejected) · ${statCardsDateLabel}`;
 
   const getPaymentBadge = (paymentStatusRaw) => {
     const s = (paymentStatusRaw || "").toString().trim().toLowerCase();
@@ -2477,7 +2473,7 @@ export default function OrderTable({
                 Products total
               </p>
               <p className="text-[10px] text-indigo-600/90 mb-2 leading-tight">
-                {amountSummaryScopeLabel}
+                {productSpareScopeLabel}
                 {productSpareTotalsLoading ? (
                   <span className="ml-1 text-indigo-500">· Updating…</span>
                 ) : null}
@@ -2508,7 +2504,7 @@ export default function OrderTable({
                 Spares total
               </p>
               <p className="text-[10px] text-rose-600/90 mb-2 leading-tight">
-                {amountSummaryScopeLabel}
+                {productSpareScopeLabel}
                 {productSpareTotalsLoading ? (
                   <span className="ml-1 text-rose-500">· Updating…</span>
                 ) : null}

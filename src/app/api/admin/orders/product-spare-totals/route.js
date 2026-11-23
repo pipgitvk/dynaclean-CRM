@@ -25,7 +25,6 @@ export async function GET(req) {
     const dateTo = searchParams.get("dateTo")?.trim() || "";
     const createdBy = searchParams.get("createdBy")?.trim() || "";
     const leadCampaign = searchParams.get("leadCampaign")?.trim() || "";
-    const approvalStatus = searchParams.get("approvalStatus")?.trim() || "";
     const itemLineType = searchParams.get("itemLineType")?.trim() || "";
     const serviceSupportOnly = searchParams.get("serviceSupport") === "1";
 
@@ -50,7 +49,7 @@ export async function GET(req) {
         dateTo: range.dateTo,
         createdBy,
         leadCampaign,
-        approvalStatus,
+        approvalStatus: "",
       }),
     ]);
 
@@ -58,10 +57,7 @@ export async function GET(req) {
       orders,
       catalogByCode,
       spareCatalogByCode,
-      {
-        approvalStatusFilter: approvalStatus,
-        itemLineTypeFilter: itemLineType,
-      },
+      { itemLineTypeFilter: itemLineType },
     );
 
     return NextResponse.json({

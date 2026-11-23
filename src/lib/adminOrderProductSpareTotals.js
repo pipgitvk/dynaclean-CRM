@@ -1,12 +1,21 @@
+import {
+  getAdminOrderPaymentColumnAmount,
+  getAdminOrderTotalAmount,
+} from "@/lib/adminOrderAmounts";
+
 function normalizeApprovalStatus(status) {
   const s = (status ?? "").toString().trim().toLowerCase();
   if (!s || s === "null" || s === "undefined") return "pending";
   return s;
 }
 
+function isOrderCancelled(order) {
+  return Number(order?.is_cancelled) === 1;
+}
+
 function isOrderExcludedFromStatCards(order) {
   if (normalizeApprovalStatus(order.approval_status) === "rejected") return true;
-  if (order.is_cancelled) return true;
+  if (isOrderCancelled(order)) return true;
   return false;
 }
 
@@ -17,6 +26,25 @@ function normalizeModelCode(code) {
 function parseOrderLineItems(order) {
   if (Array.isArray(order?.line_items)) return order.line_items;
   return [];
+}
+
+function dedupeOrderLineItems(items) {
+  if (!Array.isArray(items) || !items.length) return [];
+  const seen = new Set();
+  const out = [];
+  for (const item of items) {
+    const key = [
+      normalizeModelCode(item?.item_code),
+      String(item?.item_name || "").trim(),
+      Number(item?.quantity) || 0,
+      lineItemTaxableAmount(item),
+      lineItemTotalAmount(item),
+    ].join("\u0001");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
 }
 
 function lineItemTaxableAmount(item) {
@@ -77,23 +105,68 @@ const EMPTY_TOTALS = {
   spares: { taxable: 0, total: 0 },
 };
 
+function splitOrderAmountsByProductSpare(
+  order,
+  items,
+  catalogByCode,
+  spareCatalogByCode,
+) {
+  const orderTaxable = getAdminOrderPaymentColumnAmount(order);
+  const orderTotal = getAdminOrderTotalAmount(order);
+
+  let productTaxable = 0;
+  let spareTaxable = 0;
+  let productTotal = 0;
+  let spareTotal = 0;
+
+  for (const item of items) {
+    const type = resolveLineItemCatalogType(item, catalogByCode, spareCatalogByCode);
+    const tax = lineItemTaxableAmount(item);
+    const tot = lineItemTotalAmount(item);
+    if (type === "spare") {
+      spareTaxable += tax;
+      spareTotal += tot;
+    } else {
+      productTaxable += tax;
+      productTotal += tot;
+    }
+  }
+
+  const taxWeight = productTaxable + spareTaxable;
+  const totalWeight = productTotal + spareTotal;
+
+  const products = { taxable: 0, total: 0 };
+  const spares = { taxable: 0, total: 0 };
+
+  const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+
+  if (taxWeight > 0) {
+    products.taxable = round2(orderTaxable * (productTaxable / taxWeight));
+    spares.taxable = round2(orderTaxable - products.taxable);
+  } else if (orderTaxable > 0) {
+    products.taxable = round2(orderTaxable);
+  }
+
+  if (totalWeight > 0) {
+    products.total = round2(orderTotal * (productTotal / totalWeight));
+    spares.total = round2(orderTotal - products.total);
+  } else if (orderTotal > 0) {
+    products.total = round2(orderTotal);
+  }
+
+  return { products, spares };
+}
+
 /**
- * Sum product vs spare line amounts for admin order list cards.
+ * Product vs spare split aligned to Amount Summary (order-level taxable / grand total).
  */
 export function computeAdminOrderProductSpareTotals(
   orders,
   catalogByCode,
   spareCatalogByCode,
-  {
-    approvalStatusFilter = "",
-    itemLineTypeFilter = "",
-    approvedOnly = true,
-  } = {},
+  { itemLineTypeFilter = "" } = {},
 ) {
   const list = Array.isArray(orders) ? orders : [];
-  const isRejectedOnlyView =
-    approvalStatusFilter.toString().trim().toLowerCase() === "rejected";
-  const requireApproved = approvedOnly && !isRejectedOnlyView;
 
   const acc = {
     products: { taxable: 0, total: 0 },
@@ -101,10 +174,10 @@ export function computeAdminOrderProductSpareTotals(
   };
 
   for (const order of list) {
-    if (requireApproved && normalizeApprovalStatus(order.approval_status) !== "approved") {
-      continue;
-    }
-    if (!isRejectedOnlyView && isOrderExcludedFromStatCards(order)) continue;
+    if (normalizeApprovalStatus(order.approval_status) !== "approved") continue;
+    if (isOrderExcludedFromStatCards(order)) continue;
+
+    const items = dedupeOrderLineItems(parseOrderLineItems(order));
 
     if (
       itemLineTypeFilter &&
@@ -118,15 +191,16 @@ export function computeAdminOrderProductSpareTotals(
       continue;
     }
 
-    const items = parseOrderLineItems(order);
-    if (!items.length) continue;
-
-    for (const item of items) {
-      const type = resolveLineItemCatalogType(item, catalogByCode, spareCatalogByCode);
-      const bucket = type === "spare" ? acc.spares : acc.products;
-      bucket.taxable += lineItemTaxableAmount(item);
-      bucket.total += lineItemTotalAmount(item);
-    }
+    const split = splitOrderAmountsByProductSpare(
+      order,
+      items,
+      catalogByCode,
+      spareCatalogByCode,
+    );
+    acc.products.taxable += split.products.taxable;
+    acc.products.total += split.products.total;
+    acc.spares.taxable += split.spares.taxable;
+    acc.spares.total += split.spares.total;
   }
 
   return acc;
