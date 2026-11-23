@@ -1021,7 +1021,13 @@ async function fetchOpenInstallationBreakdownByBuckets(conn, filters) {
   const cacheKey = openInstallationKpiCacheKey(kpiFilters, false);
   const cached = OPEN_INSTALLATION_KPI_CACHE.get(cacheKey);
   if (cached && Date.now() - cached.at < OPEN_INSTALLATION_KPI_TTL_MS) {
-    return cached.data;
+    const plannedReady = Number(cached.data?.installation_planned) > 0;
+    const othersReady =
+      Number(cached.data?.delivered_installation_pending) > 0 ||
+      Number(cached.data?.delivery_pending_after_dispatch) > 0 ||
+      Number(cached.data?.completed_installation) > 0 ||
+      Number(cached.data?.total) > 0;
+    if (plannedReady || !othersReady) return cached.data;
   }
 
   const data = parseOpenInstallationBreakdownRow(null);

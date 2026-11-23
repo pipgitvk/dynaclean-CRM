@@ -186,7 +186,10 @@ export default function ServiceBeforeInstallationKpiCard({
 }) {
   const Icon = SBI_CARD_ICONS[card.id] || Package;
   const seed = SBI_SPARK_SEED[card.id] ?? 1;
-  const numericTotal = loading ? 0 : Number(total) || 0;
+  const numericTotal = Number(total);
+  const hasNumber = total != null && total !== "" && Number.isFinite(numericTotal);
+  const waiting = !hasNumber || (Boolean(loading) && !(numericTotal > 0));
+  const displayTotal = hasNumber ? numericTotal : 0;
   const title =
     variant === "compact" && COMPACT_TITLES[card.id] ? COMPACT_TITLES[card.id] : card.title;
   const invertTrend = card.id === "overdue-delayed-installation" || card.id === "due-warranty-expiry";
@@ -239,18 +242,18 @@ export default function ServiceBeforeInstallationKpiCard({
                 <p className="mt-1 line-clamp-2 text-sm text-slate-500">{card.subtitle}</p>
               </div>
             </div>
-            {!loading && (
-              <SummarySparkline color={card.chartColor} value={numericTotal} seed={seed} />
-            )}
+            {!waiting && hasNumber ? (
+              <SummarySparkline color={card.chartColor} value={displayTotal} seed={seed} />
+            ) : null}
           </div>
 
           <div className="mt-auto pt-5">
             <span className="text-4xl font-bold tabular-nums tracking-tight text-slate-900 sm:text-[2.65rem]">
-              {loading ? "…" : formatSbiNum(total)}
+              {waiting ? "…" : formatSbiNum(displayTotal)}
             </span>
             {showTrend ? (
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                {!loading && (
+                {!waiting && (
                   <ChangePill
                     value={changePct}
                     invertTrend={invertTrend}
@@ -264,11 +267,11 @@ export default function ServiceBeforeInstallationKpiCard({
         </div>
       ) : (
         <>
-          {!loading ? (
+          {!waiting && hasNumber ? (
             <div className="pointer-events-none absolute right-2 top-2.5 z-20 sm:right-3 sm:top-3">
               <SummarySparkline
                 color={card.chartColor}
-                value={numericTotal}
+                value={displayTotal}
                 seed={seed}
                 size="compact"
               />
@@ -288,9 +291,9 @@ export default function ServiceBeforeInstallationKpiCard({
             <div className="mt-2 min-w-0">
               <div className="flex flex-wrap items-end gap-2">
                 <span className="text-[1.75rem] font-bold leading-none tabular-nums tracking-tight text-slate-900 sm:text-[2.125rem]">
-                  {loading ? "…" : formatSbiNum(total)}
+                  {waiting ? "…" : formatSbiNum(displayTotal)}
                 </span>
-                {!loading && showTrend ? (
+                {!waiting && showTrend ? (
                   <ChangePill
                     value={changePct}
                     invertTrend={invertTrend}

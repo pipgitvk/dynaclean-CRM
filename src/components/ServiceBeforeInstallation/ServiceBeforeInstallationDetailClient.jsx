@@ -1592,12 +1592,12 @@ export default function ServiceBeforeInstallationDetailClient({
   const applyListTotalRef = useRef(null);
   const servicesEnrichRequestIdRef = useRef(0);
   const openInstallationBreakdownRef = useRef({
-    delivered_installation_pending: 0,
-    delivery_pending_after_dispatch: 0,
-    installation_planned: 0,
-    completed_installation: 0,
-    feedback_collected: 0,
-    total: 0,
+    delivered_installation_pending: null,
+    delivery_pending_after_dispatch: null,
+    installation_planned: null,
+    completed_installation: null,
+    feedback_collected: null,
+    total: null,
   });
   const [loading, setLoading] = useState(true);
   const [applyingFilters, setApplyingFilters] = useState(false);
@@ -1608,15 +1608,22 @@ export default function ServiceBeforeInstallationDetailClient({
     installation_completed: 0,
   });
   const [openInstallationBreakdown, setOpenInstallationBreakdown] = useState({
-    delivered_installation_pending: 0,
-    delivery_pending_after_dispatch: 0,
-    installation_planned: 0,
-    completed_installation: 0,
-    feedback_collected: 0,
-    total: 0,
+    delivered_installation_pending: null,
+    delivery_pending_after_dispatch: null,
+    installation_planned: null,
+    completed_installation: null,
+    feedback_collected: null,
+    total: null,
   });
-  const [openInstallationKpiLoading, setOpenInstallationKpiLoading] = useState(false);
-  const [feedbackCollectedKpiLoading, setFeedbackCollectedKpiLoading] = useState(false);
+  const [openInstallationKpiLoading, setOpenInstallationKpiLoading] = useState(
+    () => segment === "open-installation",
+  );
+  const [plannedKpiLoading, setPlannedKpiLoading] = useState(
+    () => segment === "open-installation",
+  );
+  const [feedbackCollectedKpiLoading, setFeedbackCollectedKpiLoading] = useState(
+    () => segment === "open-installation",
+  );
   openInstallationBreakdownRef.current = openInstallationBreakdown;
 
   useEffect(() => {
@@ -1658,14 +1665,19 @@ export default function ServiceBeforeInstallationDetailClient({
   );
   applyListTotalRef.current = applyListTotal;
 
-  const patchFeedbackCollected = useCallback((total) => {
-    const n = Number(total || 0);
+  const patchBreakdownField = useCallback((field, total) => {
+    const n = Number(total);
+    if (!Number.isFinite(n)) return;
     setOpenInstallationBreakdown((prev) => {
-      const next = { ...prev, feedback_collected: n };
+      const next = { ...prev, [field]: n };
       openInstallationBreakdownRef.current = next;
       return next;
     });
   }, []);
+
+  const patchFeedbackCollected = useCallback((total) => {
+    patchBreakdownField("feedback_collected", total);
+  }, [patchBreakdownField]);
 
   /** Google feedback collected count — does not block list / other KPI cards. */
   const fetchFeedbackCollectedKpiCount = useCallback(
@@ -1682,7 +1694,7 @@ export default function ServiceBeforeInstallationDetailClient({
             skip: 0,
           },
           signal,
-          timeout: 15_000,
+          timeout: 20_000,
         });
         if (res.data?.success) {
           const n = Number(
@@ -1692,14 +1704,66 @@ export default function ServiceBeforeInstallationDetailClient({
           if (String(appliedFilters.openInstallationBucket || "").trim() === "feedback_collected") {
             applyListTotal(n);
           }
+        } else {
+          setOpenInstallationBreakdown((prev) => {
+            if (prev.feedback_collected != null) return prev;
+            const next = { ...prev, feedback_collected: 0 };
+            openInstallationBreakdownRef.current = next;
+            return next;
+          });
         }
       } catch (e) {
         if (e?.code !== "ERR_CANCELED") console.error(e);
+        setOpenInstallationBreakdown((prev) => {
+          if (prev.feedback_collected != null) return prev;
+          const next = { ...prev, feedback_collected: 0 };
+          openInstallationBreakdownRef.current = next;
+          return next;
+        });
       } finally {
         if (!signal?.aborted) setFeedbackCollectedKpiLoading(false);
       }
     },
     [segment, appliedFilters, patchFeedbackCollected, applyListTotal],
+  );
+
+  const fetchPlannedKpiCount = useCallback(
+    async (signal) => {
+      if (segment !== "open-installation") return;
+      const { openInstallationBucket: _bucket, ...kpiFilters } = appliedFilters;
+      setPlannedKpiLoading(true);
+      try {
+        const res = await axios.get(
+          "/api/service-before-installation/open-installation/kpi/planned",
+          {
+            params: { ...kpiFilters, openInstallationBucket: "" },
+            signal,
+            timeout: 20_000,
+          },
+        );
+        if (res.data?.success) {
+          patchBreakdownField("installation_planned", res.data.installation_planned);
+        } else {
+          setOpenInstallationBreakdown((prev) => {
+            if (prev.installation_planned != null) return prev;
+            const next = { ...prev, installation_planned: 0 };
+            openInstallationBreakdownRef.current = next;
+            return next;
+          });
+        }
+      } catch (e) {
+        if (e?.code !== "ERR_CANCELED") console.error(e);
+        setOpenInstallationBreakdown((prev) => {
+          if (prev.installation_planned != null) return prev;
+          const next = { ...prev, installation_planned: 0 };
+          openInstallationBreakdownRef.current = next;
+          return next;
+        });
+      } finally {
+        if (!signal?.aborted) setPlannedKpiLoading(false);
+      }
+    },
+    [segment, appliedFilters, patchBreakdownField],
   );
 
   /** Cards API only — does not load table rows. */
@@ -1714,14 +1778,18 @@ export default function ServiceBeforeInstallationDetailClient({
     kpiFetchAbortRef.current = controller;
 
     setOpenInstallationKpiLoading(true);
+    setPlannedKpiLoading(true);
+    setFeedbackCollectedKpiLoading(true);
     const { openInstallationBucket: _bucket, ...kpiFilters } = appliedFilters;
+    void fetchFeedbackCollectedKpiCount(controller.signal);
+    void fetchPlannedKpiCount(controller.signal);
     try {
       const res = await axios.get(
         "/api/service-before-installation/open-installation/kpi",
         {
           params: { ...kpiFilters, openInstallationBucket: "" },
           signal: controller.signal,
-          timeout: 12_000,
+          timeout: 25_000,
         },
       );
       if (requestId !== kpiRequestIdRef.current) return;
@@ -1730,15 +1798,22 @@ export default function ServiceBeforeInstallationDetailClient({
         kpiFetchedKeyRef.current = filterKey;
         setOpenInstallationBreakdown((prev) => {
           const next = {
-            ...br,
-            installation_planned: Math.max(
-              Number(prev.installation_planned) || 0,
-              Number(br.installation_planned) || 0,
-            ),
+            ...prev,
+            delivered_installation_pending:
+              br.delivered_installation_pending ?? prev.delivered_installation_pending,
+            delivery_pending_after_dispatch:
+              br.delivery_pending_after_dispatch ?? prev.delivery_pending_after_dispatch,
+            completed_installation:
+              br.completed_installation ?? prev.completed_installation,
+            total: br.total ?? prev.total,
+            installation_planned:
+              Number(br.installation_planned) > 0
+                ? Number(br.installation_planned)
+                : prev.installation_planned,
             feedback_collected:
               Number(prev.feedback_collected) > 0
                 ? Number(prev.feedback_collected)
-                : Number(br.feedback_collected || 0),
+                : prev.feedback_collected,
           };
           openInstallationBreakdownRef.current = next;
           return next;
@@ -1759,19 +1834,12 @@ export default function ServiceBeforeInstallationDetailClient({
         setOpenInstallationKpiLoading(false);
       }
     }
-
-    // Feedback only — planned is already in cards breakdown.
-    if (requestId === kpiRequestIdRef.current) {
-      window.setTimeout(() => {
-        if (requestId !== kpiRequestIdRef.current) return;
-        void fetchFeedbackCollectedKpiCount(controller.signal);
-      }, 200);
-    }
   }, [
     segment,
     openInstallationKpiFilterKey,
     appliedFilters,
     fetchFeedbackCollectedKpiCount,
+    fetchPlannedKpiCount,
   ]);
 
   const enrichOpenInstallationServiceColumns = useCallback(async (baseRows, listRequestId) => {
@@ -2010,17 +2078,7 @@ export default function ServiceBeforeInstallationDetailClient({
     enrichOpenInstallationServiceColumns,
   ]);
 
-  const openInstallationKpiStripLoading = useMemo(() => {
-    if (!openInstallationKpiLoading) return false;
-    const b = openInstallationBreakdown;
-    const hasAny =
-      Number(b.delivered_installation_pending) > 0 ||
-      Number(b.delivery_pending_after_dispatch) > 0 ||
-      Number(b.completed_installation) > 0 ||
-      Number(b.installation_planned) > 0 ||
-      Number(b.total) > 0;
-    return !hasAny;
-  }, [openInstallationKpiLoading, openInstallationBreakdown]);
+  const openInstallationKpiStripLoading = openInstallationKpiLoading;
 
   const fetchTableFilterOptions = useCallback(async () => {
     if (
@@ -2124,6 +2182,7 @@ export default function ServiceBeforeInstallationDetailClient({
             openInstallationBucket={appliedFilters.openInstallationBucket}
             totals={openInstallationBreakdown}
             loading={openInstallationKpiStripLoading}
+            plannedLoading={plannedKpiLoading}
             noFeedbackLoading={feedbackCollectedKpiLoading}
             onCardSelect={(openInstallationBucket) => {
               setPage(0);
@@ -2160,6 +2219,8 @@ export default function ServiceBeforeInstallationDetailClient({
             tableFilterOptionsFetchKeyRef.current = null;
             kpiFetchedKeyRef.current = "";
             setOpenInstallationKpiLoading(true);
+            setPlannedKpiLoading(true);
+            setFeedbackCollectedKpiLoading(true);
             setAppliedFilters({ ...draftFilters });
           }}
           onClear={() => {
