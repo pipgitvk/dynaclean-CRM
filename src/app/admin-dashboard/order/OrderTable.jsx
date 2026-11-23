@@ -225,7 +225,9 @@ function readOrderTableFilterState() {
     modelNameFilters: parseModelFiltersFromStorage(savedModel),
     approvalStatusFilter: localStorage.getItem("orderTable_approvalStatusFilter") || "",
     paymentStatusFilter: localStorage.getItem("orderTable_paymentStatusFilter") || "",
-    itemLineTypeFilter: localStorage.getItem("orderTable_itemLineTypeFilter") || "",
+    itemLineTypeFilter: normalizeItemLineTypeFilter(
+      localStorage.getItem("orderTable_itemLineTypeFilter"),
+    ),
   };
 }
 
@@ -311,12 +313,17 @@ function orderMatchesItemLineTypeFilter(
     else hasProduct = true;
   }
 
-  if (v === "products") return hasProduct;
-  if (v === "spares") return hasSpare;
-  if (v === "mixed") return hasProduct && hasSpare;
-  if (v === "products_only") return hasProduct && !hasSpare;
-  if (v === "spares_only") return hasSpare && !hasProduct;
+  if (v === "products" || v === "products_only") return hasProduct;
+  if (v === "spares" || v === "spares_only") return hasSpare;
   return true;
+}
+
+/** Only All | Products | Spares — legacy mixed/both values clear to All. */
+function normalizeItemLineTypeFilter(value) {
+  const v = String(value || "").trim().toLowerCase();
+  if (v === "products" || v === "products_only") return "products";
+  if (v === "spares" || v === "spares_only") return "spares";
+  return "";
 }
 
 function splitOrderItemsByType(order, catalogByCode, spareCatalogByCode) {
@@ -2835,18 +2842,17 @@ export default function OrderTable({
         </div>
 
         <div className="min-w-[140px] flex-1 sm:max-w-[200px]">
-          <label className="block text-xs text-gray-600 mb-1">Line type</label>
+          <label className="block text-xs text-gray-600 mb-1">Products / Spares</label>
           <select
             value={itemLineTypeFilter}
-            onChange={(e) => setItemLineTypeFilter(e.target.value)}
+            onChange={(e) =>
+              setItemLineTypeFilter(normalizeItemLineTypeFilter(e.target.value))
+            }
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
           >
-            <option value="">All (Products &amp; Spares)</option>
-            <option value="products">Has products</option>
-            <option value="spares">Has spares</option>
-            <option value="mixed">Products &amp; spares (both)</option>
-            <option value="products_only">Products only</option>
-            <option value="spares_only">Spares only</option>
+            <option value="">All orders</option>
+            <option value="products">Products</option>
+            <option value="spares">Spares</option>
           </select>
         </div>
 

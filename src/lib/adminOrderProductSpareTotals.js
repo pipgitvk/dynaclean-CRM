@@ -92,11 +92,8 @@ export function orderMatchesItemLineTypeFilter(
     else hasProduct = true;
   }
 
-  if (v === "products") return hasProduct;
-  if (v === "spares") return hasSpare;
-  if (v === "mixed") return hasProduct && hasSpare;
-  if (v === "products_only") return hasProduct && !hasSpare;
-  if (v === "spares_only") return hasSpare && !hasProduct;
+  if (v === "products" || v === "products_only") return hasProduct;
+  if (v === "spares" || v === "spares_only") return hasSpare;
   return true;
 }
 
@@ -197,10 +194,15 @@ export function computeAdminOrderProductSpareTotals(
       catalogByCode,
       spareCatalogByCode,
     );
-    acc.products.taxable += split.products.taxable;
-    acc.products.total += split.products.total;
-    acc.spares.taxable += split.spares.taxable;
-    acc.spares.total += split.spares.total;
+    const lineFilter = String(itemLineTypeFilter || "").trim().toLowerCase();
+    if (lineFilter !== "spares") {
+      acc.products.taxable += split.products.taxable;
+      acc.products.total += split.products.total;
+    }
+    if (lineFilter !== "products") {
+      acc.spares.taxable += split.spares.taxable;
+      acc.spares.total += split.spares.total;
+    }
   }
 
   return acc;
