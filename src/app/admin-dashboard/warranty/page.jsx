@@ -52,6 +52,12 @@ function normalizeStateFromDb(rawState) {
   return found || trimmed;
 }
 
+function isProductDispatchWithSerial(d) {
+  return (
+    d?.item_kind === "product" && String(d.serial_number || "").trim() !== ""
+  );
+}
+
 function dispatchToForm(d) {
   return {
     product_name: d.product_name || "",
@@ -109,9 +115,15 @@ export default function WarrantyForm() {
       if (!res.ok || !data.success) {
         throw new Error(data.error || "Failed to fetch data for this Order ID");
       }
-      setOrderDispatches(data.dispatches || []);
-      if (!data.dispatches?.length) {
-        setOrderError("No eligible dispatch found for this Order ID.");
+      const allDispatches = data.dispatches || [];
+      const productsOnly = allDispatches.filter(isProductDispatchWithSerial);
+      setOrderDispatches(productsOnly);
+      if (!productsOnly.length) {
+        setOrderError(
+          allDispatches.length
+            ? "No eligible products for warranty on this order (spares are not registered here)."
+            : "No eligible dispatch found for this Order ID.",
+        );
       }
     } catch (err) {
       setOrderError(err.message || "Failed to fetch data for this Order ID");
@@ -128,12 +140,6 @@ export default function WarrantyForm() {
       fetchByOrderId(true);
     }
   }, [orderId, fetchByOrderId]);
-
-  const productDispatches = orderDispatches.filter(
-    (d) =>
-      d.item_kind === "product" && String(d.serial_number || "").trim() !== "",
-  );
-  const spareDispatches = orderDispatches.filter((d) => d.item_kind !== "product");
 
   const toggleDispatch = (dispatchId) => {
     setSelectedDispatchIds((prev) => {
@@ -160,7 +166,7 @@ export default function WarrantyForm() {
       selectedDispatchIds.has(d.dispatch_id),
     );
     if (!selected.length) {
-      toast.error("Select at least one product or spare");
+      toast.error("Select at least one product");
       return;
     }
     const newForms = selected.map((d) => ({
@@ -300,8 +306,7 @@ export default function WarrantyForm() {
                 ) : null}
                 {orderDispatches.length > 0 ? (
                   <div className="max-h-[min(22rem,55vh)] space-y-3 overflow-y-auto pr-0.5">
-                    {renderDispatchPickList(productDispatches, "Products")}
-                    {renderDispatchPickList(spareDispatches, "Spares")}
+                    {renderDispatchPickList(orderDispatches, "Products")}
                   </div>
                 ) : null}
               </div>

@@ -44,6 +44,8 @@ export default function UpcomingInstallationsClient({
   registrationFilter = "",
   pageTitle = "",
   showTypeFilter = true,
+  /** When true, API always uses type=products (no spares / mixed "all" list). */
+  productsOnly = false,
 }) {
   const orderHref = (orderId) => `${orderLinkBase}/order/${orderId}`;
   const dashboardBase = useMemo(
@@ -53,7 +55,10 @@ export default function UpcomingInstallationsClient({
   const serviceDetailsHrefBase = `${orderLinkBase.replace(/\/$/, "")}/complete-service`;
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState(initialTypeFilter);
+  const [typeFilter, setTypeFilter] = useState(
+    productsOnly ? "products" : initialTypeFilter,
+  );
+  const apiTypeFilter = productsOnly ? "products" : typeFilter;
   const [statusFilter, setStatusFilter] = useState("all");
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -85,7 +90,7 @@ export default function UpcomingInstallationsClient({
       } else {
         alert(data.message || "Action completed successfully");
       }
-      await fetchData(typeFilter);
+      await fetchData(apiTypeFilter);
     } catch (err) {
       console.error(err);
       alert("Failed to perform action");
@@ -156,7 +161,7 @@ export default function UpcomingInstallationsClient({
       if (data.success) {
         alert(data.message || "Items returned successfully");
         setShowReturnModal(false);
-        await fetchData(typeFilter);
+        await fetchData(apiTypeFilter);
       } else {
         alert(data.error || "Failed to return items");
       }
@@ -215,8 +220,8 @@ export default function UpcomingInstallationsClient({
   }, [registrationFilter]);
 
   useEffect(() => {
-    fetchData(typeFilter);
-  }, [typeFilter, fetchData]);
+    fetchData(apiTypeFilter);
+  }, [apiTypeFilter, fetchData]);
 
   const filteredRecords = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -270,7 +275,7 @@ export default function UpcomingInstallationsClient({
           className="px-4 py-2 border rounded shadow-sm"
         />
 
-        {showTypeFilter ? (
+        {showTypeFilter && !productsOnly ? (
         <div className="flex gap-3">
           <button
             type="button"
