@@ -66,7 +66,8 @@ export default function ServiceBeforeInstallationOpenInstallationKpiStrip({
                 ? () => {
                     const next = openInstallationBucketFromKpiCardId(card.id);
                     const current = String(openInstallationBucket || "").trim();
-                    onCardSelect(current === next && next ? "" : next);
+                    if (!next || next === current) return;
+                    onCardSelect(next);
                   }
                 : undefined
             }

@@ -198,7 +198,7 @@ function normalizeWarrantyRegistration(raw) {
   return "";
 }
 
-function normalizeOpenInstallationBucket(raw) {
+export function normalizeOpenInstallationBucket(raw) {
   const v = String(raw ?? "")
     .trim()
     .toLowerCase();

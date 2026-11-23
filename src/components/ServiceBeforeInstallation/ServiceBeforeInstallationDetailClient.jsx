@@ -24,7 +24,10 @@ import {
 } from "lucide-react";
 import { getSegmentMeta } from "@/lib/serviceBeforeInstallationHub";
 import { openInstallationBucketRecordCount } from "@/lib/openInstallationKpiSql";
-import { defaultSbiSelectFilters } from "@/lib/serviceBeforeInstallationFilters";
+import {
+  defaultSbiSelectFilters,
+  normalizeOpenInstallationBucket,
+} from "@/lib/serviceBeforeInstallationFilters";
 import ServiceBeforeInstallationFilters from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationFilters";
 import ServiceBeforeInstallationDetailKpiStrip from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationDetailKpiStrip";
 import ServiceBeforeInstallationOpenInstallationKpiStrip from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationOpenInstallationKpiStrip";
@@ -55,6 +58,46 @@ import { useWarrantyProductFollowup } from "@/components/warranty/WarrantyProduc
 
 const DEFAULT_PAGE_SIZE = 10;
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+const OPEN_INSTALLATION_BUCKET_STORAGE_KEY = "sbi.openInstallationBucket";
+
+function readStoredOpenInstallationBucket() {
+  if (typeof window === "undefined") return "";
+  try {
+    const fromUrl = new URLSearchParams(window.location.search).get("openInstallationBucket");
+    const fromStore = window.localStorage.getItem(OPEN_INSTALLATION_BUCKET_STORAGE_KEY);
+    return normalizeOpenInstallationBucket(fromUrl || fromStore);
+  } catch {
+    return "";
+  }
+}
+
+function persistOpenInstallationBucket(bucket) {
+  const v = normalizeOpenInstallationBucket(bucket) || "delivered_pending";
+  if (typeof window === "undefined") return v;
+  try {
+    window.localStorage.setItem(OPEN_INSTALLATION_BUCKET_STORAGE_KEY, v);
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("openInstallationBucket") !== v) {
+      url.searchParams.set("openInstallationBucket", v);
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${url.pathname}${url.search}${url.hash}`,
+      );
+    }
+  } catch {
+    // ignore storage / history failures
+  }
+  return v;
+}
+
+function stickyOpenInstallationBucket(preferred) {
+  return (
+    normalizeOpenInstallationBucket(preferred) ||
+    readStoredOpenInstallationBucket() ||
+    "delivered_pending"
+  );
+}
 
 const SEGMENT_ICONS = {
   "total-registered": Package,
@@ -84,12 +127,12 @@ function isWarrantyProductSegment(segment) {
   );
 }
 
-function initialSbiFiltersForSegment(segment) {
+function initialSbiFiltersForSegment(segment, stickyBucket = "") {
   const base = defaultSbiSelectFilters();
   if (segment === "open-installation") {
     return {
       ...base,
-      openInstallationBucket: "delivered_pending",
+      openInstallationBucket: stickyOpenInstallationBucket(stickyBucket),
       itemType: "products",
       dispatchStatus: "not_completed",
     };
@@ -1567,6 +1610,7 @@ export default function ServiceBeforeInstallationDetailClient({
   segment,
   dashboardBase = "admin-dashboard",
   userRole = "",
+  initialOpenInstallationBucket = "",
 }) {
   const meta = getSegmentMeta(segment);
   const headerMeta = meta
@@ -1579,8 +1623,23 @@ export default function ServiceBeforeInstallationDetailClient({
   const warrantyHref = `/${dashboardBase}/warranty`;
   const { ProductFollowupIcons, followupModals } = useWarrantyProductFollowup();
 
-  const [draftFilters, setDraftFilters] = useState(() => initialSbiFiltersForSegment(segment));
-  const [appliedFilters, setAppliedFilters] = useState(() => initialSbiFiltersForSegment(segment));
+  const [draftFilters, setDraftFilters] = useState(() =>
+    initialSbiFiltersForSegment(segment, initialOpenInstallationBucket),
+  );
+  const [appliedFilters, setAppliedFilters] = useState(() =>
+    initialSbiFiltersForSegment(segment, initialOpenInstallationBucket),
+  );
+  const stickyBucketRef = useRef(
+    segment === "open-installation"
+      ? stickyOpenInstallationBucket(initialOpenInstallationBucket)
+      : "",
+  );
+  const prevSegmentRef = useRef(segment);
+  const [openInstallationBucketReady, setOpenInstallationBucketReady] = useState(
+    () =>
+      segment !== "open-installation" ||
+      Boolean(normalizeOpenInstallationBucket(initialOpenInstallationBucket)),
+  );
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [rows, setRows] = useState([]);
@@ -1638,10 +1697,35 @@ export default function ServiceBeforeInstallationDetailClient({
   openInstallationBreakdownRef.current = openInstallationBreakdown;
 
   useEffect(() => {
+    if (segment !== "open-installation") {
+      setOpenInstallationBucketReady(true);
+      return;
+    }
+    const nextBucket = stickyOpenInstallationBucket(
+      stickyBucketRef.current || initialOpenInstallationBucket,
+    );
+    stickyBucketRef.current = nextBucket;
+    persistOpenInstallationBucket(nextBucket);
+    setAppliedFilters((prev) =>
+      prev.openInstallationBucket === nextBucket
+        ? prev
+        : { ...prev, openInstallationBucket: nextBucket },
+    );
+    setDraftFilters((prev) =>
+      prev.openInstallationBucket === nextBucket
+        ? prev
+        : { ...prev, openInstallationBucket: nextBucket },
+    );
+    setOpenInstallationBucketReady(true);
+  }, [segment, initialOpenInstallationBucket]);
+
+  useEffect(() => {
+    if (prevSegmentRef.current === segment) return;
+    prevSegmentRef.current = segment;
     setPage(0);
     setTableFilterOptions(null);
     tableFilterOptionsFetchKeyRef.current = null;
-    const next = initialSbiFiltersForSegment(segment);
+    const next = initialSbiFiltersForSegment(segment, stickyBucketRef.current);
     setDraftFilters(next);
     setAppliedFilters(next);
   }, [segment]);
@@ -2123,9 +2207,10 @@ export default function ServiceBeforeInstallationDetailClient({
   }, [segment]);
 
   useEffect(() => {
+    if (segment === "open-installation" && !openInstallationBucketReady) return;
     fetchRows();
     return () => rowsFetchAbortRef.current?.abort();
-  }, [fetchRows]);
+  }, [fetchRows, segment, openInstallationBucketReady]);
 
   const totalPages = pagination.totalPending
     ? Math.max(1, page + (pagination.hasMore ? 2 : 1))
@@ -2190,15 +2275,25 @@ export default function ServiceBeforeInstallationDetailClient({
             completedLoading={completedKpiLoading}
             noFeedbackLoading={feedbackCollectedKpiLoading}
             onCardSelect={(openInstallationBucket) => {
+              const nextBucket = persistOpenInstallationBucket(
+                openInstallationBucket ||
+                  stickyBucketRef.current ||
+                  appliedFilters.openInstallationBucket,
+              );
+              if (nextBucket === String(appliedFilters.openInstallationBucket || "").trim()) {
+                stickyBucketRef.current = nextBucket;
+                return;
+              }
+              stickyBucketRef.current = nextBucket;
               setPage(0);
               setLoading(true);
-              const nextBucket = String(openInstallationBucket || "").trim();
-              const estTotal = nextBucket
-                ? openInstallationBucketRecordCount(nextBucket, openInstallationBreakdown)
-                : openInstallationBreakdown.total ?? listTotalRef.current;
+              const estTotal = openInstallationBucketRecordCount(
+                nextBucket,
+                openInstallationBreakdown,
+              );
               listTotalRef.current = estTotal;
               setPagination({ total: estTotal, hasMore: estTotal > pageSize });
-              const next = { ...appliedFilters, openInstallationBucket };
+              const next = { ...appliedFilters, openInstallationBucket: nextBucket };
               setAppliedFilters(next);
               setDraftFilters(next);
             }}
@@ -2211,7 +2306,16 @@ export default function ServiceBeforeInstallationDetailClient({
           onRequestTableFilterOptions={requestTableFilterOptions}
           className="mb-5 shadow-[0_4px_20px_-10px_rgba(124,58,237,0.2)]"
           value={draftFilters}
-          onChange={setDraftFilters}
+          onChange={(next) => {
+            setDraftFilters({
+              ...next,
+              openInstallationBucket:
+                stickyBucketRef.current ||
+                appliedFilters.openInstallationBucket ||
+                next.openInstallationBucket ||
+                "delivered_pending",
+            });
+          }}
           loading={applyingFilters}
           onApply={() => {
             setApplyingFilters(true);
@@ -2228,12 +2332,25 @@ export default function ServiceBeforeInstallationDetailClient({
             setPlannedKpiLoading(true);
             setCompletedKpiLoading(true);
             setFeedbackCollectedKpiLoading(true);
-            setAppliedFilters({ ...draftFilters });
+            const keptBucket = persistOpenInstallationBucket(
+              stickyBucketRef.current ||
+                appliedFilters.openInstallationBucket ||
+                draftFilters.openInstallationBucket,
+            );
+            stickyBucketRef.current = keptBucket;
+            setAppliedFilters({
+              ...draftFilters,
+              openInstallationBucket: keptBucket,
+            });
           }}
           onClear={() => {
             setLoading(true);
             setPage(0);
-            const next = initialSbiFiltersForSegment(segment);
+            const keptBucket = persistOpenInstallationBucket(
+              stickyBucketRef.current || appliedFilters.openInstallationBucket,
+            );
+            stickyBucketRef.current = keptBucket;
+            const next = initialSbiFiltersForSegment(segment, keptBucket);
             applyFilterState(setDraftFilters, setAppliedFilters, next);
           }}
         />
