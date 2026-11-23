@@ -52,6 +52,20 @@ function manualReportExtension(file) {
   return null;
 }
 
+async function saveManualAttachment(file, serviceId, namePrefix) {
+  const ext = manualReportExtension(file);
+  if (!ext) return { error: "Upload a PDF or image (jpg, png, webp)." };
+  if (file.size > MAX_MANUAL_REPORT_BYTES) {
+    return { error: "File is too large. Maximum size is 25 MB." };
+  }
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const fileName = `${namePrefix}-${serviceId}-${Date.now()}${ext}`;
+  const uploadDir = path.join(process.cwd(), "public", "attachments");
+  await mkdir(uploadDir, { recursive: true });
+  await writeFile(path.join(uploadDir, fileName), buffer);
+  return { fileName };
+}
+
 async function loadService(conn, serviceId) {
   const [[row]] = await conn.execute(
     `SELECT
@@ -69,6 +83,7 @@ async function loadService(conn, serviceId) {
         sr.completed_by_service_engineer,
         sr.google_feedback_collected,
         sr.google_feedback_collection,
+        sr.google_feedback_proof,
         s.video_360,
         s.video_problem,
         s.video_damaged,
@@ -115,6 +130,7 @@ function payloadFromRow(row, product = null) {
       completed_by_service_engineer: row.completed_by_service_engineer || null,
       google_feedback_collected: row.google_feedback_collected || null,
       google_feedback_collection: row.google_feedback_collection || null,
+      google_feedback_proof: row.google_feedback_proof || null,
     },
     product: product
       ? {
@@ -305,11 +321,11 @@ export async function POST(request, context) {
         );
       }
 
-      const buffer = Buffer.from(await file.arrayBuffer());
-      const fileName = `manual-install-${serviceId}-${Date.now()}${ext}`;
-      const uploadDir = path.join(process.cwd(), "public", "attachments");
-      await mkdir(uploadDir, { recursive: true });
-      await writeFile(path.join(uploadDir, fileName), buffer);
+      const manualSaved = await saveManualAttachment(file, serviceId, "manual-install");
+      if (manualSaved.error) {
+        return NextResponse.json({ message: manualSaved.error }, { status: 400 });
+      }
+      const fileName = manualSaved.fileName;
 
       const viewerRole = String(session.role ?? session.userRole ?? "")
         .trim()
@@ -336,18 +352,38 @@ export async function POST(request, context) {
             { status: 400 },
           );
         }
-        if (
-          manualMeta.googleFeedbackCollected === "yes" &&
-          !manualMeta.googleFeedbackCollection
-        ) {
-          return NextResponse.json(
-            { message: "Please select Google feedback collection status." },
-            { status: 400 },
-          );
-        }
-      }
+        let googleFeedbackProof = String(existing.google_feedback_proof || "").trim();
+        let googleFeedbackCollection = manualMeta.googleFeedbackCollection;
 
-      if (backofficeManual) {
+        if (manualMeta.googleFeedbackCollected === "yes") {
+          if (!googleFeedbackCollection) {
+            return NextResponse.json(
+              { message: "Please select Google feedback collection status." },
+              { status: 400 },
+            );
+          }
+          const gfFile = formData.get("google_feedback_file");
+          if (gfFile && typeof gfFile !== "string" && gfFile.size > 0) {
+            const gfSaved = await saveManualAttachment(
+              gfFile,
+              serviceId,
+              "google-feedback",
+            );
+            if (gfSaved.error) {
+              return NextResponse.json({ message: gfSaved.error }, { status: 400 });
+            }
+            googleFeedbackProof = gfSaved.fileName;
+          } else if (!googleFeedbackProof) {
+            return NextResponse.json(
+              { message: "Google feedback proof upload is required when feedback is Yes." },
+              { status: 400 },
+            );
+          }
+        } else {
+          googleFeedbackProof = "";
+          googleFeedbackCollection = "not_collected";
+        }
+
         await conn.execute(
           `UPDATE service_records
            SET installation_report = ?,
@@ -356,7 +392,8 @@ export async function POST(request, context) {
                installation_completion_date = ?,
                completed_by_service_engineer = ?,
                google_feedback_collected = ?,
-               google_feedback_collection = ?
+               google_feedback_collection = ?,
+               google_feedback_proof = ?
            WHERE service_id = ?`,
           [
             fileName,
@@ -364,7 +401,8 @@ export async function POST(request, context) {
             manualMeta.installationCompletionDate,
             manualMeta.completedByServiceEngineer,
             manualMeta.googleFeedbackCollected,
-            manualMeta.googleFeedbackCollection,
+            googleFeedbackCollection,
+            googleFeedbackProof || null,
             serviceId,
           ],
         );

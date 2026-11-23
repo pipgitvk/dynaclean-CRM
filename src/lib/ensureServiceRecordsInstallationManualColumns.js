@@ -19,6 +19,10 @@ const COLUMNS = [
     name: "google_feedback_collection",
     ddl: "ADD COLUMN google_feedback_collection VARCHAR(80) NULL",
   },
+  {
+    name: "google_feedback_proof",
+    ddl: "ADD COLUMN google_feedback_proof VARCHAR(255) NULL COMMENT 'screenshot/PDF filename in attachments'",
+  },
 ];
 
 export async function ensureServiceRecordsInstallationManualColumns(conn) {

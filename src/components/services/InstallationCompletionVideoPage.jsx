@@ -7,8 +7,8 @@ import { ChevronLeft, Download, FileUp, Play, Square, Video } from "lucide-react
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { generateServiceReportPDF, downloadPDF } from "@/utils/pdfGenerator";
 import {
-  GOOGLE_FEEDBACK_COLLECTION_WHEN_YES,
   GOOGLE_FEEDBACK_COLLECTED_YES_NO,
+  GOOGLE_FEEDBACK_COLLECTION_WHEN_YES,
   canShowInstallationManualBackofficeFields,
   inferGoogleFeedbackCollectedYesNo,
   normalizeGoogleFeedbackCollection,
@@ -95,6 +95,8 @@ export default function InstallationCompletionVideoPage() {
   const [completedByServiceEngineer, setCompletedByServiceEngineer] = useState("");
   const [googleFeedbackCollected, setGoogleFeedbackCollected] = useState("");
   const [googleFeedbackCollection, setGoogleFeedbackCollection] = useState("");
+  const [googleFeedbackFile, setGoogleFeedbackFile] = useState(null);
+  const [existingGoogleFeedbackProof, setExistingGoogleFeedbackProof] = useState("");
   const [serviceEngineerOptions, setServiceEngineerOptions] = useState([]);
 
   const videoRef = useRef(null);
@@ -148,6 +150,8 @@ export default function InstallationCompletionVideoPage() {
       setGoogleFeedbackCollection(
         yesNo === "no" ? "" : collectionNorm === "not_collected" ? "" : collectionNorm,
       );
+      setExistingGoogleFeedbackProof(String(svc.google_feedback_proof || "").trim());
+      setGoogleFeedbackFile(null);
       setData(body);
     } catch (err) {
       setError(err.message || "Failed to load service");
@@ -226,6 +230,27 @@ export default function InstallationCompletionVideoPage() {
     }
   };
 
+  const onPickGoogleFeedbackFile = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const ok =
+      file.type === "application/pdf" ||
+      file.type.startsWith("image/") ||
+      /\.(pdf|jpe?g|png|webp)$/i.test(file.name);
+    if (!ok) {
+      setError("Choose a PDF or image for Google feedback proof.");
+      event.target.value = "";
+      return;
+    }
+    if (file.size > 25 * 1024 * 1024) {
+      setError("Maximum file size is 25 MB.");
+      event.target.value = "";
+      return;
+    }
+    setError("");
+    setGoogleFeedbackFile(file);
+  };
+
   const onPickManualFile = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -266,6 +291,14 @@ export default function InstallationCompletionVideoPage() {
         setError("Select Google feedback collection status.");
         return;
       }
+      if (
+        googleFeedbackCollected === "yes" &&
+        !googleFeedbackFile &&
+        !existingGoogleFeedbackProof
+      ) {
+        setError("Upload Google feedback proof (mandatory when Yes).");
+        return;
+      }
     }
     setManualUploading(true);
     setManualProgress(0);
@@ -285,6 +318,9 @@ export default function InstallationCompletionVideoPage() {
           "google_feedback_collection",
           googleFeedbackCollected === "no" ? "not_collected" : googleFeedbackCollection,
         );
+        if (googleFeedbackCollected === "yes" && googleFeedbackFile) {
+          formData.append("google_feedback_file", googleFeedbackFile);
+        }
       }
       await uploadWithProgress(
         `/api/service-report-steps/${serviceId}`,
@@ -623,7 +659,10 @@ export default function InstallationCompletionVideoPage() {
                   onChange={(e) => {
                     const v = e.target.value;
                     setGoogleFeedbackCollected(v);
-                    if (v !== "yes") setGoogleFeedbackCollection("");
+                    if (v !== "yes") {
+                      setGoogleFeedbackCollection("");
+                      setGoogleFeedbackFile(null);
+                    }
                   }}
                 >
                   {GOOGLE_FEEDBACK_COLLECTED_YES_NO.map((opt) => (
@@ -634,22 +673,57 @@ export default function InstallationCompletionVideoPage() {
                 </select>
               </label>
               {googleFeedbackCollected === "yes" ? (
-                <label className="block">
+                <>
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-gray-700">
+                      Google feedback collection <span className="text-red-500">*</span>
+                    </span>
+                    <select
+                      className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                      value={googleFeedbackCollection}
+                      onChange={(e) => setGoogleFeedbackCollection(e.target.value)}
+                    >
+                      {GOOGLE_FEEDBACK_COLLECTION_WHEN_YES.map((opt) => (
+                        <option key={opt.value || "select"} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="space-y-2">
                   <span className="mb-1 block text-sm font-medium text-gray-700">
-                    Google feedback collection <span className="text-red-500">*</span>
+                    Upload Google feedback proof <span className="text-red-500">*</span>
                   </span>
-                  <select
-                    className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
-                    value={googleFeedbackCollection}
-                    onChange={(e) => setGoogleFeedbackCollection(e.target.value)}
-                  >
-                    {GOOGLE_FEEDBACK_COLLECTION_WHEN_YES.map((opt) => (
-                      <option key={opt.value || "select"} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                  <p className="text-xs text-gray-500">
+                    Screenshot or photo of collected Google review/feedback (PDF or image).
+                  </p>
+                  {existingGoogleFeedbackProof && !googleFeedbackFile ? (
+                    <p className="text-xs text-emerald-700">
+                      Saved:{" "}
+                      <a
+                        href={`/attachments/${existingGoogleFeedbackProof}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium underline"
+                      >
+                        View current file
+                      </a>
+                    </p>
+                  ) : null}
+                  <label className="flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-violet-300 bg-violet-50 px-3 py-4 text-sm text-violet-900 hover:bg-violet-100">
+                    <FileUp className="h-5 w-5" />
+                    {googleFeedbackFile
+                      ? googleFeedbackFile.name
+                      : "Choose Google feedback file (PDF or image)"}
+                    <input
+                      type="file"
+                      accept=".pdf,image/*"
+                      className="hidden"
+                      onChange={onPickGoogleFeedbackFile}
+                    />
+                  </label>
+                  </div>
+                </>
               ) : null}
             </div>
           ) : null}
