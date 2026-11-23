@@ -3,7 +3,6 @@ import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { LEDGER_INVOICE_SQL } from "@/lib/ledgerInvoiceFilters";
 import { parseLinkedStatementIds } from "@/lib/statementLinkedPurchases";
-import { ensurePartyPaymentsTable } from "@/lib/ensurePartyPaymentsTable";
 
 function parseTransIds(raw) {
   if (!raw) return [];
@@ -287,113 +286,6 @@ async function getPartyNameAliases(conn, decodedCompany, customerId) {
   }
 
   return [...aliases].filter(Boolean);
-}
-
-/**
- * Party Payments module: In → credit, Out → debit on the party ledger.
- */
-async function appendPartyPaymentLedgerEntries(
-  conn,
-  {
-    derivedLedger,
-    customerId,
-    cidFilter,
-    nameAliases,
-    decodedCompany,
-  },
-) {
-  try {
-    await ensurePartyPaymentsTable(conn);
-  } catch {
-    return;
-  }
-
-  const where = [];
-  const params = [];
-
-  const cid =
-    cidFilter ||
-    (customerId != null && String(customerId).trim() !== ""
-      ? String(customerId).trim()
-      : null);
-
-  if (cid) {
-    where.push("CAST(customer_id AS CHAR) = ?");
-    params.push(cid);
-  }
-
-  const names = nameAliases.length > 0 ? nameAliases : [decodedCompany];
-  if (names.length > 0) {
-    const ph = names.map(() => "?").join(",");
-    where.push(
-      `(TRIM(company_name) IN (${ph}) OR TRIM(name) IN (${ph}))`,
-    );
-    params.push(...names, ...names);
-  }
-
-  if (where.length === 0) return;
-
-  let rows = [];
-  try {
-    const [ppRows] = await conn.execute(
-      `SELECT id, payment_date, amount_in, amount_out, name, company_name, order_id, invoice_number
-       FROM party_payments
-       WHERE (${where.join(" OR ")})
-       ORDER BY payment_date ASC, id ASC`,
-      params,
-    );
-    rows = ppRows || [];
-  } catch {
-    return;
-  }
-
-  const seen = new Set();
-  for (const row of rows) {
-    const ppId = row.id;
-    if (seen.has(ppId)) continue;
-    seen.add(ppId);
-
-    const entryDate = row.payment_date
-      ? String(row.payment_date).slice(0, 10)
-      : null;
-    if (!entryDate) continue;
-
-    const amountIn = Number(row.amount_in) || 0;
-    const amountOut = Number(row.amount_out) || 0;
-    const invRef = row.invoice_number
-      ? String(row.invoice_number).trim()
-      : "";
-    const orderRef = row.order_id ? String(row.order_id).trim() : "";
-
-    if (amountIn > 0.001) {
-      derivedLedger.push({
-        id: `pp-in-${ppId}`,
-        entry_date: entryDate,
-        particulars: invRef
-          ? `Party Payment In – #${ppId} (${invRef})`
-          : `Party Payment In – #${ppId}`,
-        vch_type: "Party Payment In",
-        vch_no: String(ppId),
-        debit: 0,
-        credit: amountIn,
-        source: "party_payment",
-      });
-    }
-    if (amountOut > 0.001) {
-      derivedLedger.push({
-        id: `pp-out-${ppId}`,
-        entry_date: entryDate,
-        particulars: orderRef
-          ? `Party Payment Out – #${ppId} (Order ${orderRef})`
-          : `Party Payment Out – #${ppId}`,
-        vch_type: "Party Payment Out",
-        vch_no: String(ppId),
-        debit: amountOut,
-        credit: 0,
-        source: "party_payment",
-      });
-    }
-  }
 }
 
 /**
@@ -909,14 +801,6 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
     onlyCustomerId: false,
   });
 
-  await appendPartyPaymentLedgerEntries(conn, {
-    derivedLedger,
-    customerId: customerIdForCompany,
-    cidFilter,
-    nameAliases,
-    decodedCompany,
-  });
-
   const combined = [
     ...derivedLedger,
     ...filteredManualRows.map((r) => ({ ...r, source: "manual" })),
@@ -933,9 +817,7 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
       "Spare Purchase": 2,
       Spare: 3,
       Payment: 3,
-      "Party Payment Out": 3,
       Receipt: 4,
-      "Party Payment In": 4,
     };
     const aOrder =
       orderMap[a.vch_type] !== undefined ? orderMap[a.vch_type] : 99;

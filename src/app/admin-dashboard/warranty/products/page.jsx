@@ -455,7 +455,7 @@ export default function WarrantyPage() {
     async (page, search = "") => {
       setLoading(true);
       try {
-        const url = `/api/warranty/all?page=${page}&limit=${pageSize}&kind=product&search=${encodeURIComponent(search)}&model=${encodeURIComponent(modelFilter)}&state=${encodeURIComponent(stateFilter)}&geoTag=${encodeURIComponent(geoTagFilter)}&warranty=${encodeURIComponent(warrantyFilter)}&serial=${encodeURIComponent(serialFilter)}`;
+        const url = `/api/warranty/all?page=${page}&limit=${pageSize}&search=${encodeURIComponent(search)}&model=${encodeURIComponent(modelFilter)}&state=${encodeURIComponent(stateFilter)}&geoTag=${encodeURIComponent(geoTagFilter)}&warranty=${encodeURIComponent(warrantyFilter)}&serial=${encodeURIComponent(serialFilter)}`;
         const res = await fetch(url);
         const data = await res.json();
         setProducts(data.products || []);

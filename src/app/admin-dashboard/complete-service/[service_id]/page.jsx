@@ -8,7 +8,6 @@ import {
   fetchLatestInstallationReport,
   mergeInstallationReportIntoService,
 } from "@/lib/mergeInstallationReportIntoService";
-import { loadSpareInstallationReportPrefill } from "@/lib/spareInstallationReportPrefill";
 
 export const dynamic = "force-dynamic";
 
@@ -22,24 +21,10 @@ export default async function CompleteServicePage({ params }) {
     [serviceId]
   );
 
-  let [[product]] = await conn.execute(
+  const [[product]] = await conn.execute(
     "SELECT * FROM warranty_products WHERE serial_number = ?",
     [service?.serial_number]
   );
-
-  let sparePrefill = null;
-  if (service?.service_id) {
-    sparePrefill = await loadSpareInstallationReportPrefill(
-      conn,
-      service.service_id,
-    );
-    if (sparePrefill?.product) {
-      product = {
-        ...(product || {}),
-        ...sparePrefill.product,
-      };
-    }
-  }
 
   const installationReport = service
     ? await fetchLatestInstallationReport(conn, serviceId)
@@ -60,9 +45,6 @@ export default async function CompleteServicePage({ params }) {
       ...service,
       product,
       warrantyExpiry,
-      ...(sparePrefill?.reportPrefill
-        ? { reportPrefill: sparePrefill.reportPrefill, isSpareInstallation: true }
-        : {}),
     },
     installationReport,
   );
@@ -185,12 +167,10 @@ export default async function CompleteServicePage({ params }) {
                 )
                 : "N/A"}
             </p>
-            {!combinedServiceData.isSpareInstallation ? (
-              <p>
-                <strong>Warranty Expiry:</strong>{" "}
-                {combinedServiceData.warrantyExpiry}
-              </p>
-            ) : null}
+            <p>
+              <strong>Warranty Expiry:</strong>{" "}
+              {combinedServiceData.warrantyExpiry}
+            </p>
           </div>
         </div>
         <div

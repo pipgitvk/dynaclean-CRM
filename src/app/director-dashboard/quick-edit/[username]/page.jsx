@@ -343,7 +343,6 @@ const QuickEditPage = () => {
       "denied-leads",
       "warranty-console",
       "registered-products",
-      "registered-spares",
       "service-followups",
       "warranty-map",
       "service-records",
@@ -439,7 +438,6 @@ const QuickEditPage = () => {
       // Products & ops
       "warranty-console",
       "registered-products",
-      "registered-spares",
       "warranty-map",
       "product-stock",
       "product-accessories",

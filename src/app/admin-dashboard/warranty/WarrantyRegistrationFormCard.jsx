@@ -5,12 +5,6 @@ import WarrantyDispatchItemLabel from "@/components/warranty/WarrantyDispatchIte
 import { useState } from "react";
 import toast from "react-hot-toast";
 
-const SPARE_INSTALLED_BY_OPTIONS = [
-  { value: "videocall", label: "On videocall" },
-  { value: "self_customer", label: "On self customer" },
-  { value: "on_site", label: "On site" },
-];
-
 const STATES = [
   "Andhra Pradesh (28)",
   "Arunachal Pradesh (12)",
@@ -54,69 +48,29 @@ export default function WarrantyRegistrationFormCard({
   showRemove = false,
 }) {
   const [form, setForm] = useState(initialForm);
+  const [invoiceFile, setInvoiceFile] = useState();
+  const [reports, setReports] = useState([]);
   const [submitting, setSubmitting] = useState(false);
 
-  const isSpareRegistration =
-    itemMeta?.item_kind != null && itemMeta.item_kind !== "product";
-
-  const isVideocallSpare =
-    isSpareRegistration && form.installed_by === "videocall";
-
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm((prev) => {
-      const next = { ...prev, [name]: value };
-      if (name === "installed_by" && value !== "videocall") {
-        next.installation_completed_by = "";
-        next.installation_completed_date = "";
-      }
-      return next;
-    });
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   const resetCard = () => {
     setForm(initialForm);
+    setInvoiceFile(undefined);
+    setReports([]);
   };
 
   const submit = async (e) => {
     e.preventDefault();
-    if (isSpareRegistration && !String(form.installed_by || "").trim()) {
-      toast.error("Installed by is required");
-      return;
-    }
-    if (isVideocallSpare) {
-      if (!String(form.installation_completed_by || "").trim()) {
-        toast.error("Completed by (name) is required for videocall");
-        return;
-      }
-      if (!String(form.installation_completed_date || "").trim()) {
-        toast.error("Completed date is required for videocall");
-        return;
-      }
-    }
     setSubmitting(true);
     try {
       const fd = new FormData();
-      Object.entries(form).forEach(([k, v]) => {
-        if (isSpareRegistration && k === "warranty_period") return;
-        fd.append(k, v ?? "");
-      });
+      Object.entries(form).forEach(([k, v]) => fd.append(k, v ?? ""));
       fd.set("quantity", "1");
-      if (itemMeta?.item_kind) {
-        fd.set("item_kind", itemMeta.item_kind);
-      }
-      if (itemMeta?.dispatch_id != null && itemMeta.dispatch_id !== "") {
-        fd.set("dispatch_id", String(itemMeta.dispatch_id));
-      }
-      if (itemMeta?.order_id) {
-        fd.set("order_id", String(itemMeta.order_id));
-      }
-      if (itemMeta?.quote_number) {
-        fd.set("quote_number", String(itemMeta.quote_number));
-      }
-      if (isSpareRegistration) {
-        fd.set("warranty_period", "");
-      }
+      if (invoiceFile) fd.append("invoice", invoiceFile);
+      Array.from(reports || []).forEach((r) => fd.append("service_reports", r));
 
       const res = await fetch("/api/warranty/register", {
         method: "POST",
@@ -130,13 +84,7 @@ export default function WarrantyRegistrationFormCard({
           form.product_name ||
           title ||
           "Product";
-        if (isSpareRegistration && data.spare_installation_status === "completed") {
-          toast.success(`Spare registered & installation completed: ${label}`);
-        } else if (isSpareRegistration && data.spare_installation_status === "pending") {
-          toast.success(`Spare saved — on-site installation pending: ${label}`);
-        } else {
-          toast.success(`Registered: ${label}`);
-        }
+        toast.success(`Registered: ${label}`);
         onRegistered?.();
       } else {
         toast.error("Error: " + (data.error || "Registration failed"));
@@ -182,6 +130,7 @@ export default function WarrantyRegistrationFormCard({
       <div className="p-6">
       <form
         onSubmit={submit}
+        encType="multipart/form-data"
         className="grid grid-cols-1 gap-5 sm:grid-cols-2"
       >
         <input
@@ -221,65 +170,15 @@ export default function WarrantyRegistrationFormCard({
           placeholder="GST Number"
           className="input-sleek rounded-md border border-gray-300 p-2 focus:border-blue-500 focus:ring-blue-500"
         />
-        {!isSpareRegistration ? (
-          <input
-            name="warranty_period"
-            type="number"
-            value={form.warranty_period || ""}
-            onChange={handleChange}
-            placeholder="Warranty Period (months)"
-            required
-            className="input-sleek rounded-md border border-gray-300 p-2 focus:border-blue-500 focus:ring-blue-500"
-          />
-        ) : (
-          <fieldset className="min-w-0 rounded-md border border-gray-200 bg-slate-50/80 p-3">
-            <legend className="px-1 text-xs font-semibold text-gray-600">
-              Installed by <span className="text-red-600">*</span>
-            </legend>
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
-              {SPARE_INSTALLED_BY_OPTIONS.map((opt, index) => (
-                <label
-                  key={opt.value}
-                  className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-800"
-                >
-                  <input
-                    type="radio"
-                    name="installed_by"
-                    value={opt.value}
-                    checked={form.installed_by === opt.value}
-                    onChange={handleChange}
-                    required={index === 0}
-                    className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span>{opt.label}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-        )}
-        {isVideocallSpare ? (
-          <>
-            <input
-              name="installation_completed_by"
-              value={form.installation_completed_by || ""}
-              onChange={handleChange}
-              placeholder="Completed by (name) *"
-              required
-              className="input-sleek rounded-md border border-gray-300 p-2 focus:border-blue-500 focus:ring-blue-500"
-            />
-            <TypeableDateFilterInput
-              value={form.installation_completed_date || ""}
-              onChange={(v) =>
-                handleChange({
-                  target: { name: "installation_completed_date", value: v },
-                })
-              }
-              placeholder="Completed date *"
-              required
-              className="input-sleek rounded-md border border-gray-300 p-2 focus:border-blue-500 focus:ring-blue-500"
-            />
-          </>
-        ) : null}
+        <input
+          name="warranty_period"
+          type="number"
+          value={form.warranty_period || ""}
+          onChange={handleChange}
+          placeholder="Warranty Period (months)"
+          required
+          className="input-sleek rounded-md border border-gray-300 p-2 focus:border-blue-500 focus:ring-blue-500"
+        />
         <input name="quantity" type="hidden" value="1" readOnly />
         <input
           name="customer_name"
@@ -350,23 +249,40 @@ export default function WarrantyRegistrationFormCard({
           className="input-sleek rounded-md border border-gray-300 p-2 focus:border-blue-500 focus:ring-blue-500"
         />
 
+        <div className="sm:col-span-2">
+          <label className="mb-1 block text-sm font-medium text-gray-600">
+            Upload Invoice
+          </label>
+          <input
+            type="file"
+            name="invoice"
+            accept=".pdf,.jpg,.png"
+            onChange={(e) => setInvoiceFile(e.target.files?.[0])}
+            className="input-sleek file:rounded file:border-none file:bg-blue-50 file:px-4 file:py-1 file:text-sm file:text-blue-700 hover:file:bg-blue-100"
+          />
+        </div>
+
+        <div className="sm:col-span-2">
+          <label className="mb-1 block text-sm font-medium text-gray-600">
+            Upload Proof of Delivery
+          </label>
+          <input
+            type="file"
+            name="service_reports"
+            accept=".pdf,.jpg,.png"
+            multiple
+            onChange={(e) => setReports(e.target.files)}
+            className="input-sleek file:rounded file:border-none file:bg-blue-50 file:px-4 file:py-1 file:text-sm file:text-blue-700 hover:file:bg-blue-100"
+          />
+        </div>
+
         <div className="mt-2 flex flex-col justify-between gap-4 sm:col-span-2 sm:flex-row">
           <button
             type="submit"
-            disabled={
-              submitting ||
-              (isSpareRegistration && !String(form.installed_by || "").trim()) ||
-              (isVideocallSpare &&
-                (!String(form.installation_completed_by || "").trim() ||
-                  !String(form.installation_completed_date || "").trim()))
-            }
+            disabled={submitting}
             className="w-full rounded-md bg-blue-600 px-6 py-2 font-medium text-white transition hover:bg-blue-700 disabled:opacity-60 sm:w-auto"
           >
-            {submitting
-              ? "Saving..."
-              : isSpareRegistration
-                ? "Register Spare"
-                : "Register Product"}
+            {submitting ? "Saving..." : "Register Product"}
           </button>
           <button
             type="button"

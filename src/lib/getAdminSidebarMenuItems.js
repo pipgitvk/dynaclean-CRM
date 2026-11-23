@@ -499,13 +499,6 @@ const allMenuItems = [
           icon: "ShieldCheck",
         },
         {
-          path: "/admin-dashboard/warranty/spares",
-          name: "Registered Spares",
-          moduleKey: "registered-spares",
-          roles: ["SUPERADMIN", "SERVICE SUPPORT"],
-          icon: "ShieldCheck",
-        },
-        {
           path: "/admin-dashboard/service-followups",
           name: "Machine Follow-ups",
           accessKey: "service-followups",
@@ -523,13 +516,6 @@ const allMenuItems = [
           path: "/admin-dashboard/view_service_reports",
           name: "Service History",
           roles: ["SUPERADMIN"],
-          icon: "BookOpen",
-        },
-        {
-          path: "/admin-dashboard/view_service_reports/spare-records",
-          name: "Spare Records",
-          moduleKey: "spare-installation-records",
-          roles: ["SUPERADMIN", "SERVICE SUPPORT"],
           icon: "BookOpen",
         },
         {
