@@ -177,6 +177,19 @@ export function buildInstalledOrderGoogleFeedbackWhereSql(filters, { quoteInSql 
     sql += ` AND TRIM(no.created_by) = TRIM(?)`;
     params.push(f.salesPerson);
   }
+  if (f.dispatchStatus === "not_completed") {
+    sql += ` AND NOT EXISTS (
+      SELECT 1 FROM dispatch d_ds
+      WHERE ${sqlTrimUtf8EqColumns("d_ds.quote_number", "no.quote_number")}
+        AND COALESCE(d_ds.updated_at, d_ds.created_at) IS NOT NULL
+    )`;
+  } else if (f.dispatchStatus === "completed") {
+    sql += ` AND EXISTS (
+      SELECT 1 FROM dispatch d_ds
+      WHERE ${sqlTrimUtf8EqColumns("d_ds.quote_number", "no.quote_number")}
+        AND COALESCE(d_ds.updated_at, d_ds.created_at) IS NOT NULL
+    )`;
+  }
   if (f.warrantyRegistration === "registered") {
     sql += ` AND EXISTS (
       SELECT 1
@@ -212,6 +225,7 @@ export async function countOpenInstallationGoogleFeedbackStats(filters = {}) {
     to: f.to,
     salesPerson: f.salesPerson,
     warrantyRegistration: f.warrantyRegistration,
+    dispatchStatus: f.dispatchStatus,
   });
   const cached = gfCacheGet(GF_COUNT_CACHE, cacheKey);
   if (cached) return cached;

@@ -264,6 +264,28 @@ function FilterInput({ label, placeholder, value, onChange, className = "xl:col-
   );
 }
 
+function DispatchStatusFilterSelect({ value, onChange, className = "xl:col-span-3" }) {
+  const options = [
+    { value: "not_completed", label: "Not completed" },
+    { value: "completed", label: "Completed" },
+  ];
+  return (
+    <label className={`block min-w-0 sm:col-span-1 ${className}`}>
+      <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+        Dispatch
+      </span>
+      <SearchableSelect
+        options={options}
+        value={value || "not_completed"}
+        onChange={onChange}
+        placeholder="Not completed"
+        searchPlaceholder="Search…"
+        className={`w-full min-w-0 ${filterSelectClass}`}
+      />
+    </label>
+  );
+}
+
 function WarrantyRegistrationFilterSelect({ value, onChange, className = "xl:col-span-3" }) {
   const options = [
     { value: "", label: "All (Registered & not)" },
@@ -440,6 +462,13 @@ export default function ServiceBeforeInstallationFilters({
             />
             {segment === "open-installation" || segment === "overdue-delayed-installation" ? (
               <>
+                {segment === "open-installation" ? (
+                  <DispatchStatusFilterSelect
+                    value={draft.dispatchStatus}
+                    onChange={setField("dispatchStatus")}
+                    className={row2Field}
+                  />
+                ) : null}
                 <WarrantyRegistrationFilterSelect
                   value={draft.warrantyRegistration}
                   onChange={setField("warrantyRegistration")}

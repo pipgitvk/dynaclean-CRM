@@ -62,7 +62,7 @@ const HUB_COUNTS_TTL_MS = 45_000;
 const OPEN_INSTALLATION_KPI_CACHE = new Map();
 const OPEN_INSTALLATION_KPI_TTL_MS = 90_000;
 /** Bump when count semantics change so stale under-counts (e.g. forced products) are dropped. */
-const OPEN_INSTALLATION_KPI_CACHE_VER = "v3-no-forced-products";
+const OPEN_INSTALLATION_KPI_CACHE_VER = "v4-dispatch-status";
 
 const DELIVERED_ON_SQL = `(
   no.delivered_on IS NOT NULL
@@ -96,6 +96,26 @@ function sqlQuoteHasAnyWarrantyRegistration(quoteNoColumn) {
     WHERE ${sqlTrimUtf8EqColumns("d_wr.quote_number", quoteNoColumn)}
       AND d_wr.serial_no IS NOT NULL
       AND ${sqlUtf8TrimExpr("d_wr.serial_no")} <> ''
+  )`;
+}
+
+/** Dispatch Date column: MAX(COALESCE(dispatch.updated_at, created_at)). */
+function sqlQuoteHasDispatchDate(quoteColumn) {
+  return `EXISTS (
+    SELECT 1
+    FROM dispatch d_ds
+    WHERE ${sqlTrimUtf8EqColumns("d_ds.quote_number", quoteColumn)}
+      AND COALESCE(d_ds.updated_at, d_ds.created_at) IS NOT NULL
+  )`;
+}
+
+function sqlQuoteHasProductOnQuotation(quoteColumn) {
+  return `EXISTS (
+    SELECT 1
+    FROM quotation_items qi_ds
+    INNER JOIN products_list pl_ds
+      ON ${sqlTrimUtf8EqColumns("pl_ds.item_code", "qi_ds.item_code")}
+    WHERE ${sqlTrimUtf8EqColumns("qi_ds.quote_number", quoteColumn)}
   )`;
 }
 
@@ -183,15 +203,25 @@ function appendOpenInstallationNeworderExtraFilters(
     )`;
     params.push(`%${f.model}%`);
   }
+  if (f.dispatchStatus === "not_completed") {
+    sql += ` AND NOT ${sqlQuoteHasDispatchDate("no.quote_number")}`;
+  } else if (f.dispatchStatus === "completed") {
+    sql += ` AND ${sqlQuoteHasDispatchDate("no.quote_number")}`;
+  }
+
   const itemType = resolveUpcomingInstallationType(f.itemType);
   if (!skipItemType && itemType === "products") {
-    sql += ` AND EXISTS (
+    if (f.dispatchStatus === "not_completed") {
+      sql += ` AND ${sqlQuoteHasProductOnQuotation("no.quote_number")}`;
+    } else {
+      sql += ` AND EXISTS (
       SELECT 1
       FROM dispatch d_it
       INNER JOIN products_list pl
         ON ${sqlTrimUtf8EqColumns("pl.item_code", "d_it.item_code")}
       WHERE ${sqlTrimUtf8EqColumns("d_it.quote_number", "no.quote_number")}
     )`;
+    }
   } else if (!skipItemType && itemType === "spares") {
     sql += ` AND EXISTS (
       SELECT 1
@@ -389,6 +419,7 @@ function openInstallationKpiCacheKey(filters, overdueDelayedOnly) {
     serviceStatus: f.serviceStatus,
     warrantyRegistration: f.warrantyRegistration,
     orderDeliveryStatus: f.orderDeliveryStatus,
+    dispatchStatus: f.dispatchStatus,
     salesPerson: f.salesPerson,
     serviceEngineer: f.serviceEngineer,
     thirdPartyEngineer: f.thirdPartyEngineer,
@@ -425,7 +456,10 @@ async function fetchOpenInstallationBreakdownLite(
   }
 
   // Item-type as JOIN (materialized once) — correlated EXISTS made cards crawl.
-  const itemJoin = sqlOpenInstallationItemTypeJoin(f.itemType);
+  const itemJoin =
+    f.dispatchStatus === "not_completed"
+      ? ""
+      : sqlOpenInstallationItemTypeJoin(f.itemType);
   const merged = appendOpenInstallationNeworderExtraFilters(kpiFilters, filterSql, params, {
     overdueDelayedOnly,
     skipItemType: Boolean(itemJoin),
@@ -595,7 +629,10 @@ async function countInstallationPlannedServiceRecords(conn, filters = {}) {
     noSql += ` AND ${sqlUtf8TrimExpr("no.quote_number")} IN (${quoteKeys.map(() => "?").join(",")})`;
     noParams.push(...quoteKeys);
   }
-  const itemJoin = sqlOpenInstallationItemTypeJoin(f.itemType);
+  const itemJoin =
+    f.dispatchStatus === "not_completed"
+      ? ""
+      : sqlOpenInstallationItemTypeJoin(f.itemType);
   const mergedNo = appendOpenInstallationNeworderExtraFilters(kpiFilters, noSql, noParams, {
     skipItemType: Boolean(itemJoin),
   });
@@ -927,7 +964,10 @@ async function fetchOpenInstallationNeworderPage(
   } = {},
 ) {
   const parsed = parseSbiFilters(filters);
-  const itemJoin = prebuiltWhere ? "" : sqlOpenInstallationItemTypeJoin(parsed.itemType);
+  const itemJoin =
+    prebuiltWhere || parsed.dispatchStatus === "not_completed"
+      ? ""
+      : sqlOpenInstallationItemTypeJoin(parsed.itemType);
   const where =
     prebuiltWhere ??
     (await buildOpenInstallationNeworderWhereWithQuotePrefilters(
@@ -997,7 +1037,10 @@ async function countDeliveryStatusPending(conn, filters) {
 
 async function countOpenInstallationNeworder(conn, filters, { overdueDelayedOnly = false } = {}) {
   const parsed = parseSbiFilters(filters);
-  const itemJoin = sqlOpenInstallationItemTypeJoin(parsed.itemType);
+  const itemJoin =
+    parsed.dispatchStatus === "not_completed"
+      ? ""
+      : sqlOpenInstallationItemTypeJoin(parsed.itemType);
   const where = await buildOpenInstallationNeworderWhereWithQuotePrefilters(conn, filters, {
     overdueDelayedOnly,
     skipItemType: Boolean(itemJoin),

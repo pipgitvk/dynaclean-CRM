@@ -179,6 +179,12 @@ export function buildUpcomingInstallationListFilterSql(
     sql += ` AND NOT ${U_ACTUALLY_DELIVERED_SQL}`;
   }
 
+  if (f.dispatchStatus === "not_completed") {
+    sql += ` AND (u.dispatch_date IS NULL OR TRIM(CAST(u.dispatch_date AS CHAR)) = '')`;
+  } else if (f.dispatchStatus === "completed") {
+    sql += ` AND u.dispatch_date IS NOT NULL AND TRIM(CAST(u.dispatch_date AS CHAR)) <> ''`;
+  }
+
   if (f.serviceStatus) {
     if (f.serviceStatus === "__no_installation_service__") {
       sql += ` AND NOT EXISTS (

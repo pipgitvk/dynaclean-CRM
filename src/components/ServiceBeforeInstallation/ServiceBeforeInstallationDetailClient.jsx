@@ -87,7 +87,12 @@ function isWarrantyProductSegment(segment) {
 function initialSbiFiltersForSegment(segment) {
   const base = defaultSbiSelectFilters();
   if (segment === "open-installation") {
-    return { ...base, openInstallationBucket: "delivered_pending", itemType: "products" };
+    return {
+      ...base,
+      openInstallationBucket: "delivered_pending",
+      itemType: "products",
+      dispatchStatus: "not_completed",
+    };
   }
   return base;
 }
