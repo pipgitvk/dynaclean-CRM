@@ -27,6 +27,8 @@ export default function ServiceBeforeInstallationOpenInstallationKpiStrip({
   totals = {},
   loading = false,
   plannedLoading = false,
+  deliveryPendingLoading = false,
+  completedLoading = false,
   noFeedbackLoading = false,
   onCardSelect,
 }) {
@@ -39,12 +41,17 @@ export default function ServiceBeforeInstallationOpenInstallationKpiStrip({
         const pick = COUNT_BY_CARD_ID[card.id];
         const value = pick ? pick(totals) : null;
         const settled = cardHasSettledCount(value);
-        const cardLoading =
+        const loadingFlag =
           card.id === "open-installation-feedback-collected"
-            ? Boolean(noFeedbackLoading) && !(settled && Number(value) > 0)
+            ? noFeedbackLoading
             : card.id === "open-installation-planned"
-              ? Boolean(plannedLoading) && !(settled && Number(value) > 0)
-              : Boolean(loading) && !(settled && Number(value) > 0);
+              ? plannedLoading
+              : card.id === "open-installation-delivery-pending"
+                ? deliveryPendingLoading
+                : card.id === "open-installation-completed"
+                  ? completedLoading
+                  : loading;
+        const cardLoading = Boolean(loadingFlag) && !(settled && Number(value) > 0);
         return (
           <ServiceBeforeInstallationKpiCard
             key={card.id}

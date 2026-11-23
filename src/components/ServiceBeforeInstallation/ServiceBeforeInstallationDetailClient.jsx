@@ -1626,6 +1626,12 @@ export default function ServiceBeforeInstallationDetailClient({
   const [plannedKpiLoading, setPlannedKpiLoading] = useState(
     () => segment === "open-installation",
   );
+  const [deliveryPendingKpiLoading, setDeliveryPendingKpiLoading] = useState(
+    () => segment === "open-installation",
+  );
+  const [completedKpiLoading, setCompletedKpiLoading] = useState(
+    () => segment === "open-installation",
+  );
   const [feedbackCollectedKpiLoading, setFeedbackCollectedKpiLoading] = useState(
     () => segment === "open-installation",
   );
@@ -1732,26 +1738,39 @@ export default function ServiceBeforeInstallationDetailClient({
     [segment, appliedFilters, patchFeedbackCollected, applyListTotal],
   );
 
-  const fetchPlannedKpiCount = useCallback(
-    async (signal) => {
+  const fetchOpenInstallationKpiCard = useCallback(
+    async ({ bucket, field, setLoading, signal, requestId }) => {
       if (segment !== "open-installation") return;
-      const { openInstallationBucket: _bucket, ...kpiFilters } = appliedFilters;
-      setPlannedKpiLoading(true);
+      const { openInstallationBucket: _b, ...kpiFilters } = appliedFilters;
+      setLoading(true);
       try {
         const res = await axios.get(
-          "/api/service-before-installation/open-installation/kpi/planned",
+          `/api/service-before-installation/open-installation/kpi/${bucket}`,
           {
             params: { ...kpiFilters, openInstallationBucket: "" },
             signal,
-            timeout: 20_000,
+            timeout: 12_000,
           },
         );
+        if (requestId !== kpiRequestIdRef.current) return;
         if (res.data?.success) {
-          patchBreakdownField("installation_planned", res.data.installation_planned);
+          const n = Number(res.data.count ?? res.data[field] ?? 0);
+          patchBreakdownField(field, n);
+          const activeBucket = String(appliedFilters.openInstallationBucket || "").trim();
+          if (
+            !(listTotalRef.current > 0) &&
+            activeBucket &&
+            openInstallationBucketRecordCount(activeBucket, {
+              ...openInstallationBreakdownRef.current,
+              [field]: n,
+            }) === n
+          ) {
+            applyListTotalRef.current?.(n);
+          }
         } else {
           setOpenInstallationBreakdown((prev) => {
-            if (prev.installation_planned != null) return prev;
-            const next = { ...prev, installation_planned: 0 };
+            if (prev[field] != null) return prev;
+            const next = { ...prev, [field]: 0 };
             openInstallationBreakdownRef.current = next;
             return next;
           });
@@ -1759,19 +1778,21 @@ export default function ServiceBeforeInstallationDetailClient({
       } catch (e) {
         if (e?.code !== "ERR_CANCELED") console.error(e);
         setOpenInstallationBreakdown((prev) => {
-          if (prev.installation_planned != null) return prev;
-          const next = { ...prev, installation_planned: 0 };
+          if (prev[field] != null) return prev;
+          const next = { ...prev, [field]: 0 };
           openInstallationBreakdownRef.current = next;
           return next;
         });
       } finally {
-        if (!signal?.aborted) setPlannedKpiLoading(false);
+        if (!signal?.aborted && requestId === kpiRequestIdRef.current) {
+          setLoading(false);
+        }
       }
     },
     [segment, appliedFilters, patchBreakdownField],
   );
 
-  /** Cards API only — does not load table rows. */
+  /** Four card APIs in parallel — each paints as soon as its count returns. */
   const fetchOpenInstallationKpis = useCallback(async () => {
     if (segment !== "open-installation") return;
     const filterKey = openInstallationKpiFilterKey;
@@ -1781,70 +1802,49 @@ export default function ServiceBeforeInstallationDetailClient({
     kpiFetchAbortRef.current?.abort();
     const controller = new AbortController();
     kpiFetchAbortRef.current = controller;
+    const { signal } = controller;
 
+    kpiFetchedKeyRef.current = filterKey;
     setOpenInstallationKpiLoading(true);
+    setDeliveryPendingKpiLoading(true);
     setPlannedKpiLoading(true);
+    setCompletedKpiLoading(true);
     setFeedbackCollectedKpiLoading(true);
-    const { openInstallationBucket: _bucket, ...kpiFilters } = appliedFilters;
-    void fetchFeedbackCollectedKpiCount(controller.signal);
-    void fetchPlannedKpiCount(controller.signal);
-    try {
-      const res = await axios.get(
-        "/api/service-before-installation/open-installation/kpi",
-        {
-          params: { ...kpiFilters, openInstallationBucket: "" },
-          signal: controller.signal,
-          timeout: 25_000,
-        },
-      );
-      if (requestId !== kpiRequestIdRef.current) return;
-      if (res.data?.success && res.data.openInstallationBreakdown) {
-        const br = res.data.openInstallationBreakdown;
-        kpiFetchedKeyRef.current = filterKey;
-        setOpenInstallationBreakdown((prev) => {
-          const next = {
-            ...prev,
-            delivered_installation_pending:
-              br.delivered_installation_pending ?? prev.delivered_installation_pending,
-            delivery_pending_after_dispatch:
-              br.delivery_pending_after_dispatch ?? prev.delivery_pending_after_dispatch,
-            completed_installation:
-              br.completed_installation ?? prev.completed_installation,
-            total: br.total ?? prev.total,
-            installation_planned:
-              Number(br.installation_planned) > 0
-                ? Number(br.installation_planned)
-                : prev.installation_planned,
-            feedback_collected:
-              Number(prev.feedback_collected) > 0
-                ? Number(prev.feedback_collected)
-                : prev.feedback_collected,
-          };
-          openInstallationBreakdownRef.current = next;
-          return next;
-        });
-        const activeBucket = String(appliedFilters.openInstallationBucket || "").trim();
-        if (!(listTotalRef.current > 0) && activeBucket !== "feedback_collected") {
-          applyListTotalRef.current?.(
-            openInstallationBucketRecordCount(activeBucket, br),
-          );
-        }
-      }
-    } catch (e) {
-      if (e?.code !== "ERR_CANCELED" && requestId === kpiRequestIdRef.current) {
-        console.error(e);
-      }
-    } finally {
-      if (requestId === kpiRequestIdRef.current) {
-        setOpenInstallationKpiLoading(false);
-      }
-    }
+
+    void fetchOpenInstallationKpiCard({
+      bucket: "delivered-pending",
+      field: "delivered_installation_pending",
+      setLoading: setOpenInstallationKpiLoading,
+      signal,
+      requestId,
+    });
+    void fetchOpenInstallationKpiCard({
+      bucket: "delivery-pending",
+      field: "delivery_pending_after_dispatch",
+      setLoading: setDeliveryPendingKpiLoading,
+      signal,
+      requestId,
+    });
+    void fetchOpenInstallationKpiCard({
+      bucket: "planned",
+      field: "installation_planned",
+      setLoading: setPlannedKpiLoading,
+      signal,
+      requestId,
+    });
+    void fetchOpenInstallationKpiCard({
+      bucket: "completed",
+      field: "completed_installation",
+      setLoading: setCompletedKpiLoading,
+      signal,
+      requestId,
+    });
+    void fetchFeedbackCollectedKpiCount(signal);
   }, [
     segment,
     openInstallationKpiFilterKey,
-    appliedFilters,
+    fetchOpenInstallationKpiCard,
     fetchFeedbackCollectedKpiCount,
-    fetchPlannedKpiCount,
   ]);
 
   const enrichOpenInstallationServiceColumns = useCallback(async (baseRows, listRequestId) => {
@@ -2083,8 +2083,6 @@ export default function ServiceBeforeInstallationDetailClient({
     enrichOpenInstallationServiceColumns,
   ]);
 
-  const openInstallationKpiStripLoading = openInstallationKpiLoading;
-
   const fetchTableFilterOptions = useCallback(async () => {
     if (
       segment !== "total-registered" &&
@@ -2186,8 +2184,10 @@ export default function ServiceBeforeInstallationDetailClient({
           <ServiceBeforeInstallationOpenInstallationKpiStrip
             openInstallationBucket={appliedFilters.openInstallationBucket}
             totals={openInstallationBreakdown}
-            loading={openInstallationKpiStripLoading}
+            loading={openInstallationKpiLoading}
             plannedLoading={plannedKpiLoading}
+            deliveryPendingLoading={deliveryPendingKpiLoading}
+            completedLoading={completedKpiLoading}
             noFeedbackLoading={feedbackCollectedKpiLoading}
             onCardSelect={(openInstallationBucket) => {
               setPage(0);
@@ -2224,7 +2224,9 @@ export default function ServiceBeforeInstallationDetailClient({
             tableFilterOptionsFetchKeyRef.current = null;
             kpiFetchedKeyRef.current = "";
             setOpenInstallationKpiLoading(true);
+            setDeliveryPendingKpiLoading(true);
             setPlannedKpiLoading(true);
+            setCompletedKpiLoading(true);
             setFeedbackCollectedKpiLoading(true);
             setAppliedFilters({ ...draftFilters });
           }}

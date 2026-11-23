@@ -1112,6 +1112,69 @@ export async function fetchOpenInstallationCardsBreakdown(filters = {}) {
   return fetchOpenInstallationBreakdownByBuckets(conn, filters);
 }
 
+const OPEN_INSTALLATION_KPI_CARD_SPEC = {
+  "delivered-pending": {
+    field: "delivered_installation_pending",
+    openInstallationBucket: "delivered_pending",
+  },
+  delivered_pending: {
+    field: "delivered_installation_pending",
+    openInstallationBucket: "delivered_pending",
+  },
+  "delivery-pending": {
+    field: "delivery_pending_after_dispatch",
+    openInstallationBucket: "delivery_pending",
+  },
+  delivery_pending: {
+    field: "delivery_pending_after_dispatch",
+    openInstallationBucket: "delivery_pending",
+  },
+  completed: {
+    field: "completed_installation",
+    openInstallationBucket: "completed",
+  },
+  planned: {
+    field: "installation_planned",
+    openInstallationBucket: "installation_planned",
+  },
+  "installation-planned": {
+    field: "installation_planned",
+    openInstallationBucket: "installation_planned",
+  },
+};
+
+/**
+ * One KPI card count on its own connection — so 4 cards can load in parallel.
+ */
+export async function countOpenInstallationKpiBucket(filters, bucket) {
+  const key = String(bucket || "")
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, "-");
+  const spec =
+    OPEN_INSTALLATION_KPI_CARD_SPEC[key] ||
+    OPEN_INSTALLATION_KPI_CARD_SPEC[key.replace(/-/g, "_")];
+  if (!spec) {
+    return { field: null, count: 0 };
+  }
+
+  const kpiFilters = sbiFiltersForOpenInstallationKpi(
+    withDefaultOpenInstallationItemType(filters),
+  );
+  const conn = await getDbConnection();
+
+  if (spec.field === "installation_planned") {
+    const count = await countInstallationPlannedServiceRecords(conn, kpiFilters);
+    return { field: spec.field, count };
+  }
+
+  const count = await countOpenInstallationNeworder(conn, {
+    ...kpiFilters,
+    openInstallationBucket: spec.openInstallationBucket,
+  });
+  return { field: spec.field, count };
+}
+
 /** Fast total for open-installation list (separate API from rows). */
 export async function countOpenInstallationSegment(segment, filters = {}) {
   const conn = await getDbConnection();

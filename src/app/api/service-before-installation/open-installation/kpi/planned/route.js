@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { assertSuperAdminApiAccess } from "@/lib/serviceBeforeInstallationAccess";
 import { parseSbiFiltersFromSearchParams } from "@/lib/serviceBeforeInstallationFilters";
 import {
-  countOpenInstallationPlannedKpi,
+  countOpenInstallationKpiBucket,
   withDefaultOpenInstallationItemType,
 } from "@/lib/serviceBeforeInstallationQueries";
 
@@ -17,11 +17,13 @@ export async function GET(request) {
     const filters = withDefaultOpenInstallationItemType(
       parseSbiFiltersFromSearchParams(searchParams),
     );
-    const installation_planned = await countOpenInstallationPlannedKpi(filters);
+    const { count } = await countOpenInstallationKpiBucket(filters, "planned");
 
     return NextResponse.json({
       success: true,
-      installation_planned,
+      installation_planned: count,
+      field: "installation_planned",
+      count,
     });
   } catch (error) {
     console.error("[open-installation/kpi/planned]", error);
