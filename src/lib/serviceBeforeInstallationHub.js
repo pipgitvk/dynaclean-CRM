@@ -71,34 +71,8 @@ export const OPEN_INSTALLATION_DETAIL_KPI_STRIP = [
   },
 ];
 
-export const TOTAL_REGISTERED_DETAIL_KPI_STRIP = [
-  {
-    id: "registered-installation-pending",
-    title: "Installation Pending",
-    subtitle: "After registration — not installed yet",
-    countCaption: "No. of installations pending after registered products",
-    countKey: "registered_installation_pending",
-    accent: "from-amber-500 to-orange-600",
-    surface:
-      "bg-white/80 backdrop-blur-xl border-amber-200/40 shadow-[0_8px_30px_-8px_rgba(245,158,11,0.35)]",
-    glow: "bg-amber-400/25",
-    iconSurface: "bg-gradient-to-br from-amber-500 to-orange-600",
-    chartColor: "#f59e0b",
-  },
-  {
-    id: "registered-installation-completed",
-    title: "Installation Completed",
-    subtitle: "Registered products with installation done",
-    countCaption: "No. of installations completed after registered products",
-    countKey: "registered_installation_completed",
-    accent: "from-emerald-500 to-teal-600",
-    surface:
-      "bg-white/80 backdrop-blur-xl border-emerald-200/40 shadow-[0_8px_30px_-8px_rgba(16,185,129,0.3)]",
-    glow: "bg-emerald-400/25",
-    iconSurface: "bg-gradient-to-br from-emerald-500 to-teal-600",
-    chartColor: "#10b981",
-  },
-];
+/** Total Registered detail — no sub KPI strip (pending/completed cards removed). */
+export const TOTAL_REGISTERED_DETAIL_KPI_STRIP = [];
 
 export const SERVICE_BEFORE_INSTALLATION_SEGMENTS = [
   {

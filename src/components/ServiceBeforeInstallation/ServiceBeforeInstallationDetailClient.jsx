@@ -33,7 +33,6 @@ import {
   normalizeOpenInstallationBucket,
 } from "@/lib/serviceBeforeInstallationFilters";
 import ServiceBeforeInstallationFilters from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationFilters";
-import ServiceBeforeInstallationDetailKpiStrip from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationDetailKpiStrip";
 import ServiceBeforeInstallationOpenInstallationKpiStrip from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationOpenInstallationKpiStrip";
 import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { formatCrmDatetimeForISTDisplay } from "@/lib/timezone";
@@ -2275,22 +2274,6 @@ export default function ServiceBeforeInstallationDetailClient({
         </Link>
 
         <DetailSegmentHeader meta={headerMeta} segment={segment} />
-
-        {segment === "total-registered" ? (
-          <ServiceBeforeInstallationDetailKpiStrip
-            dashboardBase={dashboardBase}
-            registeredInstallation={appliedFilters.registeredInstallation}
-            totals={installationBreakdown}
-            loading={loading}
-            onCardSelect={(registeredInstallation) => {
-              setLoading(true);
-              setPage(0);
-              const next = { ...appliedFilters, registeredInstallation };
-              setAppliedFilters(next);
-              setDraftFilters(next);
-            }}
-          />
-        ) : null}
 
         {segment === "open-installation" ? (
           <ServiceBeforeInstallationOpenInstallationKpiStrip
