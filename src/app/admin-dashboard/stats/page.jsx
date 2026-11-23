@@ -37,6 +37,7 @@ import {
 } from "chart.js";
 import toast from "react-hot-toast";
 import TopAchieversCard from "@/components/stats/TopAchieversCard";
+import TopSalesPerformersSection from "@/components/stats/TopSalesPerformersSection";
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 
 const formatLocalDate = (date) => {
@@ -875,89 +876,13 @@ export default function AdminStatsDashboard() {
                 />
             </div>
 
-            {/* Top Sales Performers by Revenue */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                <div className="bg-white rounded-xl shadow-md p-6">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                        Taxable split (all performers)
-                    </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="rounded-lg border border-indigo-200 bg-indigo-50/80 p-4">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700 mb-1">
-                                Products taxable
-                            </p>
-                            <p className="text-2xl font-bold text-indigo-950 tabular-nums">
-                                {formatCurrency(topPerformersMeta?.products_taxable || 0)}
-                            </p>
-                        </div>
-                        <div className="rounded-lg border border-rose-200 bg-rose-50/80 p-4">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-rose-700 mb-1">
-                                Spares taxable
-                            </p>
-                            <p className="text-2xl font-bold text-rose-950 tabular-nums">
-                                {formatCurrency(topPerformersMeta?.spares_taxable || 0)}
-                            </p>
-                        </div>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-3">
-                        Approved orders · quotation line items in selected period
-                    </p>
-                </div>
-                <div className="bg-white rounded-xl shadow-md p-6">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Top Sales Performers</h3>
-                    <div className="space-y-3 max-h-80 overflow-y-auto">
-                        {topPerformersLoading ? (
-                            <div className="flex justify-center py-12">
-                                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
-                            </div>
-                        ) : topPerformers.length > 0 ? (
-                            topPerformers.map((performer, index) => (
-                                <div
-                                    key={performer.salesperson}
-                                    className="flex items-center justify-between gap-2 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-                                >
-                                    <div className="flex items-center gap-3 min-w-0">
-                                        <div className="w-8 h-8 shrink-0 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm">
-                                            {index + 1}
-                                        </div>
-                                        <div className="min-w-0">
-                                            <p className="font-medium text-gray-900 truncate">
-                                                {performer.salesperson}
-                                            </p>
-                                            <p className="text-sm text-gray-500">
-                                                {performer.orders_count} orders
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2 shrink-0">
-                                        <div className="text-right">
-                                            <p className="font-semibold text-green-600 tabular-nums">
-                                                {formatCurrency(performer.revenue)}
-                                            </p>
-                                            <p className="text-[11px] text-indigo-700 tabular-nums">
-                                                Products: {formatCurrency(performer.products_taxable)}
-                                            </p>
-                                            <p className="text-[11px] text-rose-700 tabular-nums">
-                                                Spares: {formatCurrency(performer.spares_taxable)}
-                                            </p>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => openQuotationsModal(performer.salesperson)}
-                                            className="p-1.5 rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-600 transition-colors"
-                                            title="View quotations"
-                                        >
-                                            <Eye className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))
-                        ) : (
-                            <p className="text-gray-500 text-center py-8">No sales data available</p>
-                        )}
-                    </div>
-                </div>
-            </div>
+            <TopSalesPerformersSection
+                performers={topPerformers}
+                meta={topPerformersMeta}
+                loading={topPerformersLoading}
+                formatCurrency={formatCurrency}
+                onViewQuotations={openQuotationsModal}
+            />
 
             {/* Salesperson Quotations Modal */}
             {quotationsModalOpen && (
