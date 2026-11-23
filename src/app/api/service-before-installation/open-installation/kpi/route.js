@@ -7,8 +7,7 @@ import {
 } from "@/lib/serviceBeforeInstallationQueries";
 
 /**
- * KPI cards — same per-bucket COUNT as the table (e.g. delivered-pending 142).
- * Table: /list — Total: /count
+ * Fast 3-card KPI (one neworder scan). Planned + Google Feedback stay on their own APIs.
  */
 export async function GET(request) {
   try {

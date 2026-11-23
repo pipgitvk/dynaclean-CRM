@@ -22,7 +22,11 @@ import {
   ShieldCheck,
   Wrench,
 } from "lucide-react";
-import { getSegmentMeta } from "@/lib/serviceBeforeInstallationHub";
+import {
+  getSegmentMeta,
+  openInstallationTableCountApi,
+  openInstallationTableListApi,
+} from "@/lib/serviceBeforeInstallationHub";
 import { openInstallationBucketRecordCount } from "@/lib/openInstallationKpiSql";
 import {
   defaultSbiSelectFilters,
@@ -1876,7 +1880,7 @@ export default function ServiceBeforeInstallationDetailClient({
     [segment, appliedFilters, patchBreakdownField],
   );
 
-  /** Four card APIs in parallel — each paints as soon as its count returns. */
+  /** One lite KPI scan for 3 neworder cards; planned + Google Feedback stay independent. */
   const fetchOpenInstallationKpis = useCallback(async () => {
     if (segment !== "open-installation") return;
     const filterKey = openInstallationKpiFilterKey;
@@ -1891,24 +1895,49 @@ export default function ServiceBeforeInstallationDetailClient({
     kpiFetchedKeyRef.current = filterKey;
     setOpenInstallationKpiLoading(true);
     setDeliveryPendingKpiLoading(true);
-    setPlannedKpiLoading(true);
     setCompletedKpiLoading(true);
+    setPlannedKpiLoading(true);
     setFeedbackCollectedKpiLoading(true);
 
-    void fetchOpenInstallationKpiCard({
-      bucket: "delivered-pending",
-      field: "delivered_installation_pending",
-      setLoading: setOpenInstallationKpiLoading,
-      signal,
-      requestId,
-    });
-    void fetchOpenInstallationKpiCard({
-      bucket: "delivery-pending",
-      field: "delivery_pending_after_dispatch",
-      setLoading: setDeliveryPendingKpiLoading,
-      signal,
-      requestId,
-    });
+    const { openInstallationBucket: _b, ...kpiFilters } = appliedFilters;
+    const params = { ...kpiFilters, openInstallationBucket: "" };
+
+    void (async () => {
+      try {
+        const res = await axios.get("/api/service-before-installation/open-installation/kpi", {
+          params,
+          signal,
+          timeout: 10_000,
+        });
+        if (requestId !== kpiRequestIdRef.current) return;
+        if (res.data?.success && res.data.openInstallationBreakdown) {
+          const b = res.data.openInstallationBreakdown;
+          setOpenInstallationBreakdown((prev) => {
+            const next = {
+              ...prev,
+              delivered_installation_pending: b.delivered_installation_pending,
+              delivery_pending_after_dispatch: b.delivery_pending_after_dispatch,
+              completed_installation: b.completed_installation,
+              total: b.total ?? prev.total,
+            };
+            openInstallationBreakdownRef.current = next;
+            return next;
+          });
+          const activeBucket = String(appliedFilters.openInstallationBucket || "").trim();
+          const n = openInstallationBucketRecordCount(activeBucket, b);
+          if (n > 0) applyListTotalRef.current?.(n);
+        }
+      } catch (e) {
+        if (e?.code !== "ERR_CANCELED") console.error(e);
+      } finally {
+        if (!signal.aborted && requestId === kpiRequestIdRef.current) {
+          setOpenInstallationKpiLoading(false);
+          setDeliveryPendingKpiLoading(false);
+          setCompletedKpiLoading(false);
+        }
+      }
+    })();
+
     void fetchOpenInstallationKpiCard({
       bucket: "planned",
       field: "installation_planned",
@@ -1916,17 +1945,11 @@ export default function ServiceBeforeInstallationDetailClient({
       signal,
       requestId,
     });
-    void fetchOpenInstallationKpiCard({
-      bucket: "completed",
-      field: "completed_installation",
-      setLoading: setCompletedKpiLoading,
-      signal,
-      requestId,
-    });
     void fetchFeedbackCollectedKpiCount(signal);
   }, [
     segment,
     openInstallationKpiFilterKey,
+    appliedFilters,
     fetchOpenInstallationKpiCard,
     fetchFeedbackCollectedKpiCount,
   ]);
@@ -1973,24 +1996,20 @@ export default function ServiceBeforeInstallationDetailClient({
     const controller = new AbortController();
     countFetchAbortRef.current = controller;
     const bucket = String(appliedFilters.openInstallationBucket || "").trim();
-    const useGoogleFeedbackApi =
+    const isFeedbackTable =
       segment === "open-installation" && bucket === "feedback_collected";
 
     setCountLoading(true);
-    if (useGoogleFeedbackApi) setFeedbackCollectedKpiLoading(true);
     try {
+      const { openInstallationBucket: _bucket, ...countFilters } = appliedFilters;
       const res = await axios.get(
-        useGoogleFeedbackApi
-          ? "/api/service-before-installation/google-feedback"
-          : segment === "open-installation"
-            ? "/api/service-before-installation/open-installation/count"
-            : `/api/service-before-installation/${segment}`,
+        segment === "open-installation"
+          ? openInstallationTableCountApi(bucket)
+          : `/api/service-before-installation/${segment}`,
         {
           params: {
-            ...appliedFilters,
-            ...(useGoogleFeedbackApi || segment !== "open-installation"
-              ? { countOnly: "1" }
-              : {}),
+            ...countFilters,
+            ...(segment !== "open-installation" ? { countOnly: "1" } : {}),
             limit: pageSize,
             skip: page * pageSize,
           },
@@ -2003,19 +2022,18 @@ export default function ServiceBeforeInstallationDetailClient({
           res.data.pagination?.total ?? res.data.feedback_collected ?? 0,
         );
         applyListTotal(total);
-        if (useGoogleFeedbackApi) patchFeedbackCollected(total);
+        if (isFeedbackTable) patchFeedbackCollected(total);
       }
     } catch (e) {
       if (e?.code === "ERR_CANCELED") return;
       console.error(e);
-      if (useGoogleFeedbackApi && !(listTotalRef.current > 0)) {
+      if (isFeedbackTable && !(listTotalRef.current > 0)) {
         const fallback = Math.max(pageSize, page * pageSize + pageSize);
         applyListTotal(fallback);
       }
     } finally {
       if (!controller.signal.aborted) {
         setCountLoading(false);
-        if (useGoogleFeedbackApi) setFeedbackCollectedKpiLoading(false);
       }
     }
   }, [segment, appliedFilters, page, pageSize, applyListTotal, patchFeedbackCollected]);
@@ -2037,24 +2055,24 @@ export default function ServiceBeforeInstallationDetailClient({
         ? openInstallationBucketRecordCount(activeBucket, openInstallationBreakdownRef.current)
         : 0);
 
-    // Open Installation: separate APIs — cards (/kpi) vs table (/list).
+    // Open Installation: each card has its own table API (/list/{bucket}).
     if (isOpenInstallationList) {
-      const useGoogleFeedbackApi =
+      const isFeedbackTable =
         segment === "open-installation" && activeBucket === "feedback_collected";
-      if (segment === "open-installation" && !useGoogleFeedbackApi) {
+      if (segment === "open-installation") {
         if (kpiFetchedKeyRef.current !== openInstallationKpiFilterKey) {
           void fetchOpenInstallationKpis();
         }
       }
       try {
-        const listUrl = useGoogleFeedbackApi
-          ? "/api/service-before-installation/google-feedback"
-          : segment === "open-installation"
-            ? "/api/service-before-installation/open-installation/list"
+        const { openInstallationBucket: _bucket, ...listFilters } = appliedFilters;
+        const listUrl =
+          segment === "open-installation"
+            ? openInstallationTableListApi(activeBucket)
             : `/api/service-before-installation/${segment}`;
         const res = await axios.get(listUrl, {
           params: {
-            ...appliedFilters,
+            ...listFilters,
             limit: pageSize,
             skip: page * pageSize,
             includeFilterOptions: "0",
@@ -2075,7 +2093,7 @@ export default function ServiceBeforeInstallationDetailClient({
             total,
             hasMore: total > 0 ? page * pageSize + data.length < total : hasMoreFlag,
           });
-          if (useGoogleFeedbackApi && !hasMoreFlag) {
+          if (isFeedbackTable && !hasMoreFlag) {
             const exact = page * pageSize + data.length;
             applyListTotal(exact, data.length);
             patchFeedbackCollected(exact);
@@ -2100,7 +2118,7 @@ export default function ServiceBeforeInstallationDetailClient({
 
       if (signal.aborted || requestId !== rowsRequestIdRef.current) return;
 
-      // Prefer card totals for pagination; only hit /count when still unknown.
+      // Prefer card totals; skip extra COUNT unless KPI still has not returned.
       const fromCards = openInstallationBucketRecordCount(
         activeBucket,
         openInstallationBreakdownRef.current,
@@ -2108,11 +2126,15 @@ export default function ServiceBeforeInstallationDetailClient({
       if (fromCards > 0) {
         applyListTotal(fromCards);
         setCountLoading(false);
-      } else if (useGoogleFeedbackApi || !(listTotalRef.current > 0)) {
+      } else if (!(listTotalRef.current > 0)) {
         window.setTimeout(() => {
           if (requestId !== rowsRequestIdRef.current) return;
+          if (listTotalRef.current > 0) {
+            setCountLoading(false);
+            return;
+          }
           void fetchOpenInstallationCount();
-        }, 200);
+        }, 500);
       } else {
         setCountLoading(false);
       }
@@ -2205,6 +2227,11 @@ export default function ServiceBeforeInstallationDetailClient({
   useEffect(() => {
     listTotalRef.current = 0;
   }, [segment]);
+
+  useEffect(() => {
+    if (segment !== "open-installation") return;
+    void fetchOpenInstallationKpis();
+  }, [segment, fetchOpenInstallationKpis]);
 
   useEffect(() => {
     if (segment === "open-installation" && !openInstallationBucketReady) return;

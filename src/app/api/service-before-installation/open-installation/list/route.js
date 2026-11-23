@@ -7,9 +7,8 @@ import {
 } from "@/lib/serviceBeforeInstallationQueries";
 
 /**
- * Table rows only — no KPI breakdown, no full COUNT.
- * Cards: GET /open-installation/kpi
- * Total: GET /open-installation/count
+ * Legacy combined table list. Prefer per-card:
+ * GET /open-installation/list/delivered-pending | delivery-pending | planned | completed | feedback-collected
  */
 export async function GET(request) {
   try {

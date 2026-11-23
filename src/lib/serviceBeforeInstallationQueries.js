@@ -60,14 +60,15 @@ export const OVERDUE_DELAYED_INSTALLATION_DAYS = 2;
 const HUB_COUNTS_CACHE = new Map();
 const HUB_COUNTS_TTL_MS = 45_000;
 const OPEN_INSTALLATION_KPI_CACHE = new Map();
+const OPEN_INSTALLATION_KPI_INFLIGHT = new Map();
 const OPEN_INSTALLATION_KPI_TTL_MS = 90_000;
 /** Bump when count semantics change so stale under-counts (e.g. forced products) are dropped. */
-const OPEN_INSTALLATION_KPI_CACHE_VER = "v4-dispatch-status";
+const OPEN_INSTALLATION_KPI_CACHE_VER = "v5-fast-joins";
 
 const DELIVERED_ON_SQL = `(
   no.delivered_on IS NOT NULL
   AND TRIM(CAST(no.delivered_on AS CHAR)) NOT IN ('', '0000-00-00', '0000-00-00 00:00:00')
-  AND DATE(no.delivered_on) > '1970-01-01'
+  AND no.delivered_on > '1970-01-01'
 )`;
 
 function openInstallationNeedsFullListShape(filters) {
@@ -119,6 +120,56 @@ function sqlQuoteHasProductOnQuotation(quoteColumn) {
   )`;
 }
 
+/**
+ * Default Open Installation filters (products + dispatch not completed) used correlated
+ * EXISTS per neworder row and timed out the pool. Materialize quote sets once.
+ */
+function openInstallationNeworderJoinPlan(filters) {
+  const f = parseSbiFilters(filters);
+  const type = resolveUpcomingInstallationType(f.itemType);
+  let joinSql = "";
+  let extraWhere = "";
+  let skipItemType = false;
+  let skipDispatchStatus = false;
+
+  if (f.dispatchStatus === "not_completed" || f.dispatchStatus === "completed") {
+    const joinKind = f.dispatchStatus === "not_completed" ? "LEFT JOIN" : "INNER JOIN";
+    joinSql += `
+    ${joinKind} (
+      SELECT DISTINCT ${sqlUtf8TrimExpr("d.quote_number")} AS quote_key
+      FROM dispatch d
+      WHERE d.quote_number IS NOT NULL
+        AND ${sqlUtf8TrimExpr("d.quote_number")} <> ''
+        AND COALESCE(d.updated_at, d.created_at) IS NOT NULL
+    ) oi_has_disp ON oi_has_disp.quote_key = ${sqlUtf8TrimExpr("no.quote_number")}`;
+    if (f.dispatchStatus === "not_completed") {
+      extraWhere += ` AND oi_has_disp.quote_key IS NULL`;
+    }
+    skipDispatchStatus = true;
+  }
+
+  if (type === "products" && f.dispatchStatus === "not_completed") {
+    joinSql += `
+    INNER JOIN (
+      SELECT DISTINCT ${sqlUtf8TrimExpr("qi.quote_number")} AS quote_key
+      FROM quotation_items qi
+      INNER JOIN products_list pl
+        ON ${sqlTrimUtf8EqColumns("pl.item_code", "qi.item_code")}
+      WHERE qi.quote_number IS NOT NULL
+        AND ${sqlUtf8TrimExpr("qi.quote_number")} <> ''
+    ) oi_qi_prod ON oi_qi_prod.quote_key = ${sqlUtf8TrimExpr("no.quote_number")}`;
+    skipItemType = true;
+  } else {
+    const itemJoin = sqlOpenInstallationItemTypeJoin(f.itemType);
+    if (itemJoin) {
+      joinSql += `\n    ${itemJoin}`;
+      skipItemType = true;
+    }
+  }
+
+  return { joinSql, extraWhere, skipItemType, skipDispatchStatus };
+}
+
 /** One-shot product/spare quote set — avoids correlated EXISTS per neworder row. */
 function sqlOpenInstallationItemTypeJoin(itemType, alias = "oi_item_q") {
   const type = resolveUpcomingInstallationType(itemType);
@@ -149,7 +200,7 @@ function appendOpenInstallationNeworderExtraFilters(
   filters,
   sql,
   params,
-  { overdueDelayedOnly = false, skipItemType = false } = {},
+  { overdueDelayedOnly = false, skipItemType = false, skipDispatchStatus = false } = {},
 ) {
   const f = parseSbiFilters(filters);
 
@@ -203,10 +254,12 @@ function appendOpenInstallationNeworderExtraFilters(
     )`;
     params.push(`%${f.model}%`);
   }
-  if (f.dispatchStatus === "not_completed") {
-    sql += ` AND NOT ${sqlQuoteHasDispatchDate("no.quote_number")}`;
-  } else if (f.dispatchStatus === "completed") {
-    sql += ` AND ${sqlQuoteHasDispatchDate("no.quote_number")}`;
+  if (!skipDispatchStatus) {
+    if (f.dispatchStatus === "not_completed") {
+      sql += ` AND NOT ${sqlQuoteHasDispatchDate("no.quote_number")}`;
+    } else if (f.dispatchStatus === "completed") {
+      sql += ` AND ${sqlQuoteHasDispatchDate("no.quote_number")}`;
+    }
   }
 
   const itemType = resolveUpcomingInstallationType(f.itemType);
@@ -455,16 +508,13 @@ async function fetchOpenInstallationBreakdownLite(
     params.push(...quoteKeys);
   }
 
-  // Item-type as JOIN (materialized once) — correlated EXISTS made cards crawl.
-  const itemJoin =
-    f.dispatchStatus === "not_completed"
-      ? ""
-      : sqlOpenInstallationItemTypeJoin(f.itemType);
+  const plan = openInstallationNeworderJoinPlan(kpiFilters);
   const merged = appendOpenInstallationNeworderExtraFilters(kpiFilters, filterSql, params, {
     overdueDelayedOnly,
-    skipItemType: Boolean(itemJoin),
+    skipItemType: plan.skipItemType,
+    skipDispatchStatus: plan.skipDispatchStatus,
   });
-  const baseOrderSql = merged.sql;
+  const baseOrderSql = `${merged.sql}${plan.extraWhere}`;
 
   const deliveredOnSql = DELIVERED_ON_SQL;
 
@@ -487,7 +537,7 @@ async function fetchOpenInstallationBreakdownLite(
        0 AS no_feedback_collected,
        0 AS feedback_collected
      FROM neworder no
-     ${itemJoin}
+     ${plan.joinSql}
      WHERE ${baseOrderSql}`;
 
   const [sumRows] = await conn.execute(sumSql, merged.params);
@@ -498,6 +548,43 @@ async function fetchOpenInstallationBreakdownLite(
     data.installation_planned = await countInstallationPlannedServiceRecords(conn, kpiFilters);
   }
   return data;
+}
+
+/** One lite scan for 3 neworder cards — coalesces parallel KPI HTTP requests onto one query. */
+async function loadOpenInstallationLiteBreakdown(filters, { overdueDelayedOnly = false } = {}) {
+  const kpiFilters = sbiFiltersForOpenInstallationKpi(
+    withDefaultOpenInstallationItemType(filters),
+  );
+  const cacheKey = openInstallationKpiCacheKey(kpiFilters, overdueDelayedOnly);
+  const cached = OPEN_INSTALLATION_KPI_CACHE.get(cacheKey);
+  if (cached && Date.now() - cached.at < OPEN_INSTALLATION_KPI_TTL_MS) {
+    return cached.data;
+  }
+  const inflightKey = `${cacheKey}|lite`;
+  const existing = OPEN_INSTALLATION_KPI_INFLIGHT.get(inflightKey);
+  if (existing) return existing;
+
+  const promise = (async () => {
+    const conn = await getDbConnection();
+    const data = await fetchOpenInstallationBreakdownLite(conn, kpiFilters, {
+      overdueDelayedOnly,
+      deferInstallationPlanned: true,
+    });
+    const allZero =
+      !data.total &&
+      !data.delivered_installation_pending &&
+      !data.delivery_pending_after_dispatch &&
+      !data.completed_installation;
+    if (!allZero) {
+      OPEN_INSTALLATION_KPI_CACHE.set(cacheKey, { at: Date.now(), data });
+    }
+    return data;
+  })().finally(() => {
+    OPEN_INSTALLATION_KPI_INFLIGHT.delete(inflightKey);
+  });
+
+  OPEN_INSTALLATION_KPI_INFLIGHT.set(inflightKey, promise);
+  return promise;
 }
 
 export async function countOpenInstallationPlannedKpi(filters = {}) {
@@ -696,12 +783,13 @@ function appendNeworderQuoteKeyInSql(whereSql, whereParams, quoteKeys) {
 async function buildOpenInstallationNeworderWhereWithQuotePrefilters(
   conn,
   filters,
-  { overdueDelayedOnly = false, skipItemType = false } = {},
+  { overdueDelayedOnly = false, skipItemType = false, skipDispatchStatus = false } = {},
 ) {
   const parsed = parseSbiFilters(filters);
   const base = buildOpenInstallationNeworderWhereSql(filters, {
     overdueDelayedOnly,
     skipItemType,
+    skipDispatchStatus,
   });
 
   if (parsed.instCompletedBy) {
@@ -762,7 +850,7 @@ function sqlOpenInstallationQuoteLatestRegisteredByEquals(quoteNoColumn) {
  */
 function buildOpenInstallationNeworderWhereSql(
   filters,
-  { overdueDelayedOnly = false, skipItemType = false } = {},
+  { overdueDelayedOnly = false, skipItemType = false, skipDispatchStatus = false } = {},
 ) {
   const f = parseSbiFilters(filters);
   const bucket = String(f.openInstallationBucket || "").trim().toLowerCase();
@@ -790,6 +878,7 @@ function buildOpenInstallationNeworderWhereSql(
   return appendOpenInstallationNeworderExtraFilters(filters, sql, params, {
     overdueDelayedOnly,
     skipItemType,
+    skipDispatchStatus,
   });
 }
 
@@ -964,10 +1053,7 @@ async function fetchOpenInstallationNeworderPage(
   } = {},
 ) {
   const parsed = parseSbiFilters(filters);
-  const itemJoin =
-    prebuiltWhere || parsed.dispatchStatus === "not_completed"
-      ? ""
-      : sqlOpenInstallationItemTypeJoin(parsed.itemType);
+  const plan = prebuiltWhere ? { joinSql: "", extraWhere: "", skipItemType: false, skipDispatchStatus: false } : openInstallationNeworderJoinPlan(parsed);
   const where =
     prebuiltWhere ??
     (await buildOpenInstallationNeworderWhereWithQuotePrefilters(
@@ -975,15 +1061,19 @@ async function fetchOpenInstallationNeworderPage(
       filters,
       {
         overdueDelayedOnly,
-        skipItemType: Boolean(itemJoin),
+        skipItemType: plan.skipItemType,
+        skipDispatchStatus: plan.skipDispatchStatus,
       },
     ));
+  if (!prebuiltWhere && plan.extraWhere) {
+    where.sql += plan.extraWhere;
+  }
 
   const [rows] = await conn.execute(
     `SELECT
        ${OPEN_INSTALLATION_LIST_SELECT}
      FROM neworder no
-     ${itemJoin}
+     ${plan.joinSql}
      ${where.sql}
      ORDER BY no.id DESC
      LIMIT ? OFFSET ?`,
@@ -1012,7 +1102,7 @@ async function fetchOpenInstallationNeworderPage(
   let total;
   if (!skipTotal) {
     const [[countRow]] = await conn.execute(
-      `SELECT COUNT(*) AS cnt FROM neworder no ${itemJoin} ${where.sql}`,
+      `SELECT COUNT(*) AS cnt FROM neworder no ${plan.joinSql} ${where.sql}`,
       where.params,
     );
     total = Number(countRow?.cnt || 0);
@@ -1037,16 +1127,15 @@ async function countDeliveryStatusPending(conn, filters) {
 
 async function countOpenInstallationNeworder(conn, filters, { overdueDelayedOnly = false } = {}) {
   const parsed = parseSbiFilters(filters);
-  const itemJoin =
-    parsed.dispatchStatus === "not_completed"
-      ? ""
-      : sqlOpenInstallationItemTypeJoin(parsed.itemType);
+  const plan = openInstallationNeworderJoinPlan(parsed);
   const where = await buildOpenInstallationNeworderWhereWithQuotePrefilters(conn, filters, {
     overdueDelayedOnly,
-    skipItemType: Boolean(itemJoin),
+    skipItemType: plan.skipItemType,
+    skipDispatchStatus: plan.skipDispatchStatus,
   });
+  if (plan.extraWhere) where.sql += plan.extraWhere;
   const [[row]] = await conn.execute(
-    `SELECT COUNT(*) AS cnt FROM neworder no ${itemJoin} ${where.sql}`,
+    `SELECT COUNT(*) AS cnt FROM neworder no ${plan.joinSql} ${where.sql}`,
     where.params,
   );
   return Number(row?.cnt || 0);
@@ -1108,8 +1197,7 @@ async function fetchOpenInstallationBreakdownByBuckets(conn, filters) {
 
 /** Public cards breakdown — list-accurate bucket counts (not lite SUM). */
 export async function fetchOpenInstallationCardsBreakdown(filters = {}) {
-  const conn = await getDbConnection();
-  return fetchOpenInstallationBreakdownByBuckets(conn, filters);
+  return loadOpenInstallationLiteBreakdown(filters);
 }
 
 const OPEN_INSTALLATION_KPI_CARD_SPEC = {
@@ -1144,7 +1232,7 @@ const OPEN_INSTALLATION_KPI_CARD_SPEC = {
 };
 
 /**
- * One KPI card count on its own connection — so 4 cards can load in parallel.
+ * One KPI card. Neworder cards share a single lite scan (cache / in-flight).
  */
 export async function countOpenInstallationKpiBucket(filters, bucket) {
   const key = String(bucket || "")
@@ -1161,18 +1249,15 @@ export async function countOpenInstallationKpiBucket(filters, bucket) {
   const kpiFilters = sbiFiltersForOpenInstallationKpi(
     withDefaultOpenInstallationItemType(filters),
   );
-  const conn = await getDbConnection();
 
   if (spec.field === "installation_planned") {
+    const conn = await getDbConnection();
     const count = await countInstallationPlannedServiceRecords(conn, kpiFilters);
     return { field: spec.field, count };
   }
 
-  const count = await countOpenInstallationNeworder(conn, {
-    ...kpiFilters,
-    openInstallationBucket: spec.openInstallationBucket,
-  });
-  return { field: spec.field, count };
+  const data = await loadOpenInstallationLiteBreakdown(kpiFilters);
+  return { field: spec.field, count: Number(data[spec.field] || 0) };
 }
 
 /** Fast total for open-installation list (separate API from rows). */

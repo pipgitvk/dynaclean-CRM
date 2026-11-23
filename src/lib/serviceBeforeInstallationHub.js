@@ -252,6 +252,47 @@ export function openInstallationKpiCardIdFromFilter(openInstallationBucket) {
   return "";
 }
 
+/** Path slug for per-card table APIs: /open-installation/list/{slug} */
+export const OPEN_INSTALLATION_TABLE_API_SLUGS = [
+  "delivered-pending",
+  "delivery-pending",
+  "planned",
+  "completed",
+  "feedback-collected",
+];
+
+export function openInstallationApiSlugFromBucket(openInstallationBucket) {
+  const v = String(openInstallationBucket || "").trim().toLowerCase();
+  if (v === "delivery_pending") return "delivery-pending";
+  if (v === "installation_planned") return "planned";
+  if (v === "completed") return "completed";
+  if (v === "feedback_collected" || v === "no_feedback") return "feedback-collected";
+  return "delivered-pending";
+}
+
+export function openInstallationBucketFromApiSlug(slug) {
+  const v = String(slug || "")
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, "-");
+  if (v === "delivery-pending") return "delivery_pending";
+  if (v === "planned" || v === "installation-planned") return "installation_planned";
+  if (v === "completed") return "completed";
+  if (v === "feedback-collected" || v === "no-feedback") return "feedback_collected";
+  if (v === "delivered-pending") return "delivered_pending";
+  return "";
+}
+
+export function openInstallationTableListApi(openInstallationBucket) {
+  const slug = openInstallationApiSlugFromBucket(openInstallationBucket);
+  return `/api/service-before-installation/open-installation/list/${slug}`;
+}
+
+export function openInstallationTableCountApi(openInstallationBucket) {
+  const slug = openInstallationApiSlugFromBucket(openInstallationBucket);
+  return `/api/service-before-installation/open-installation/count/${slug}`;
+}
+
 export function getServiceBeforeInstallationCards(dashboardBase) {
   const base = `/${dashboardBase}`;
   return SERVICE_BEFORE_INSTALLATION_SEGMENTS.map((c) => ({
