@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { assertSuperAdminApiAccess } from "@/lib/serviceBeforeInstallationAccess";
-import { parseSbiFiltersFromSearchParams } from "@/lib/serviceBeforeInstallationFilters";
+import {
+  forceOpenInstallationProductsOnly,
+  parseSbiFiltersFromSearchParams,
+} from "@/lib/serviceBeforeInstallationFilters";
 import {
   countOpenInstallationGoogleFeedbackStats,
   fetchOpenInstallationGoogleFeedbackPage,
@@ -17,7 +20,9 @@ export async function GET(request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const filters = parseSbiFiltersFromSearchParams(searchParams);
+    const filters = forceOpenInstallationProductsOnly(
+      parseSbiFiltersFromSearchParams(searchParams),
+    );
     const limit = Math.min(parseInt(searchParams.get("limit") || "50", 10) || 50, 200);
     const skip = Math.max(parseInt(searchParams.get("skip") || "0", 10) || 0, 0);
     const countOnly = String(searchParams.get("countOnly") || "").trim() === "1";

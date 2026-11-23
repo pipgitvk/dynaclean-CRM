@@ -58,9 +58,9 @@ export const OPEN_INSTALLATION_DETAIL_KPI_STRIP = [
   },
   {
     id: "open-installation-feedback-collected",
-    title: "Feedback Collected",
+    title: "Google Feedback Collected",
     subtitle: "Installation done — Google feedback marked Yes",
-    countCaption: "No. of feedback collected",
+    countCaption: "No. of Google feedback collected",
     countKey: "feedback_collected",
     accent: "from-rose-500 to-orange-600",
     surface:
@@ -117,7 +117,8 @@ export const SERVICE_BEFORE_INSTALLATION_SEGMENTS = [
   {
     id: "open-installation",
     title: "Open Installation",
-    subtitle: "All upcoming installations",
+    detailTitle: "Google Feedback Collected",
+    subtitle: "Open installations — delivery, completion & Google feedback",
     countKey: "open_installation",
     accent: "from-amber-500 to-orange-600",
     surface:

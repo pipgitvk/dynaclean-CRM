@@ -281,7 +281,9 @@ export default function ServiceBeforeInstallationKpiCard({
               >
                 <Icon className="h-[1.15rem] w-[1.15rem] sm:h-5 sm:w-5" strokeWidth={2.25} aria-hidden />
               </div>
-              <h2 className="truncate text-sm font-bold text-slate-900 sm:text-base">{title}</h2>
+              <h2 className="line-clamp-2 text-sm font-bold leading-snug text-slate-900 sm:text-base">
+                {title}
+              </h2>
             </div>
             <div className="mt-2 min-w-0">
               <div className="flex flex-wrap items-end gap-2">

@@ -1,5 +1,8 @@
 import { getDbConnection } from "@/lib/db";
-import { parseSbiFilters } from "@/lib/serviceBeforeInstallationFilters";
+import {
+  forceOpenInstallationProductsOnly,
+  parseSbiFilters,
+} from "@/lib/serviceBeforeInstallationFilters";
 import {
   sqlOrderGoogleFeedbackCollected,
   sqlOrderGoogleFeedbackNotCollected,
@@ -27,6 +30,8 @@ async function enrichDispatchLite(conn, rows) {
        DATE_FORMAT(MAX(COALESCE(d.updated_at, d.created_at)), '%Y-%m-%d') AS dispatch_date,
        MAX(CASE WHEN wp.serial_number IS NOT NULL THEN 1 ELSE 0 END) AS warranty_registered
      FROM dispatch d
+     INNER JOIN products_list pl_gf
+       ON ${sqlTrimUtf8EqColumns("pl_gf.item_code", "d.item_code")}
      LEFT JOIN warranty_products wp
        ON ${sqlTrimUtf8EqColumns("wp.serial_number", "d.serial_no")}
      WHERE ${sqlUtf8TrimExpr("d.quote_number")} IN (${placeholders})
@@ -55,11 +60,18 @@ async function enrichDispatchLite(conn, rows) {
 
 /** Shared neworder WHERE for installed orders + hub filters (no bucket). */
 export function buildInstalledOrderGoogleFeedbackWhereSql(filters) {
-  const f = parseSbiFilters(filters);
+  const f = parseSbiFilters(forceOpenInstallationProductsOnly(filters));
   let sql = `
     WHERE (no.is_cancelled = 0 OR no.is_cancelled IS NULL)
       AND (no.is_returned = 0 OR no.is_returned = 2 OR no.is_returned IS NULL)
       AND COALESCE(no.installation_status, 0) = 1
+      AND EXISTS (
+        SELECT 1
+        FROM dispatch d_prod
+        INNER JOIN products_list pl_ord
+          ON ${sqlTrimUtf8EqColumns("pl_ord.item_code", "d_prod.item_code")}
+        WHERE ${sqlTrimUtf8EqColumns("d_prod.quote_number", "no.quote_number")}
+      )
   `;
   const params = [];
 

@@ -86,7 +86,7 @@ function isWarrantyProductSegment(segment) {
 function initialSbiFiltersForSegment(segment) {
   const base = defaultSbiSelectFilters();
   if (segment === "open-installation") {
-    return { ...base, openInstallationBucket: "delivered_pending" };
+    return { ...base, openInstallationBucket: "delivered_pending", itemType: "products" };
   }
   return base;
 }
@@ -1476,6 +1476,12 @@ export default function ServiceBeforeInstallationDetailClient({
   userRole = "",
 }) {
   const meta = getSegmentMeta(segment);
+  const headerMeta = meta
+    ? {
+        ...meta,
+        title: meta.detailTitle || meta.title,
+      }
+    : meta;
   const hubHref = `/${dashboardBase}/service-before-installation`;
   const warrantyHref = `/${dashboardBase}/warranty`;
   const { ProductFollowupIcons, followupModals } = useWarrantyProductFollowup();
@@ -2007,7 +2013,7 @@ export default function ServiceBeforeInstallationDetailClient({
           Back to Hub
         </Link>
 
-        <DetailSegmentHeader meta={meta} segment={segment} />
+        <DetailSegmentHeader meta={headerMeta} segment={segment} />
 
         {segment === "total-registered" ? (
           <ServiceBeforeInstallationDetailKpiStrip

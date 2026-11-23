@@ -409,11 +409,13 @@ export default function ServiceBeforeInstallationFilters({
 
         {kind === "upcomingOrder" ? (
           <>
-            <ItemTypeFilterSelect
-              value={draft.itemType}
-              onChange={setField("itemType")}
-              className={row2Field}
-            />
+            {segment !== "open-installation" ? (
+              <ItemTypeFilterSelect
+                value={draft.itemType}
+                onChange={setField("itemType")}
+                className={row2Field}
+              />
+            ) : null}
             <FilterInput
               label="Model"
               placeholder="Model number…"

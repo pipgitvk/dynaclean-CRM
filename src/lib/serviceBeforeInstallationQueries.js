@@ -18,6 +18,7 @@ import {
 } from "@/lib/upcomingInstallationOrderEligibility";
 import { isServiceBeforeInstallationSegment } from "@/lib/serviceBeforeInstallationHub";
 import {
+  forceOpenInstallationProductsOnly,
   parseSbiFilters,
   sbiFiltersForOpenInstallationKpi,
 } from "@/lib/serviceBeforeInstallationFilters";
@@ -835,6 +836,8 @@ async function enrichOpenInstallationRowsWithDispatch(conn, rows) {
          ''
        ) AS registered_by
      FROM dispatch d
+     INNER JOIN products_list pl_disp
+       ON ${sqlTrimUtf8EqColumns("pl_disp.item_code", "d.item_code")}
      LEFT JOIN warranty_products wp
        ON ${sqlTrimUtf8EqColumns("wp.serial_number", "d.serial_no")}
      WHERE ${sqlUtf8TrimExpr("d.quote_number")} IN (${placeholders})
@@ -1078,7 +1081,7 @@ export async function countOpenInstallationSegment(segment, filters = {}) {
  * Empty / all = full open-installation universe (same as legacy countOnly).
  */
 export function withDefaultOpenInstallationItemType(filters) {
-  return parseSbiFilters(filters);
+  return forceOpenInstallationProductsOnly(filters);
 }
 
 /**

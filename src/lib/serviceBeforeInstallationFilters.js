@@ -197,9 +197,16 @@ function normalizeOrderItemType(raw) {
   return "";
 }
 
+/** Open Installation list/KPI — products only (no spares). */
+export function forceOpenInstallationProductsOnly(filters) {
+  const f = parseSbiFilters(filters);
+  if (f.itemType === "products") return f;
+  return { ...f, itemType: "products" };
+}
+
 /** KPI strip + breakdown — same filters as list but never scoped to one bucket card. */
 export function sbiFiltersForOpenInstallationKpi(filters) {
-  const f = parseSbiFilters(filters);
+  const f = forceOpenInstallationProductsOnly(filters);
   return { ...f, openInstallationBucket: "" };
 }
 
