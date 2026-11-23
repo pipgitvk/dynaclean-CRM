@@ -265,6 +265,44 @@ function resolveItemType(codeKey, catalogByCode, spareCatalogByCode) {
   return /[a-zA-Z]/.test(codeKey) ? "product" : "spare";
 }
 
+function formatOrderLineItemDisplay(item) {
+  const name = String(item.item_name || "").trim();
+  const code = String(item.item_code || "").trim();
+  let label = name;
+  if (name && code) label = `${name} (${code})`;
+  else if (!name) label = code;
+  const qty = Number(item.quantity);
+  if (qty > 0 && label) return `${label} ×${qty}`;
+  return label || "—";
+}
+
+function splitOrderItemsByType(order, catalogByCode, spareCatalogByCode) {
+  const items = parseOrderLineItems(order);
+  if (!items.length) {
+    const fallback = [order.item_name, order.item_code].filter(Boolean).join(", ");
+    return { products: fallback || "—", spares: "—" };
+  }
+
+  const products = [];
+  const spares = [];
+  items.forEach((item) => {
+    const codeKey = normalizeModelCode(item.item_code);
+    const explicit = String(item.item_type || "").trim().toLowerCase();
+    const type =
+      explicit === "spare" || explicit === "product"
+        ? explicit
+        : resolveItemType(codeKey, catalogByCode, spareCatalogByCode);
+    const label = formatOrderLineItemDisplay(item);
+    if (type === "spare") spares.push(label);
+    else products.push(label);
+  });
+
+  return {
+    products: products.length ? products.join(", ") : "—",
+    spares: spares.length ? spares.join(", ") : "—",
+  };
+}
+
 function sortModelOptions(options) {
   return [...options].sort((a, b) => {
     const typeOrder = (type) => (type === "product" ? 0 : 1);
@@ -1422,8 +1460,8 @@ export default function OrderTable({
         { header: "Company Name", key: "company_name", width: 30 },
         { header: "Contact", key: "contact", width: 15 },
         { header: "State", key: "state", width: 15 },
-        { header: "Item Name", key: "item_name", width: 30 },
-        { header: "Item Code", key: "item_code", width: 20 },
+        { header: "Products", key: "products", width: 35 },
+        { header: "Spares", key: "spares", width: 35 },
         { header: "Created By", key: "created_by", width: 15 },
         { header: "Lead Campaign", key: "lead_campaign", width: 18 },
         { header: "Order Date / PO Date", key: "created_at", width: 20 },
@@ -1464,8 +1502,7 @@ export default function OrderTable({
           company_name: order.company_name || "",
           contact: order.contact || "",
           state: order.state || "",
-          item_name: order.item_name || "",
-          item_code: order.item_code || "",
+          ...splitOrderItemsByType(order, catalogByCode, spareCatalogByCode),
           created_by: order.created_by || "",
           lead_campaign: formatLeadCampaignLabel(order.lead_campaign),
           created_at: order.created_at ? dayjs(order.created_at).format("DD-MM-YYYY") : "",
@@ -2592,7 +2629,7 @@ export default function OrderTable({
         ref={tableScrollRef}
         className="hidden lg:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-160px)] min-h-[calc(100vh-240px)] bg-white rounded-xl shadow-lg"
       >
-        <table className="w-full min-w-[1100px] text-sm">
+        <table className="w-full min-w-[1200px] text-sm">
           <thead className="bg-gray-800 text-white sticky top-0 z-10">
             <tr>
               <th className="px-3 py-3 font-semibold text-center">#</th>
@@ -2662,17 +2699,18 @@ export default function OrderTable({
                   )}
                 </div>
               </th>
-              <th 
+              <th
                 className="px-3 py-3 font-semibold text-left cursor-pointer hover:bg-gray-700 transition-colors"
                 onClick={() => handleSort("item_name")}
               >
                 <div className="flex items-center gap-1">
-                  Item
+                  Products
                   {sortColumn === "item_name" && (
                     sortDirection === "asc" ? <ArrowUp size={14} /> : <ArrowDown size={14} />
                   )}
                 </div>
               </th>
+              <th className="px-3 py-3 font-semibold text-left">Spares</th>
               <th 
                 className="px-3 py-3 font-semibold text-center cursor-pointer hover:bg-gray-700 transition-colors"
                 onClick={() => handleSort("status")}
@@ -2740,6 +2778,11 @@ export default function OrderTable({
                 const status = getStatusText(r);
                 const pay = getPaymentBadge(deriveOrderListPaymentStatus(r));
                 const paidUi = getOrderPaidAmountUiClasses(r);
+                const { products: productItems, spares: spareItems } = splitOrderItemsByType(
+                  r,
+                  catalogByCode,
+                  spareCatalogByCode,
+                );
                 return (
                   <tr
                     key={r.order_id}
@@ -2796,17 +2839,11 @@ export default function OrderTable({
                         </div>
                       </div>
                     </td>
-                    <td className="px-3 py-3 text-left">
-                      <div className="space-y-1 text-xs">
-                        <div>
-                          <span className="font-semibold">Item:</span>{" "}
-                          {r.item_name}
-                        </div>
-                        <div>
-                          <span className="font-semibold">Modal:</span>{" "}
-                          {r.item_code}
-                        </div>
-                      </div>
+                    <td className="px-3 py-3 text-left text-xs text-gray-800 whitespace-normal break-words max-w-[220px]">
+                      {productItems}
+                    </td>
+                    <td className="px-3 py-3 text-left text-xs text-gray-800 whitespace-normal break-words max-w-[220px]">
+                      {spareItems}
                     </td>
                     <td className="px-3 py-3">
                       <span
@@ -2892,13 +2929,13 @@ export default function OrderTable({
               })
             ) : showListLoadingEmpty ? (
               <tr>
-                <td colSpan={15} className="px-6 py-8 text-center text-gray-600">
+                <td colSpan={16} className="px-6 py-8 text-center text-gray-600">
                   Loading…
                 </td>
               </tr>
             ) : showNoOrdersEmpty ? (
               <tr>
-                <td colSpan={15} className="px-6 py-4 text-center text-gray-500">
+                <td colSpan={16} className="px-6 py-4 text-center text-gray-500">
                   No orders found.
                 </td>
               </tr>
@@ -2926,6 +2963,11 @@ export default function OrderTable({
             const status = getStatusText(r);
             const pay = getPaymentBadge(deriveOrderListPaymentStatus(r));
             const paidUi = getOrderPaidAmountUiClasses(r);
+            const { products: productItems, spares: spareItems } = splitOrderItemsByType(
+              r,
+              catalogByCode,
+              spareCatalogByCode,
+            );
             return (
               <div
                 key={r.order_id}
@@ -3010,6 +3052,12 @@ export default function OrderTable({
                 </div>
                 <div>
                   <strong>Location:</strong> {r.state}
+                </div>
+                <div className="whitespace-normal break-words">
+                  <strong>Products:</strong> {productItems}
+                </div>
+                <div className="whitespace-normal break-words">
+                  <strong>Spares:</strong> {spareItems}
                 </div>
                 <div>
                   <strong>Due Date:</strong> {dayjs(r.duedate).format("DD-MM-YYYY")}
