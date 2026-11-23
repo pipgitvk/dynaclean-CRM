@@ -95,11 +95,15 @@ export default function AdminStatsDashboard() {
     const [quotationsLoading, setQuotationsLoading] = useState(false);
     const [selectedSalespersonOrders, setSelectedSalespersonOrders] = useState(0);
     const [selectedSalespersonTotal, setSelectedSalespersonTotal] = useState(0);
+    const [topPerformers, setTopPerformers] = useState([]);
+    const [topPerformersMeta, setTopPerformersMeta] = useState(null);
+    const [topPerformersLoading, setTopPerformersLoading] = useState(false);
 
     useEffect(() => {
         fetchDashboardStats();
         fetchTotalAchievedAmount();
         fetchOrdersTotalAmount();
+        fetchTopPerformers();
     }, [timeRange, appliedDateRange]);
 
     const dashboardQuery = () => {
@@ -160,6 +164,30 @@ export default function AdminStatsDashboard() {
             }
         } catch (error) {
             console.error("Error fetching achieved amount:", error);
+        }
+    };
+
+    const fetchTopPerformers = async () => {
+        setTopPerformersLoading(true);
+        try {
+            const res = await fetch(
+                `/api/admin-dashboard-stats/top-performers?${dashboardQuery()}`,
+                { cache: "no-store" },
+            );
+            const data = await res.json();
+            if (data.success) {
+                setTopPerformers(data.data || []);
+                setTopPerformersMeta(data.meta || null);
+            } else {
+                setTopPerformers([]);
+                setTopPerformersMeta(null);
+            }
+        } catch (error) {
+            console.error("Error fetching top performers:", error);
+            setTopPerformers([]);
+            setTopPerformersMeta(null);
+        } finally {
+            setTopPerformersLoading(false);
         }
     };
 
@@ -849,27 +877,70 @@ export default function AdminStatsDashboard() {
 
             {/* Top Sales Performers by Revenue */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                <div></div>
+                <div className="bg-white rounded-xl shadow-md p-6">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                        Taxable split (all performers)
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="rounded-lg border border-indigo-200 bg-indigo-50/80 p-4">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700 mb-1">
+                                Products taxable
+                            </p>
+                            <p className="text-2xl font-bold text-indigo-950 tabular-nums">
+                                {formatCurrency(topPerformersMeta?.products_taxable || 0)}
+                            </p>
+                        </div>
+                        <div className="rounded-lg border border-rose-200 bg-rose-50/80 p-4">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-rose-700 mb-1">
+                                Spares taxable
+                            </p>
+                            <p className="text-2xl font-bold text-rose-950 tabular-nums">
+                                {formatCurrency(topPerformersMeta?.spares_taxable || 0)}
+                            </p>
+                        </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-3">
+                        Approved orders · quotation line items in selected period
+                    </p>
+                </div>
                 <div className="bg-white rounded-xl shadow-md p-6">
                     <h3 className="text-lg font-semibold text-gray-800 mb-4">Top Sales Performers</h3>
                     <div className="space-y-3 max-h-80 overflow-y-auto">
-                        {stats?.sales?.topPerformers?.length > 0 ? (
-                            stats.sales.topPerformers.map((performer, index) => (
+                        {topPerformersLoading ? (
+                            <div className="flex justify-center py-12">
+                                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
+                            </div>
+                        ) : topPerformers.length > 0 ? (
+                            topPerformers.map((performer, index) => (
                                 <div
-                                    key={index}
-                                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                                    key={performer.salesperson}
+                                    className="flex items-center justify-between gap-2 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                                 >
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className="w-8 h-8 shrink-0 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm">
                                             {index + 1}
                                         </div>
-                                        <div>
-                                            <p className="font-medium text-gray-900">{performer.salesperson}</p>
-                                            <p className="text-sm text-gray-500">{performer.orders_count} orders</p>
+                                        <div className="min-w-0">
+                                            <p className="font-medium text-gray-900 truncate">
+                                                {performer.salesperson}
+                                            </p>
+                                            <p className="text-sm text-gray-500">
+                                                {performer.orders_count} orders
+                                            </p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-3">
-                                        <p className="font-semibold text-green-600">{formatCurrency(performer.revenue)}</p>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <div className="text-right">
+                                            <p className="font-semibold text-green-600 tabular-nums">
+                                                {formatCurrency(performer.revenue)}
+                                            </p>
+                                            <p className="text-[11px] text-indigo-700 tabular-nums">
+                                                Products: {formatCurrency(performer.products_taxable)}
+                                            </p>
+                                            <p className="text-[11px] text-rose-700 tabular-nums">
+                                                Spares: {formatCurrency(performer.spares_taxable)}
+                                            </p>
+                                        </div>
                                         <button
                                             type="button"
                                             onClick={() => openQuotationsModal(performer.salesperson)}

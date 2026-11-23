@@ -132,6 +132,15 @@ export function computeAdminOrderProductSpareTotals(
   return acc;
 }
 
+export function classifyLineItemTaxableAmount(
+  item,
+  catalogByCode,
+  spareCatalogByCode,
+) {
+  const type = resolveLineItemCatalogType(item, catalogByCode, spareCatalogByCode);
+  return { type, amount: lineItemTaxableAmount(item) };
+}
+
 export async function loadAdminOrderListCatalogMaps(conn) {
   const [productRows] = await conn.execute(
     `SELECT item_code FROM products_list WHERE item_code IS NOT NULL AND TRIM(item_code) <> ''`,
