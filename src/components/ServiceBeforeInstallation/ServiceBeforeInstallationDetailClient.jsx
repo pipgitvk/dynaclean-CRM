@@ -1694,7 +1694,7 @@ export default function ServiceBeforeInstallationDetailClient({
             skip: 0,
           },
           signal,
-          timeout: 20_000,
+          timeout: 8_000,
         });
         if (res.data?.success) {
           const n = Number(
@@ -1992,7 +1992,7 @@ export default function ServiceBeforeInstallationDetailClient({
             patchFeedbackCollected(exact);
           }
           // Enrich after paint (serial/model/engineer) — never blocks first rows.
-          if (!useGoogleFeedbackApi && data.length) {
+          if (data.length) {
             window.setTimeout(() => {
               if (requestId !== rowsRequestIdRef.current) return;
               void enrichOpenInstallationServiceColumns(data, requestId);
