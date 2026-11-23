@@ -41,9 +41,11 @@ const LINE_TYPE_LABELS = {
   product: "Product (max 3)",
   spare: "Spare",
   multi: "Multi Products",
+  mixed: "Products & spares",
 };
 
 function apiSourceForLineType(lineType) {
+  if (lineType === "mixed" || !lineType) return null;
   if (lineType === "spare") return "spare";
   if (lineType === "product" || lineType === "multi") return "product";
   return null;
@@ -255,7 +257,11 @@ export default function QuotationTable({
   );
 
   const addLabel =
-    lineType === "spare" ? "+ Add Spare" : "+ Add Product";
+    lineType === "spare"
+      ? "+ Add Spare"
+      : lineType === "mixed"
+        ? "+ Add line"
+        : "+ Add Product";
 
   return (
     <div className="overflow-x-auto border mt-4 rounded">
