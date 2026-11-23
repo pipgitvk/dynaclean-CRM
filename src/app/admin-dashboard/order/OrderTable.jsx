@@ -21,6 +21,7 @@ import {
   Package,
   Pencil,
   AlertCircle,
+  Wrench,
 } from "lucide-react";
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import dayjs from "dayjs";
@@ -31,6 +32,7 @@ import {
   sumOrderPaymentAmounts,
 } from "@/lib/orderPaymentHistory";
 import { EMPTY_ORDER_STATS } from "@/lib/adminOrderListStatCards";
+import { EMPTY_PRODUCT_SPARE_TOTALS } from "@/lib/adminOrderProductSpareTotals";
 import { OrderPaymentHistoryTrigger } from "@/components/orders/OrderPaymentHistoryModal";
 import {
   deriveOrderPaymentStatus,
@@ -201,6 +203,7 @@ function readOrderTableFilterState() {
       modelNameFilters: [],
       approvalStatusFilter: "",
       paymentStatusFilter: "",
+      itemLineTypeFilter: "",
     };
   }
   const savedModel =
@@ -222,6 +225,7 @@ function readOrderTableFilterState() {
     modelNameFilters: parseModelFiltersFromStorage(savedModel),
     approvalStatusFilter: localStorage.getItem("orderTable_approvalStatusFilter") || "",
     paymentStatusFilter: localStorage.getItem("orderTable_paymentStatusFilter") || "",
+    itemLineTypeFilter: localStorage.getItem("orderTable_itemLineTypeFilter") || "",
   };
 }
 
@@ -236,6 +240,7 @@ function defaultOrderTableFilterState() {
     modelNameFilters: [],
     approvalStatusFilter: "",
     paymentStatusFilter: "",
+    itemLineTypeFilter: "",
   };
 }
 
@@ -250,6 +255,7 @@ function persistOrderTableFilterState(state) {
   localStorage.setItem("orderTable_modelNameFilters", JSON.stringify(state.modelNameFilters));
   localStorage.setItem("orderTable_approvalStatusFilter", state.approvalStatusFilter);
   localStorage.setItem("orderTable_paymentStatusFilter", state.paymentStatusFilter);
+  localStorage.setItem("orderTable_itemLineTypeFilter", state.itemLineTypeFilter || "");
 }
 
 function formatModelOptionLabel(item) {
@@ -274,6 +280,43 @@ function formatOrderLineItemDisplay(item) {
   const qty = Number(item.quantity);
   if (qty > 0 && label) return `${label} ×${qty}`;
   return label || "—";
+}
+
+function resolveLineItemCatalogType(item, catalogByCode, spareCatalogByCode) {
+  const codeKey = normalizeModelCode(item?.item_code);
+  const explicit = String(item?.item_type || "").trim().toLowerCase();
+  if (explicit === "spare" || explicit === "product") return explicit;
+  return resolveItemType(codeKey, catalogByCode, spareCatalogByCode);
+}
+
+function orderMatchesItemLineTypeFilter(
+  order,
+  filter,
+  catalogByCode,
+  spareCatalogByCode,
+) {
+  const v = String(filter || "").trim().toLowerCase();
+  if (!v) return true;
+
+  const items = parseOrderLineItems(order);
+  if (!items.length) {
+    return false;
+  }
+
+  let hasProduct = false;
+  let hasSpare = false;
+  for (const item of items) {
+    const type = resolveLineItemCatalogType(item, catalogByCode, spareCatalogByCode);
+    if (type === "spare") hasSpare = true;
+    else hasProduct = true;
+  }
+
+  if (v === "products") return hasProduct;
+  if (v === "spares") return hasSpare;
+  if (v === "mixed") return hasProduct && hasSpare;
+  if (v === "products_only") return hasProduct && !hasSpare;
+  if (v === "spares_only") return hasSpare && !hasProduct;
+  return true;
 }
 
 function splitOrderItemsByType(order, catalogByCode, spareCatalogByCode) {
@@ -869,6 +912,9 @@ export default function OrderTable({
   const [fetchError, setFetchError] = useState(null);
   const [cardStats, setCardStats] = useState(null);
   const [cardStatsLoading, setCardStatsLoading] = useState(false);
+  const [productSpareTotals, setProductSpareTotals] = useState(null);
+  const [productSpareTotalsLoading, setProductSpareTotalsLoading] =
+    useState(false);
   const pageRef = useRef(1);
   const fetchAbortRef = useRef(null);
   const tableScrollRef = useRef(null);
@@ -957,6 +1003,12 @@ export default function OrderTable({
   );
   const [appliedPaymentStatusFilter, setAppliedPaymentStatusFilter] = useState(
     () => readOrderTableFilterState().paymentStatusFilter,
+  );
+  const [itemLineTypeFilter, setItemLineTypeFilter] = useState(
+    () => readOrderTableFilterState().itemLineTypeFilter,
+  );
+  const [appliedItemLineTypeFilter, setAppliedItemLineTypeFilter] = useState(
+    () => readOrderTableFilterState().itemLineTypeFilter,
   );
   const [showNukePanel, setShowNukePanel] = useState(false);
   const [nukeConfirmText, setNukeConfirmText] = useState("");
@@ -1123,6 +1175,60 @@ export default function OrderTable({
     ],
   );
 
+  const fetchProductSpareTotals = useCallback(
+    async (filters) => {
+      const f = filters || {
+        search: appliedSearchQuery,
+        dateFrom: appliedDateFrom,
+        dateTo: appliedDateTo,
+        createdBy: appliedCreatedByFilter,
+        leadCampaign: appliedLeadCampaignFilter,
+        approvalStatus: appliedApprovalStatusFilter,
+        itemLineType: appliedItemLineTypeFilter,
+      };
+
+      setProductSpareTotalsLoading(true);
+      try {
+        const params = new URLSearchParams();
+        if (serviceSupportOnly) params.set("serviceSupport", "1");
+        if (f.search) params.set("search", f.search);
+        if (f.dateFrom) params.set("dateFrom", f.dateFrom);
+        if (f.dateTo) params.set("dateTo", f.dateTo);
+        if (f.createdBy) params.set("createdBy", f.createdBy);
+        if (f.leadCampaign) params.set("leadCampaign", f.leadCampaign);
+        if (f.approvalStatus) params.set("approvalStatus", f.approvalStatus);
+        if (f.itemLineType) params.set("itemLineType", f.itemLineType);
+
+        const res = await fetch(
+          `/api/admin/orders/product-spare-totals?${params.toString()}`,
+          { cache: "no-store" },
+        );
+        const json = await res.json();
+        if (!res.ok || !json.success) {
+          throw new Error(
+            json.detail || json.error || "Failed to load product/spare totals",
+          );
+        }
+        setProductSpareTotals(json.data);
+      } catch (err) {
+        console.error("Admin product/spare totals fetch failed:", err);
+        setProductSpareTotals(null);
+      } finally {
+        setProductSpareTotalsLoading(false);
+      }
+    },
+    [
+      appliedSearchQuery,
+      appliedDateFrom,
+      appliedDateTo,
+      appliedCreatedByFilter,
+      appliedLeadCampaignFilter,
+      appliedApprovalStatusFilter,
+      appliedItemLineTypeFilter,
+      serviceSupportOnly,
+    ],
+  );
+
   const loadMoreOrders = useCallback(() => {
     if (listLoading || loadingMore || !hasMore) return;
     fetchOrdersPage({ page: pageRef.current + 1, append: true });
@@ -1145,6 +1251,7 @@ export default function OrderTable({
     setAppliedModelNameFilters(modelNameFilters);
     setAppliedApprovalStatusFilter(approvalStatusFilter);
     setAppliedPaymentStatusFilter(paymentStatusFilter);
+    setAppliedItemLineTypeFilter(itemLineTypeFilter);
     persistOrderTableFilterState({
       searchQuery,
       statusFilter,
@@ -1155,6 +1262,7 @@ export default function OrderTable({
       modelNameFilters,
       approvalStatusFilter,
       paymentStatusFilter,
+      itemLineTypeFilter,
     });
     pageRef.current = 1;
     setHasMore(true);
@@ -1180,6 +1288,15 @@ export default function OrderTable({
         leadCampaign: leadCampaignFilter,
         approvalStatus: approvalStatusFilter,
       });
+      fetchProductSpareTotals({
+        search: searchQuery,
+        dateFrom: nextFrom,
+        dateTo: nextTo,
+        createdBy: createdByFilter,
+        leadCampaign: leadCampaignFilter,
+        approvalStatus: approvalStatusFilter,
+        itemLineType: itemLineTypeFilter,
+      });
     }
   }, [
     searchQuery,
@@ -1191,8 +1308,10 @@ export default function OrderTable({
     modelNameFilters,
     approvalStatusFilter,
     paymentStatusFilter,
+    itemLineTypeFilter,
     fetchOrdersPage,
     fetchCardStats,
+    fetchProductSpareTotals,
     clientFetch,
   ]);
 
@@ -1214,6 +1333,21 @@ export default function OrderTable({
     appliedLeadCampaignFilter,
     appliedApprovalStatusFilter,
     fetchCardStats,
+  ]);
+
+  useEffect(() => {
+    if (!clientFetch) return;
+    fetchProductSpareTotals();
+  }, [
+    clientFetch,
+    appliedSearchQuery,
+    appliedDateFrom,
+    appliedDateTo,
+    appliedCreatedByFilter,
+    appliedLeadCampaignFilter,
+    appliedApprovalStatusFilter,
+    appliedItemLineTypeFilter,
+    fetchProductSpareTotals,
   ]);
 
   useEffect(() => {
@@ -1266,6 +1400,8 @@ export default function OrderTable({
     setAppliedApprovalStatusFilter(defaults.approvalStatusFilter);
     setPaymentStatusFilter(defaults.paymentStatusFilter);
     setAppliedPaymentStatusFilter(defaults.paymentStatusFilter);
+    setItemLineTypeFilter(defaults.itemLineTypeFilter);
+    setAppliedItemLineTypeFilter(defaults.itemLineTypeFilter);
     setModelSearchText("");
     setShowModelDropdown(false);
     persistOrderTableFilterState(defaults);
@@ -1554,6 +1690,7 @@ export default function OrderTable({
       appliedApprovalStatusFilter,
       appliedPaymentStatusFilter,
       appliedModelNameFilters,
+      appliedItemLineTypeFilter,
     }),
     [
       appliedSearchQuery,
@@ -1565,6 +1702,7 @@ export default function OrderTable({
       appliedApprovalStatusFilter,
       appliedPaymentStatusFilter,
       appliedModelNameFilters,
+      appliedItemLineTypeFilter,
     ],
   );
 
@@ -1581,28 +1719,6 @@ export default function OrderTable({
     });
     return [...users].sort((a, b) => a.localeCompare(b));
   }, [orders, listFilterState]);
-
-  // Filter + sort orders (shared by table, stat cards, and amount summary)
-  const filteredOrders = useMemo(() => {
-    if (!orders) return [];
-
-    let result = orders.filter((order) =>
-      orderMatchesListFilters(order, listFilterState),
-    );
-
-    return [...result].sort((a, b) => {
-      const valA = getSortValue(a, sortColumn);
-      const valB = getSortValue(b, sortColumn);
-
-      if (typeof valA === "number" && typeof valB === "number") {
-        return sortDirection === "asc" ? valA - valB : valB - valA;
-      }
-
-      if (valA < valB) return sortDirection === "asc" ? -1 : 1;
-      if (valA > valB) return sortDirection === "asc" ? 1 : -1;
-      return 0;
-    });
-  }, [orders, listFilterState, sortColumn, sortDirection]);
 
   const catalogByCode = useMemo(() => {
     const map = new Map();
@@ -1623,6 +1739,47 @@ export default function OrderTable({
     });
     return map;
   }, [spareCatalog]);
+
+  // Filter + sort orders (shared by table, stat cards, and amount summary)
+  const filteredOrders = useMemo(() => {
+    if (!orders) return [];
+
+    let result = orders.filter((order) =>
+      orderMatchesListFilters(order, listFilterState),
+    );
+
+    if (appliedItemLineTypeFilter) {
+      result = result.filter((order) =>
+        orderMatchesItemLineTypeFilter(
+          order,
+          appliedItemLineTypeFilter,
+          catalogByCode,
+          spareCatalogByCode,
+        ),
+      );
+    }
+
+    return [...result].sort((a, b) => {
+      const valA = getSortValue(a, sortColumn);
+      const valB = getSortValue(b, sortColumn);
+
+      if (typeof valA === "number" && typeof valB === "number") {
+        return sortDirection === "asc" ? valA - valB : valB - valA;
+      }
+
+      if (valA < valB) return sortDirection === "asc" ? -1 : 1;
+      if (valA > valB) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [
+    orders,
+    listFilterState,
+    sortColumn,
+    sortDirection,
+    appliedItemLineTypeFilter,
+    catalogByCode,
+    spareCatalogByCode,
+  ]);
 
   const modelOptions = useMemo(
     () => buildModelOptions(orders, catalogByCode, spareCatalogByCode),
@@ -1923,6 +2080,15 @@ export default function OrderTable({
       { taxableTotal: 0 }
     );
   }, [filteredOrders]);
+
+  const productSpareAmountTotals =
+    productSpareTotals ?? EMPTY_PRODUCT_SPARE_TOTALS;
+
+  const formatInr = (n) =>
+    Number(n || 0).toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
 
   const displayAmountTotals = isRejectedOnlyView
     ? {
@@ -2228,7 +2394,7 @@ export default function OrderTable({
         {renderLeadCampaignPieChart()}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2">
         {/* Combined Amount Summary Card */}
         <div className={`w-full rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white shadow-sm p-3 sm:p-4 cursor-default hover:shadow-md transition-shadow`}>
           <div className="flex items-start justify-between">
@@ -2304,7 +2470,69 @@ export default function OrderTable({
           </div>
         </div>
 
-        <div className="w-full rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white shadow-sm p-3 sm:p-4 cursor-default hover:shadow-md transition-shadow">
+        <div className="w-full rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white shadow-sm p-3 sm:p-4 cursor-default hover:shadow-md transition-shadow">
+          <div className="flex items-start justify-between gap-2">
+            <div className="w-full min-w-0">
+              <p className="text-xs text-indigo-700 mb-0.5 font-semibold uppercase tracking-wide">
+                Products total
+              </p>
+              <p className="text-[10px] text-indigo-600/90 mb-2 leading-tight">
+                {amountSummaryScopeLabel}
+                {productSpareTotalsLoading ? (
+                  <span className="ml-1 text-indigo-500">· Updating…</span>
+                ) : null}
+              </p>
+              <div className="mb-2 pb-2 border-b border-indigo-100">
+                <p className="text-[10px] text-indigo-600 font-medium">Without tax</p>
+                <p className="text-lg font-bold text-indigo-950 tabular-nums">
+                  ₹{formatInr(productSpareAmountTotals.products.taxable)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] text-indigo-600 font-medium">Total (incl. tax)</p>
+                <p className="text-lg font-bold text-indigo-800 tabular-nums">
+                  ₹{formatInr(productSpareAmountTotals.products.total)}
+                </p>
+              </div>
+            </div>
+            <span className="shrink-0 rounded-lg bg-indigo-200 p-2 text-indigo-800">
+              <Package size={18} aria-hidden />
+            </span>
+          </div>
+        </div>
+
+        <div className="w-full rounded-xl border border-rose-200 bg-gradient-to-br from-rose-50 to-white shadow-sm p-3 sm:p-4 cursor-default hover:shadow-md transition-shadow">
+          <div className="flex items-start justify-between gap-2">
+            <div className="w-full min-w-0">
+              <p className="text-xs text-rose-700 mb-0.5 font-semibold uppercase tracking-wide">
+                Spares total
+              </p>
+              <p className="text-[10px] text-rose-600/90 mb-2 leading-tight">
+                {amountSummaryScopeLabel}
+                {productSpareTotalsLoading ? (
+                  <span className="ml-1 text-rose-500">· Updating…</span>
+                ) : null}
+              </p>
+              <div className="mb-2 pb-2 border-b border-rose-100">
+                <p className="text-[10px] text-rose-600 font-medium">Without tax</p>
+                <p className="text-lg font-bold text-rose-950 tabular-nums">
+                  ₹{formatInr(productSpareAmountTotals.spares.taxable)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] text-rose-600 font-medium">Total (incl. tax)</p>
+                <p className="text-lg font-bold text-rose-800 tabular-nums">
+                  ₹{formatInr(productSpareAmountTotals.spares.total)}
+                </p>
+              </div>
+            </div>
+            <span className="shrink-0 rounded-lg bg-rose-200 p-2 text-rose-800">
+              <Wrench size={18} aria-hidden />
+            </span>
+          </div>
+        </div>
+
+        <div className="w-full rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white shadow-sm p-3 sm:p-4 cursor-default hover:shadow-md transition-shadow sm:col-span-2 xl:col-span-1">
           <div className="flex items-start justify-between">
             <div className="w-full">
               <p className="text-xs text-blue-700 mb-0.5 font-semibold uppercase tracking-wide">
@@ -2607,6 +2835,22 @@ export default function OrderTable({
             <option value="pending">Pending</option>
             <option value="approved">Approved</option>
             <option value="rejected">Rejected</option>
+          </select>
+        </div>
+
+        <div className="min-w-[140px] flex-1 sm:max-w-[200px]">
+          <label className="block text-xs text-gray-600 mb-1">Line type</label>
+          <select
+            value={itemLineTypeFilter}
+            onChange={(e) => setItemLineTypeFilter(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          >
+            <option value="">All (Products &amp; Spares)</option>
+            <option value="products">Has products</option>
+            <option value="spares">Has spares</option>
+            <option value="mixed">Products &amp; spares (both)</option>
+            <option value="products_only">Products only</option>
+            <option value="spares_only">Spares only</option>
           </select>
         </div>
 

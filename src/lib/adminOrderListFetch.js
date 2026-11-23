@@ -63,11 +63,14 @@ function parseLineItemsFromRaw(raw) {
   return raw
     .split("||")
     .map((part) => {
-      const [item_name, item_code, quantity] = part.split("::");
+      const [item_name, item_code, quantity, taxable_amount, total_amount] =
+        part.split("::");
       return {
         item_name: item_name || "",
         item_code: item_code || "",
         quantity: Number(quantity) || 0,
+        taxable_amount: Number(taxable_amount) || 0,
+        total_amount: Number(total_amount) || 0,
       };
     })
     .filter((item) => item.item_name);
@@ -113,7 +116,11 @@ function buildAdminOrderListSql(userRole, username, serviceSupportOnly) {
                     '::',
                     COALESCE(qi.item_code, ''),
                     '::',
-                    COALESCE(qi.quantity, 0)
+                    COALESCE(qi.quantity, 0),
+                    '::',
+                    COALESCE(qi.total_taxable_amt, qi.taxable_price, 0),
+                    '::',
+                    COALESCE(qi.total_price, 0)
                   )
                   SEPARATOR '||'
                 ) AS line_items_raw
