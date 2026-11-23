@@ -16,6 +16,8 @@ export default function UpcomingInstallationReferenceIds({
   className = "",
   serviceIdActions = null,
   dashboardBase = "",
+  /** When true, only invoice + order — no service ID / serial lists in the table. */
+  hideServiceAndSerialLists = false,
 }) {
   const [servicesModalOpen, setServicesModalOpen] = useState(false);
   const [serialModalOpen, setSerialModalOpen] = useState(false);
@@ -63,74 +65,78 @@ export default function UpcomingInstallationReferenceIds({
       <div>
         <span className="text-green-600 font-bold">Ord:</span> {orderId}
       </div>
-      <div className="flex flex-wrap items-start gap-1.5">
-        {serviceIdActions ? (
-          <span className="shrink-0">{serviceIdActions}</span>
-        ) : null}
-        <div className="min-w-0 flex-1">
-          <span className="text-purple-600 font-bold">Ser:</span>
-          {serviceIds.length === 0 ? (
-            <span className="ml-1">—</span>
-          ) : (
-            <div className="mt-0.5 space-y-0.5">
-              {visibleServiceIds.map((id, idx) => renderServiceIdRow(id, idx))}
-              {serviceHidden > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => setServicesModalOpen(true)}
-                  className={openInstallationViewMoreBtnClassCompact}
-                  title={`View all ${serviceIds.length} services`}
-                >
-                  <Eye className="h-3 w-3" aria-hidden />
-                  <span>+{serviceHidden} more</span>
-                </button>
-              ) : null}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div>
-        <span className="text-amber-700 font-bold">S/N:</span>
-        {serials.length === 0 ? (
-          <span className="ml-1">—</span>
-        ) : (
-          <div className="mt-0.5 space-y-0.5 font-mono text-slate-800">
-            {visibleSerials.map((sn, idx) => (
-              <div key={`${sn}-${idx}`}>{sn}</div>
-            ))}
-            {serialHidden > 0 ? (
-              <button
-                type="button"
-                onClick={() => setSerialModalOpen(true)}
-                className={`${openInstallationViewMoreBtnClassCompact} font-sans`}
-                title={`View all ${serials.length} serial numbers`}
-              >
-                <Eye className="h-3 w-3" aria-hidden />
-                <span>+{serialHidden} more</span>
-              </button>
+      {hideServiceAndSerialLists ? null : (
+        <>
+          <div className="flex flex-wrap items-start gap-1.5">
+            {serviceIdActions ? (
+              <span className="shrink-0">{serviceIdActions}</span>
             ) : null}
+            <div className="min-w-0 flex-1">
+              <span className="text-purple-600 font-bold">Ser:</span>
+              {serviceIds.length === 0 ? (
+                <span className="ml-1">—</span>
+              ) : (
+                <div className="mt-0.5 space-y-0.5">
+                  {visibleServiceIds.map((id, idx) => renderServiceIdRow(id, idx))}
+                  {serviceHidden > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => setServicesModalOpen(true)}
+                      className={openInstallationViewMoreBtnClassCompact}
+                      title={`View all ${serviceIds.length} services`}
+                    >
+                      <Eye className="h-3 w-3" aria-hidden />
+                      <span>+{serviceHidden} more</span>
+                    </button>
+                  ) : null}
+                </div>
+              )}
+            </div>
           </div>
-        )}
-      </div>
 
-      <OpenInstallationServicesModal
-        isOpen={servicesModalOpen}
-        onClose={() => setServicesModalOpen(false)}
-        title={`Services (${serviceIds.length})`}
-        row={record}
-        dashboardBase={dashboardBase}
-        showStatusEditor={false}
-      />
-      <OpenInstallationServicesModal
-        isOpen={serialModalOpen}
-        onClose={() => setSerialModalOpen(false)}
-        title={`Serial numbers & services (${serials.length})`}
-        row={record}
-        dashboardBase={dashboardBase}
-        showStatusEditor={false}
-        showSerial
-      />
+          <div>
+            <span className="text-amber-700 font-bold">S/N:</span>
+            {serials.length === 0 ? (
+              <span className="ml-1">—</span>
+            ) : (
+              <div className="mt-0.5 space-y-0.5 font-mono text-slate-800">
+                {visibleSerials.map((sn, idx) => (
+                  <div key={`${sn}-${idx}`}>{sn}</div>
+                ))}
+                {serialHidden > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setSerialModalOpen(true)}
+                    className={`${openInstallationViewMoreBtnClassCompact} font-sans`}
+                    title={`View all ${serials.length} serial numbers`}
+                  >
+                    <Eye className="h-3 w-3" aria-hidden />
+                    <span>+{serialHidden} more</span>
+                  </button>
+                ) : null}
+              </div>
+            )}
+          </div>
+
+          <OpenInstallationServicesModal
+            isOpen={servicesModalOpen}
+            onClose={() => setServicesModalOpen(false)}
+            title={`Services (${serviceIds.length})`}
+            row={record}
+            dashboardBase={dashboardBase}
+            showStatusEditor={false}
+          />
+          <OpenInstallationServicesModal
+            isOpen={serialModalOpen}
+            onClose={() => setSerialModalOpen(false)}
+            title={`Serial numbers & services (${serials.length})`}
+            row={record}
+            dashboardBase={dashboardBase}
+            showStatusEditor={false}
+            showSerial
+          />
+        </>
+      )}
     </div>
   );
 }

@@ -46,6 +46,7 @@ import OpenInstallationStatusColumn from "@/components/installation/OpenInstalla
 import OpenInstallationReportButton from "@/components/installation/OpenInstallationReportButton";
 import OpenInstallationServicesModal from "@/components/installation/OpenInstallationServicesModal";
 import { parseOpenInstallationDispatchItems } from "@/lib/openInstallationDispatchItems";
+import { listOpenInstallationSerialNumbers } from "@/lib/openInstallationServiceLineItems";
 import {
   openInstallationViewMoreBtnClass,
   openInstallationViewMoreBtnClassCompact,
@@ -452,6 +453,8 @@ function openInstallationModelExport(row) {
 }
 
 const OPEN_INSTALLATION_MODEL_PREVIEW = 3;
+/** Open Installation: compact row + single View more when product lines exceed this count. */
+const OPEN_INSTALLATION_COMPACT_PRODUCT_THRESHOLD = 3;
 
 function OpenInstallationDispatchItemLine({ it, itemKey }) {
   return (
@@ -465,6 +468,60 @@ function OpenInstallationDispatchItemLine({ it, itemKey }) {
       ) : null}
       {it.name ? <p className="text-xs leading-snug text-slate-700">{it.name}</p> : null}
     </li>
+  );
+}
+
+function openInstallationRowHasExpandableDetails(row) {
+  const products = parseOpenInstallationDispatchItems(row?.model, row?.name);
+  const serviceIds = listUpcomingInstallationServiceIds(row);
+  const serials = listOpenInstallationSerialNumbers(row);
+  const statuses = parseUpcomingInstallationServiceDetails(row?.service_details);
+  return (
+    products.length > 0 ||
+    serviceIds.length > 0 ||
+    serials.length > 0 ||
+    statuses.length > 0 ||
+    Boolean(String(row?.service_id || "").trim())
+  );
+}
+
+function OpenInstallationModelSummary({ row }) {
+  const items = parseOpenInstallationDispatchItems(row.model, row.name);
+  if (!items.length) {
+    return <span className="text-xs text-slate-400">—</span>;
+  }
+  const label = items.length === 1 ? "1 product" : `${items.length} products`;
+  return <span className="text-xs font-medium text-slate-600">{label}</span>;
+}
+
+function OpenInstallationRowViewMore({ row, dashboardBase, userRole, onRowPatched }) {
+  const [open, setOpen] = useState(false);
+  if (!openInstallationRowHasExpandableDetails(row)) {
+    return <span className="text-xs text-slate-400">—</span>;
+  }
+  const orderLabel = row.order_id ? `Order ${row.order_id}` : "Order details";
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className={openInstallationViewMoreBtnClass}
+        title="View products, serials, services and status"
+      >
+        <Eye className="h-3 w-3" aria-hidden />
+        <span>View more</span>
+      </button>
+      <OpenInstallationServicesModal
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        title={orderLabel}
+        row={row}
+        dashboardBase={dashboardBase}
+        role={userRole}
+        onRowPatched={onRowPatched}
+        showStatusEditor
+      />
+    </>
   );
 }
 
@@ -1149,7 +1206,12 @@ function openInstallationServiceStatusExport(row) {
   return installed ? `installed ${installed}` : "";
 }
 
-function OpenInstallationActionCell({ row, dashboardBase, ProductFollowupIcons }) {
+function OpenInstallationActionCell({
+  row,
+  dashboardBase,
+  ProductFollowupIcons,
+  hideReportButtons = false,
+}) {
   const followupProduct = openInstallationFollowupProduct(row);
   return (
     <div className="flex min-w-[5.5rem] flex-col items-start gap-2">
@@ -1160,7 +1222,9 @@ function OpenInstallationActionCell({ row, dashboardBase, ProductFollowupIcons }
           variant="button"
         />
       ) : null}
-      <OpenInstallationReportButtons row={row} dashboardBase={dashboardBase} />
+      {hideReportButtons ? null : (
+        <OpenInstallationReportButtons row={row} dashboardBase={dashboardBase} />
+      )}
       {row.order_id ? (
         <Link
           href={`/${dashboardBase}/order/${encodeURIComponent(row.order_id)}`}
@@ -1251,8 +1315,13 @@ function OpenInstallationRows({
   userRole,
   onOpenInstallationRowPatch,
   ProductFollowupIcons,
+  segment = "",
 }) {
   return rows.map((row, idx) => {
+    const productCount = parseOpenInstallationDispatchItems(row.model, row.name).length;
+    const useCompactViewMore =
+      segment === "open-installation" &&
+      productCount > OPEN_INSTALLATION_COMPACT_PRODUCT_THRESHOLD;
     const rowNum = page * pageSize + idx + 1;
     const zebra = idx % 2 === 0 ? "bg-white" : "bg-violet-50/35";
     const dispatchLabel = formatUpcomingInstallationYmd(row.dispatch_date);
@@ -1266,7 +1335,11 @@ function OpenInstallationRows({
           {dispatchLabel}
         </td>
         <td className="px-4 py-3.5 align-top">
-          <UpcomingInstallationReferenceIds record={row} dashboardBase={dashboardBase} />
+          <UpcomingInstallationReferenceIds
+            record={row}
+            dashboardBase={dashboardBase}
+            hideServiceAndSerialLists={useCompactViewMore}
+          />
         </td>
         <td className="px-4 py-3.5 align-top">
           <OpenInstallationCompanyStateDeliveryCell row={row} />
@@ -1279,7 +1352,11 @@ function OpenInstallationRows({
           <OpenInstallationAssignedByEngineerCell row={row} />
         </td>
         <td className="px-4 py-3.5 align-top xl:max-w-none">
-          <OpenInstallationModelCell row={row} dashboardBase={dashboardBase} />
+          {useCompactViewMore ? (
+            <OpenInstallationModelSummary row={row} />
+          ) : (
+            <OpenInstallationModelCell row={row} dashboardBase={dashboardBase} />
+          )}
         </td>
         <td className="px-4 py-3.5 align-top">
           <OpenInstallationOrderDeliveryCell row={row} />
@@ -1288,18 +1365,28 @@ function OpenInstallationRows({
           <OpenInstallationRegistrationCell row={row} dashboardBase={dashboardBase} />
         </td>
         <td className="px-4 py-3.5 align-top">
-          <OpenInstallationStatusColumn
-            row={row}
-            role={userRole}
-            onRowPatched={onOpenInstallationRowPatch}
-            dashboardBase={dashboardBase}
-          />
+          {useCompactViewMore ? (
+            <OpenInstallationRowViewMore
+              row={row}
+              dashboardBase={dashboardBase}
+              userRole={userRole}
+              onRowPatched={onOpenInstallationRowPatch}
+            />
+          ) : (
+            <OpenInstallationStatusColumn
+              row={row}
+              role={userRole}
+              onRowPatched={onOpenInstallationRowPatch}
+              dashboardBase={dashboardBase}
+            />
+          )}
         </td>
         <td className="px-4 py-3.5 align-top">
           <OpenInstallationActionCell
             row={row}
             dashboardBase={dashboardBase}
             ProductFollowupIcons={ProductFollowupIcons}
+            hideReportButtons={useCompactViewMore}
           />
         </td>
       </tr>
@@ -1433,6 +1520,7 @@ function TableBody({
         userRole={userRole}
         onOpenInstallationRowPatch={onOpenInstallationRowPatch}
         ProductFollowupIcons={ProductFollowupIcons}
+        segment={segment}
       />
     );
   }
