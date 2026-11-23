@@ -20,12 +20,11 @@ const SEARCH_PLACEHOLDER = {
 const SERVICE_RECORD_STATUS_PRESETS = [
   "PENDING",
   "PLANNED",
-  "PENDING FOR SPARES",
+  { value: "PENDING FOR SPARES", label: "PENDING FOR US" },
   "PENDING BY CUSTOMER",
   "IN PROGRESS",
   "WORKED",
   "COMPLETED",
-  "CANCELLED",
 ];
 
 function getSegmentFilterKind(segment) {

@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   TrendingDown,
   TrendingUp,
+  Users,
   Wrench,
 } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer } from "recharts";
@@ -31,6 +32,13 @@ export const SBI_CARD_ICONS = {
   "open-installation-no-feedback": MessageCircleOff,
   "open-installation": Wrench,
   "open-completions": ClipboardList,
+  "oc-total-registered": ClipboardList,
+  "oc-pending": Clock,
+  "oc-planned": CalendarClock,
+  "oc-completed": CheckCircle2,
+  "oc-pending-customer": Users,
+  "oc-pending-spares": Package,
+  "oc-pending-48h": AlertTriangle,
   "overdue-delayed-installation": AlertTriangle,
   "active-warranty": ShieldCheck,
   "due-warranty-expiry": CalendarClock,

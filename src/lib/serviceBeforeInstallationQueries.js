@@ -12,6 +12,7 @@ import {
   upcomingInstallationQuoteKeyParams,
 } from "@/lib/upcomingInstallationsQuery";
 import { buildNeworderOpenInstallationBucketWhereSql } from "@/lib/openInstallationBucketNeworderSql";
+import { buildOpenCompletionsBucketWhereSql } from "@/lib/openCompletionsBucketSql";
 import {
   dispatchSerialEligibleForInstallation,
   pendingNeworderPredicates,
@@ -19,6 +20,7 @@ import {
 import { isServiceBeforeInstallationSegment } from "@/lib/serviceBeforeInstallationHub";
 import {
   forceOpenInstallationProductsOnly,
+  normalizeOpenCompletionsBucket,
   parseSbiFilters,
   sbiFiltersForOpenInstallationKpi,
 } from "@/lib/serviceBeforeInstallationFilters";
@@ -1567,6 +1569,138 @@ export const OPEN_COMPLAINTS_SQL = `(
   UPPER(TRIM(COALESCE(sr.service_type, ''))) = 'COMPLAINT'
 )`;
 
+const OPEN_COMPLAINTS_SR_JOIN = `FROM service_records sr
+  LEFT JOIN warranty_products wp
+    ON TRIM(sr.serial_number) COLLATE utf8mb4_unicode_ci = TRIM(wp.serial_number) COLLATE utf8mb4_unicode_ci`;
+
+function parseOpenCompletionsComplaintKpiRow(row) {
+  return {
+    total_complaints_registered: Number(row?.total_complaints_registered || 0),
+    pending_complaint: Number(row?.pending_complaint || 0),
+    planned_complaint: Number(row?.planned_complaint || 0),
+    completed_complaint: Number(row?.completed_complaint || 0),
+    pending_by_customer: Number(row?.pending_by_customer || 0),
+    pending_for_spares: Number(row?.pending_for_spares || 0),
+    pending_over_48h_no_plan: Number(row?.pending_over_48h_no_plan || 0),
+  };
+}
+
+/** Complaint KPI cards — all statuses; respects filters except status (pass kpi filters without serviceStatus). */
+function openCompletionsListFilters(filters) {
+  const f = parseSbiFilters(filters);
+  const bucket = normalizeOpenCompletionsBucket(f.openCompletionsBucket) || "total_registered";
+  return {
+    ...f,
+    openCompletionsBucket: bucket,
+    serviceStatus: "",
+  };
+}
+
+async function fetchOpenCompletionsComplaintsPage(conn, filters, limit, skip, { skipTotal = false } = {}) {
+  const f = openCompletionsListFilters(filters);
+  const bucketSql = buildOpenCompletionsBucketWhereSql(f.openCompletionsBucket);
+  const srFilter = buildServiceRecordFilterSql(f, {
+    dateExpr: "COALESCE(sr.planned_date, sr.complaint_date)",
+  });
+  const where = `WHERE ${OPEN_COMPLAINTS_SQL} ${bucketSql.sql} ${srFilter.sql}`;
+  const baseParams = [...bucketSql.params, ...srFilter.params];
+  const join = `FROM service_records sr
+    LEFT JOIN warranty_products wp
+      ON TRIM(sr.serial_number) COLLATE utf8mb4_unicode_ci = TRIM(wp.serial_number) COLLATE utf8mb4_unicode_ci`;
+
+  let total = 0;
+  if (!skipTotal) {
+    const [[countRow]] = await conn.execute(
+      `SELECT COUNT(*) AS cnt ${join} ${where}`,
+      baseParams,
+    );
+    total = Number(countRow?.cnt || 0);
+  }
+
+  const [rows] = await conn.execute(
+    `SELECT
+       sr.service_id,
+       sr.serial_number,
+       sr.service_type,
+       sr.status,
+       sr.complaint_date,
+       sr.planned_date,
+       sr.complaint_summary,
+       sr.assigned_to,
+       wp.customer_name,
+       wp.model,
+       wp.contact,
+       wp.product_name
+     ${join}
+     ${where}
+     ORDER BY sr.service_id DESC
+     LIMIT ? OFFSET ?`,
+    [...baseParams, limit, skip],
+  );
+
+  return {
+    total,
+    data: rows,
+    hasMore: rows.length >= limit,
+  };
+}
+
+/** Fast total for one open-completions KPI card table. */
+export async function countOpenCompletionsComplaintSegment(filters = {}) {
+  const conn = await getDbConnection();
+  const f = openCompletionsListFilters(filters);
+  const bucketSql = buildOpenCompletionsBucketWhereSql(f.openCompletionsBucket);
+  const srFilter = buildServiceRecordFilterSql(f, {
+    dateExpr: "COALESCE(sr.planned_date, sr.complaint_date)",
+  });
+  const where = `WHERE ${OPEN_COMPLAINTS_SQL} ${bucketSql.sql} ${srFilter.sql}`;
+  const baseParams = [...bucketSql.params, ...srFilter.params];
+
+  const [[countRow]] = await conn.execute(
+    `SELECT COUNT(*) AS cnt
+     FROM service_records sr
+     LEFT JOIN warranty_products wp
+       ON TRIM(sr.serial_number) COLLATE utf8mb4_unicode_ci = TRIM(wp.serial_number) COLLATE utf8mb4_unicode_ci
+     ${where}`,
+    baseParams,
+  );
+  return Number(countRow?.cnt || 0);
+}
+
+export async function fetchOpenCompletionsComplaintKpiBreakdown(conn, filters = {}) {
+  const f = parseSbiFilters(filters);
+  const kpiFilters = { ...f, serviceStatus: "" };
+  const srFilter = buildServiceRecordFilterSql(kpiFilters, {
+    dateExpr: "COALESCE(sr.planned_date, sr.complaint_date)",
+  });
+  const where = `WHERE ${OPEN_COMPLAINTS_SQL} ${srFilter.sql}`;
+
+  const [[row]] = await conn.execute(
+    `SELECT
+       COUNT(*) AS total_complaints_registered,
+       SUM(CASE WHEN UPPER(TRIM(COALESCE(sr.status, ''))) = 'PENDING' THEN 1 ELSE 0 END) AS pending_complaint,
+       SUM(CASE WHEN UPPER(TRIM(COALESCE(sr.status, ''))) = 'PLANNED' THEN 1 ELSE 0 END) AS planned_complaint,
+       SUM(CASE WHEN UPPER(TRIM(COALESCE(sr.status, ''))) = 'COMPLETED' THEN 1 ELSE 0 END) AS completed_complaint,
+       SUM(CASE WHEN UPPER(TRIM(COALESCE(sr.status, ''))) = 'PENDING BY CUSTOMER' THEN 1 ELSE 0 END) AS pending_by_customer,
+       SUM(CASE WHEN UPPER(TRIM(COALESCE(sr.status, ''))) = 'PENDING FOR SPARES' THEN 1 ELSE 0 END) AS pending_for_spares,
+       SUM(CASE
+         WHEN UPPER(TRIM(COALESCE(sr.status, ''))) = 'PENDING'
+           AND sr.complaint_date IS NOT NULL
+           AND TIMESTAMPDIFF(HOUR, sr.complaint_date, NOW()) > 48
+           AND (
+             sr.planned_date IS NULL
+             OR TRIM(CAST(sr.planned_date AS CHAR)) IN ('', '0000-00-00', '0000-00-00 00:00:00')
+             OR DATE(sr.planned_date) <= '1970-01-01'
+           )
+         THEN 1 ELSE 0 END) AS pending_over_48h_no_plan
+     ${OPEN_COMPLAINTS_SR_JOIN}
+     ${where}`,
+    [...srFilter.params],
+  );
+
+  return parseOpenCompletionsComplaintKpiRow(row);
+}
+
 /** Open Installation — pending installation jobs from Service Records (view_service_reports). */
 export const OPEN_INSTALLATIONS_SQL = `(
   UPPER(TRIM(COALESCE(sr.service_type, ''))) = 'INSTALLATION'
@@ -1702,49 +1836,9 @@ export async function fetchServiceBeforeInstallationSegmentPage(segment, options
   }
 
   if (segment === "open-completions") {
-    const srFilter = buildServiceRecordFilterSql(filters, {
-      dateExpr: "COALESCE(sr.planned_date, sr.complaint_date)",
+    return fetchOpenCompletionsComplaintsPage(conn, filters, safeLimit, safeSkip, {
+      skipTotal: Boolean(options.skipTotal),
     });
-    const typeSql = OPEN_COMPLAINTS_SQL;
-    const where = `WHERE ${PENDING_SERVICE_SQL} AND ${typeSql} ${srFilter.sql}`;
-    const baseParams = [...srFilter.params];
-
-    const [[countRow]] = await conn.execute(
-      `SELECT COUNT(*) AS cnt
-       FROM service_records sr
-       LEFT JOIN warranty_products wp
-         ON TRIM(sr.serial_number) COLLATE utf8mb4_unicode_ci = TRIM(wp.serial_number) COLLATE utf8mb4_unicode_ci
-       ${where}`,
-      baseParams,
-    );
-
-    const [rows] = await conn.execute(
-      `SELECT
-         sr.service_id,
-         sr.serial_number,
-         sr.service_type,
-         sr.status,
-         sr.complaint_date,
-         sr.planned_date,
-         sr.complaint_summary,
-         sr.assigned_to,
-         wp.customer_name,
-         wp.model,
-         wp.contact,
-         wp.product_name
-       FROM service_records sr
-       LEFT JOIN warranty_products wp
-         ON TRIM(sr.serial_number) COLLATE utf8mb4_unicode_ci = TRIM(wp.serial_number) COLLATE utf8mb4_unicode_ci
-       ${where}
-       ORDER BY sr.service_id DESC
-       LIMIT ? OFFSET ?`,
-      [...baseParams, safeLimit, safeSkip],
-    );
-
-    return {
-      total: Number(countRow?.cnt || 0),
-      data: rows,
-    };
   }
 
   if (segment === "overdue-delayed-installation") {

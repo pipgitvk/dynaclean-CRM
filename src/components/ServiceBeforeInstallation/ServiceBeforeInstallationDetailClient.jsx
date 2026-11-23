@@ -24,16 +24,21 @@ import {
 } from "lucide-react";
 import {
   getSegmentMeta,
+  openCompletionsTableCountApi,
+  openCompletionsTableListApi,
   openInstallationTableCountApi,
   openInstallationTableListApi,
 } from "@/lib/serviceBeforeInstallationHub";
+import { openCompletionsBucketRecordCount } from "@/lib/openCompletionsKpiSql";
 import { openInstallationBucketRecordCount } from "@/lib/openInstallationKpiSql";
 import {
   defaultSbiSelectFilters,
+  normalizeOpenCompletionsBucket,
   normalizeOpenInstallationBucket,
 } from "@/lib/serviceBeforeInstallationFilters";
 import ServiceBeforeInstallationFilters from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationFilters";
 import ServiceBeforeInstallationOpenInstallationKpiStrip from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationOpenInstallationKpiStrip";
+import ServiceBeforeInstallationOpenCompletionsKpiSection from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationOpenCompletionsKpiSection";
 import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { formatCrmDatetimeForISTDisplay } from "@/lib/timezone";
 import {
@@ -62,6 +67,7 @@ import { useWarrantyProductFollowup } from "@/components/warranty/WarrantyProduc
 const DEFAULT_PAGE_SIZE = 10;
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 const OPEN_INSTALLATION_BUCKET_STORAGE_KEY = "sbi.openInstallationBucket";
+const OPEN_COMPLETIONS_BUCKET_STORAGE_KEY = "sbi.openCompletionsBucket";
 
 function readStoredOpenInstallationBucket() {
   if (typeof window === "undefined") return "";
@@ -102,6 +108,45 @@ function stickyOpenInstallationBucket(preferred) {
   );
 }
 
+function readStoredOpenCompletionsBucket() {
+  if (typeof window === "undefined") return "";
+  try {
+    const fromUrl = new URLSearchParams(window.location.search).get("openCompletionsBucket");
+    const fromStore = window.localStorage.getItem(OPEN_COMPLETIONS_BUCKET_STORAGE_KEY);
+    return normalizeOpenCompletionsBucket(fromUrl || fromStore);
+  } catch {
+    return "";
+  }
+}
+
+function persistOpenCompletionsBucket(bucket) {
+  const v = normalizeOpenCompletionsBucket(bucket) || "total_registered";
+  if (typeof window === "undefined") return v;
+  try {
+    window.localStorage.setItem(OPEN_COMPLETIONS_BUCKET_STORAGE_KEY, v);
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("openCompletionsBucket") !== v) {
+      url.searchParams.set("openCompletionsBucket", v);
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${url.pathname}${url.search}${url.hash}`,
+      );
+    }
+  } catch {
+    // ignore
+  }
+  return v;
+}
+
+function stickyOpenCompletionsBucket(preferred) {
+  return (
+    normalizeOpenCompletionsBucket(preferred) ||
+    readStoredOpenCompletionsBucket() ||
+    "total_registered"
+  );
+}
+
 const SEGMENT_ICONS = {
   "total-registered": Package,
   "open-installation": Wrench,
@@ -138,6 +183,12 @@ function initialSbiFiltersForSegment(segment, stickyBucket = "") {
       openInstallationBucket: stickyOpenInstallationBucket(stickyBucket),
       itemType: "products",
       dispatchStatus: "not_completed",
+    };
+  }
+  if (segment === "open-completions") {
+    return {
+      ...base,
+      openCompletionsBucket: stickyOpenCompletionsBucket(stickyBucket),
     };
   }
   return base;
@@ -948,6 +999,12 @@ function WarrantyProductRows({ rows, dashboardBase, page, pageSize, segment }) {
   });
 }
 
+function formatComplaintStatusLabel(status) {
+  const s = String(status || "").trim().toUpperCase();
+  if (s === "PENDING FOR SPARES") return "PENDING FOR US";
+  return status || "—";
+}
+
 function ServiceRows({ rows, dashboardBase, page, pageSize, variant = "complaint" }) {
   const reportHref = (serviceId) =>
     `/${dashboardBase}/view-service-report/${encodeURIComponent(serviceId)}`;
@@ -979,7 +1036,9 @@ function ServiceRows({ rows, dashboardBase, page, pageSize, variant = "complaint
           <td className="max-w-[160px] truncate px-4 py-3.5 font-mono text-xs xl:max-w-none">{row.model || "—"}</td>
         ) : null}
         <td className="px-4 py-3.5">{row.service_type || "—"}</td>
-        <td className="px-4 py-3.5">{row.status || "—"}</td>
+        <td className="px-4 py-3.5">
+          {variant === "complaint" ? formatComplaintStatusLabel(row.status) : row.status || "—"}
+        </td>
         {showServiceRecordLayout ? (
           <td className="max-w-[180px] truncate px-4 py-3.5 text-sm text-slate-800 xl:max-w-none">
             {formatAssignedEngineer(row.assigned_to)}
@@ -1614,6 +1673,7 @@ export default function ServiceBeforeInstallationDetailClient({
   dashboardBase = "admin-dashboard",
   userRole = "",
   initialOpenInstallationBucket = "",
+  initialOpenCompletionsBucket = "",
 }) {
   const meta = getSegmentMeta(segment);
   const headerMeta = meta
@@ -1626,22 +1686,34 @@ export default function ServiceBeforeInstallationDetailClient({
   const warrantyHref = `/${dashboardBase}/warranty`;
   const { ProductFollowupIcons, followupModals } = useWarrantyProductFollowup();
 
+  const initialStickyForSegment =
+    segment === "open-completions"
+      ? initialOpenCompletionsBucket
+      : initialOpenInstallationBucket;
+
   const [draftFilters, setDraftFilters] = useState(() =>
-    initialSbiFiltersForSegment(segment, initialOpenInstallationBucket),
+    initialSbiFiltersForSegment(segment, initialStickyForSegment),
   );
   const [appliedFilters, setAppliedFilters] = useState(() =>
-    initialSbiFiltersForSegment(segment, initialOpenInstallationBucket),
+    initialSbiFiltersForSegment(segment, initialStickyForSegment),
   );
   const stickyBucketRef = useRef(
     segment === "open-installation"
       ? stickyOpenInstallationBucket(initialOpenInstallationBucket)
-      : "",
+      : segment === "open-completions"
+        ? stickyOpenCompletionsBucket(initialOpenCompletionsBucket)
+        : "",
   );
   const prevSegmentRef = useRef(segment);
   const [openInstallationBucketReady, setOpenInstallationBucketReady] = useState(
     () =>
       segment !== "open-installation" ||
       Boolean(normalizeOpenInstallationBucket(initialOpenInstallationBucket)),
+  );
+  const [openCompletionsBucketReady, setOpenCompletionsBucketReady] = useState(
+    () =>
+      segment !== "open-completions" ||
+      Boolean(normalizeOpenCompletionsBucket(initialOpenCompletionsBucket)),
   );
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -1697,7 +1769,29 @@ export default function ServiceBeforeInstallationDetailClient({
   const [feedbackCollectedKpiLoading, setFeedbackCollectedKpiLoading] = useState(
     () => segment === "open-installation",
   );
+  const [openCompletionsBreakdown, setOpenCompletionsBreakdown] = useState({
+    total_complaints_registered: null,
+    pending_complaint: null,
+    planned_complaint: null,
+    completed_complaint: null,
+    pending_by_customer: null,
+    pending_for_spares: null,
+    pending_over_48h_no_plan: null,
+  });
+  const [openCompletionsKpiLoading, setOpenCompletionsKpiLoading] = useState(
+    () => segment === "open-completions",
+  );
+  const openCompletionsBreakdownRef = useRef({
+    total_complaints_registered: null,
+    pending_complaint: null,
+    planned_complaint: null,
+    completed_complaint: null,
+    pending_by_customer: null,
+    pending_for_spares: null,
+    pending_over_48h_no_plan: null,
+  });
   openInstallationBreakdownRef.current = openInstallationBreakdown;
+  openCompletionsBreakdownRef.current = openCompletionsBreakdown;
 
   useEffect(() => {
     if (segment !== "open-installation") {
@@ -1723,11 +1817,41 @@ export default function ServiceBeforeInstallationDetailClient({
   }, [segment, initialOpenInstallationBucket]);
 
   useEffect(() => {
+    if (segment !== "open-completions") {
+      setOpenCompletionsBucketReady(true);
+      return;
+    }
+    const nextBucket = stickyOpenCompletionsBucket(
+      stickyBucketRef.current || initialOpenCompletionsBucket,
+    );
+    stickyBucketRef.current = nextBucket;
+    persistOpenCompletionsBucket(nextBucket);
+    setAppliedFilters((prev) =>
+      prev.openCompletionsBucket === nextBucket
+        ? prev
+        : { ...prev, openCompletionsBucket: nextBucket },
+    );
+    setDraftFilters((prev) =>
+      prev.openCompletionsBucket === nextBucket
+        ? prev
+        : { ...prev, openCompletionsBucket: nextBucket },
+    );
+    setOpenCompletionsBucketReady(true);
+  }, [segment, initialOpenCompletionsBucket]);
+
+  useEffect(() => {
     if (prevSegmentRef.current === segment) return;
     prevSegmentRef.current = segment;
     setPage(0);
     setTableFilterOptions(null);
     tableFilterOptionsFetchKeyRef.current = null;
+    if (segment === "open-installation") {
+      stickyBucketRef.current = stickyOpenInstallationBucket(stickyBucketRef.current);
+    } else if (segment === "open-completions") {
+      stickyBucketRef.current = stickyOpenCompletionsBucket(stickyBucketRef.current);
+    } else {
+      stickyBucketRef.current = "";
+    }
     const next = initialSbiFiltersForSegment(segment, stickyBucketRef.current);
     setDraftFilters(next);
     setAppliedFilters(next);
@@ -1742,6 +1866,42 @@ export default function ServiceBeforeInstallationDetailClient({
     } = appliedFilters;
     return JSON.stringify(rest);
   }, [segment, appliedFilters]);
+
+  const openCompletionsKpiFilterKey = useMemo(() => {
+    if (segment !== "open-completions") return "";
+    const { serviceStatus: _status, openCompletionsBucket: _bucket, ...rest } = appliedFilters;
+    return JSON.stringify(rest);
+  }, [segment, appliedFilters]);
+
+  const fetchOpenCompletionsKpis = useCallback(async () => {
+    if (segment !== "open-completions") return;
+    const filterKey = openCompletionsKpiFilterKey;
+    if (kpiFetchedKeyRef.current === filterKey) return;
+
+    kpiFetchAbortRef.current?.abort();
+    const controller = new AbortController();
+    kpiFetchAbortRef.current = controller;
+
+    kpiFetchedKeyRef.current = filterKey;
+    setOpenCompletionsKpiLoading(true);
+    try {
+      const { serviceStatus: _status, openCompletionsBucket: _bucket, ...params } = appliedFilters;
+      const res = await axios.get("/api/service-before-installation/open-completions/kpi", {
+        params,
+        signal: controller.signal,
+        timeout: 12_000,
+      });
+      if (res.data?.success && res.data.breakdown) {
+        setOpenCompletionsBreakdown(res.data.breakdown);
+      }
+    } catch (e) {
+      if (e?.code !== "ERR_CANCELED") console.error(e);
+    } finally {
+      if (!controller.signal.aborted) {
+        setOpenCompletionsKpiLoading(false);
+      }
+    }
+  }, [segment, appliedFilters, openCompletionsKpiFilterKey]);
 
   const applyListTotal = useCallback(
     (total, rowsLen = 0) => {
@@ -2037,6 +2197,36 @@ export default function ServiceBeforeInstallationDetailClient({
     }
   }, [segment, appliedFilters, page, pageSize, applyListTotal, patchFeedbackCollected]);
 
+  const fetchOpenCompletionsCount = useCallback(async () => {
+    if (segment !== "open-completions") return;
+    countFetchAbortRef.current?.abort();
+    const controller = new AbortController();
+    countFetchAbortRef.current = controller;
+
+    setCountLoading(true);
+    try {
+      const { openCompletionsBucket: _bucket, serviceStatus: _status, ...countFilters } =
+        appliedFilters;
+      const bucket = String(appliedFilters.openCompletionsBucket || "total_registered").trim();
+      const res = await axios.get(openCompletionsTableCountApi(bucket), {
+        params: countFilters,
+        signal: controller.signal,
+        timeout: 15_000,
+      });
+      if (res.data?.success) {
+        const total = Number(res.data.pagination?.total ?? 0);
+        applyListTotal(total);
+      }
+    } catch (e) {
+      if (e?.code === "ERR_CANCELED") return;
+      console.error(e);
+    } finally {
+      if (!controller.signal.aborted) {
+        setCountLoading(false);
+      }
+    }
+  }, [segment, appliedFilters, applyListTotal]);
+
   const fetchRows = useCallback(async () => {
     const requestId = (rowsRequestIdRef.current += 1);
     rowsFetchAbortRef.current?.abort();
@@ -2140,6 +2330,73 @@ export default function ServiceBeforeInstallationDetailClient({
       return;
     }
 
+    if (segment === "open-completions") {
+      const activeBucket = String(appliedFilters.openCompletionsBucket || "total_registered").trim();
+      const knownTotal =
+        listTotalRef.current ||
+        openCompletionsBucketRecordCount(activeBucket, openCompletionsBreakdownRef.current);
+
+      if (kpiFetchedKeyRef.current !== openCompletionsKpiFilterKey) {
+        void fetchOpenCompletionsKpis();
+      }
+
+      try {
+        const { openCompletionsBucket: _bucket, serviceStatus: _status, ...listFilters } =
+          appliedFilters;
+        const res = await axios.get(openCompletionsTableListApi(activeBucket), {
+          params: {
+            ...listFilters,
+            limit: pageSize,
+            skip: page * pageSize,
+          },
+          signal,
+          timeout: 12_000,
+        });
+        if (res.data?.success && requestId === rowsRequestIdRef.current) {
+          const data = res.data.data || [];
+          const pag = res.data.pagination || {};
+          const hasMoreFlag = Boolean(pag.hasMore) || data.length >= pageSize;
+          const total = knownTotal > 0 ? knownTotal : listTotalRef.current || 0;
+          setRows(data);
+          setPagination({
+            total,
+            hasMore: total > 0 ? page * pageSize + data.length < total : hasMoreFlag,
+          });
+        }
+      } catch (e) {
+        if (e?.code === "ERR_CANCELED") return;
+        console.error(e);
+      } finally {
+        if (!signal.aborted && requestId === rowsRequestIdRef.current) {
+          setLoading(false);
+          setApplyingFilters(false);
+        }
+      }
+
+      if (signal.aborted || requestId !== rowsRequestIdRef.current) return;
+
+      const fromCards = openCompletionsBucketRecordCount(
+        activeBucket,
+        openCompletionsBreakdownRef.current,
+      );
+      if (fromCards > 0) {
+        applyListTotal(fromCards);
+        setCountLoading(false);
+      } else if (!(listTotalRef.current > 0)) {
+        window.setTimeout(() => {
+          if (requestId !== rowsRequestIdRef.current) return;
+          if (listTotalRef.current > 0) {
+            setCountLoading(false);
+            return;
+          }
+          void fetchOpenCompletionsCount();
+        }, 500);
+      } else {
+        setCountLoading(false);
+      }
+      return;
+    }
+
     try {
       const res = await axios.get(`/api/service-before-installation/${segment}`, {
         params: {
@@ -2181,11 +2438,15 @@ export default function ServiceBeforeInstallationDetailClient({
     page,
     pageSize,
     openInstallationKpiFilterKey,
+    openCompletionsKpiFilterKey,
     fetchOpenInstallationCount,
     fetchOpenInstallationKpis,
+    fetchOpenCompletionsCount,
+    fetchOpenCompletionsKpis,
     fetchFeedbackCollectedKpiCount,
     patchFeedbackCollected,
     enrichOpenInstallationServiceColumns,
+    applyListTotal,
   ]);
 
   const fetchTableFilterOptions = useCallback(async () => {
@@ -2233,10 +2494,16 @@ export default function ServiceBeforeInstallationDetailClient({
   }, [segment, fetchOpenInstallationKpis]);
 
   useEffect(() => {
+    if (segment !== "open-completions") return;
+    void fetchOpenCompletionsKpis();
+  }, [segment, openCompletionsKpiFilterKey, fetchOpenCompletionsKpis]);
+
+  useEffect(() => {
     if (segment === "open-installation" && !openInstallationBucketReady) return;
+    if (segment === "open-completions" && !openCompletionsBucketReady) return;
     fetchRows();
     return () => rowsFetchAbortRef.current?.abort();
-  }, [fetchRows, segment, openInstallationBucketReady]);
+  }, [fetchRows, segment, openInstallationBucketReady, openCompletionsBucketReady]);
 
   const totalPages = pagination.totalPending
     ? Math.max(1, page + (pagination.hasMore ? 2 : 1))
@@ -2274,6 +2541,40 @@ export default function ServiceBeforeInstallationDetailClient({
         </Link>
 
         <DetailSegmentHeader meta={headerMeta} segment={segment} />
+
+        {segment === "open-completions" ? (
+          <ServiceBeforeInstallationOpenCompletionsKpiSection
+            openCompletionsBucket={appliedFilters.openCompletionsBucket || "total_registered"}
+            totals={openCompletionsBreakdown}
+            loading={openCompletionsKpiLoading}
+            onCardSelect={(openCompletionsBucket) => {
+              const nextBucket =
+                normalizeOpenCompletionsBucket(openCompletionsBucket) || "total_registered";
+              const current = String(
+                appliedFilters.openCompletionsBucket || "total_registered",
+              ).trim();
+              if (nextBucket === current) return;
+              stickyBucketRef.current = persistOpenCompletionsBucket(nextBucket);
+              setPage(0);
+              listTotalRef.current = 0;
+              setRows([]);
+              setPagination({ total: 0, hasMore: false });
+              setLoading(true);
+              setCountLoading(true);
+              const estTotal = openCompletionsBucketRecordCount(
+                nextBucket,
+                openCompletionsBreakdownRef.current,
+              );
+              if (estTotal > 0) {
+                applyListTotal(estTotal);
+                setPagination({ total: estTotal, hasMore: estTotal > pageSize });
+              }
+              const next = { ...appliedFilters, openCompletionsBucket: nextBucket };
+              setAppliedFilters(next);
+              setDraftFilters(next);
+            }}
+          />
+        ) : null}
 
         {segment === "open-installation" ? (
           <ServiceBeforeInstallationOpenInstallationKpiStrip
@@ -2319,11 +2620,24 @@ export default function ServiceBeforeInstallationDetailClient({
           onChange={(next) => {
             setDraftFilters({
               ...next,
-              openInstallationBucket:
-                stickyBucketRef.current ||
-                appliedFilters.openInstallationBucket ||
-                next.openInstallationBucket ||
-                "delivered_pending",
+              ...(segment === "open-installation"
+                ? {
+                    openInstallationBucket:
+                      stickyBucketRef.current ||
+                      appliedFilters.openInstallationBucket ||
+                      next.openInstallationBucket ||
+                      "delivered_pending",
+                  }
+                : {}),
+              ...(segment === "open-completions"
+                ? {
+                    openCompletionsBucket:
+                      stickyBucketRef.current ||
+                      appliedFilters.openCompletionsBucket ||
+                      next.openCompletionsBucket ||
+                      "total_registered",
+                  }
+                : {}),
             });
           }}
           loading={applyingFilters}
@@ -2342,25 +2656,55 @@ export default function ServiceBeforeInstallationDetailClient({
             setPlannedKpiLoading(true);
             setCompletedKpiLoading(true);
             setFeedbackCollectedKpiLoading(true);
-            const keptBucket = persistOpenInstallationBucket(
-              stickyBucketRef.current ||
-                appliedFilters.openInstallationBucket ||
-                draftFilters.openInstallationBucket,
-            );
-            stickyBucketRef.current = keptBucket;
-            setAppliedFilters({
-              ...draftFilters,
-              openInstallationBucket: keptBucket,
-            });
+            setOpenCompletionsKpiLoading(segment === "open-completions");
+            if (segment === "open-installation") {
+              const keptBucket = persistOpenInstallationBucket(
+                stickyBucketRef.current ||
+                  appliedFilters.openInstallationBucket ||
+                  draftFilters.openInstallationBucket,
+              );
+              stickyBucketRef.current = keptBucket;
+              setAppliedFilters({
+                ...draftFilters,
+                openInstallationBucket: keptBucket,
+              });
+            } else if (segment === "open-completions") {
+              const keptBucket = persistOpenCompletionsBucket(
+                stickyBucketRef.current ||
+                  appliedFilters.openCompletionsBucket ||
+                  draftFilters.openCompletionsBucket,
+              );
+              stickyBucketRef.current = keptBucket;
+              setAppliedFilters({
+                ...draftFilters,
+                openCompletionsBucket: keptBucket,
+              });
+            } else {
+              setAppliedFilters(draftFilters);
+            }
           }}
           onClear={() => {
             setLoading(true);
             setPage(0);
-            const keptBucket = persistOpenInstallationBucket(
-              stickyBucketRef.current || appliedFilters.openInstallationBucket,
-            );
-            stickyBucketRef.current = keptBucket;
-            const next = initialSbiFiltersForSegment(segment, keptBucket);
+            if (segment === "open-installation") {
+              const keptBucket = persistOpenInstallationBucket(
+                stickyBucketRef.current || appliedFilters.openInstallationBucket,
+              );
+              stickyBucketRef.current = keptBucket;
+              const next = initialSbiFiltersForSegment(segment, keptBucket);
+              applyFilterState(setDraftFilters, setAppliedFilters, next);
+              return;
+            }
+            if (segment === "open-completions") {
+              const keptBucket = persistOpenCompletionsBucket(
+                stickyBucketRef.current || appliedFilters.openCompletionsBucket,
+              );
+              stickyBucketRef.current = keptBucket;
+              const next = initialSbiFiltersForSegment(segment, keptBucket);
+              applyFilterState(setDraftFilters, setAppliedFilters, next);
+              return;
+            }
+            const next = initialSbiFiltersForSegment(segment, "");
             applyFilterState(setDraftFilters, setAppliedFilters, next);
           }}
         />

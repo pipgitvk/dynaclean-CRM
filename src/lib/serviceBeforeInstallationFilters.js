@@ -25,6 +25,8 @@ export const EMPTY_SBI_FILTERS = {
   registeredInstallation: "",
   /** open-installation KPI: "" | "delivered_pending" | "delivery_pending" | "installation_planned" | "completed" | "feedback_collected" */
   openInstallationBucket: "",
+  /** open-completions KPI card bucket */
+  openCompletionsBucket: "",
   /** open-installation list: "" | "registered" | "not_registered" */
   warrantyRegistration: "",
   /** open-installation list: "" | "delivered" | "not_delivered" */
@@ -105,6 +107,9 @@ export function parseSbiFilters(input) {
     openInstallationBucket: normalizeOpenInstallationBucket(
       src.openInstallationBucket ?? src.open_installation_bucket,
     ),
+    openCompletionsBucket: normalizeOpenCompletionsBucket(
+      src.openCompletionsBucket ?? src.open_completions_bucket,
+    ),
     warrantyRegistration: normalizeWarrantyRegistration(
       src.warrantyRegistration ?? src.warranty_registration ?? src.registration,
     ),
@@ -142,6 +147,8 @@ export function parseSbiFiltersFromSearchParams(searchParams) {
       searchParams.get("registeredInstallation") ?? searchParams.get("registered_installation"),
     openInstallationBucket:
       searchParams.get("openInstallationBucket") ?? searchParams.get("open_installation_bucket"),
+    openCompletionsBucket:
+      searchParams.get("openCompletionsBucket") ?? searchParams.get("open_completions_bucket"),
     warrantyRegistration:
       searchParams.get("warrantyRegistration") ??
       searchParams.get("warranty_registration") ??
@@ -195,6 +202,24 @@ function normalizeWarrantyRegistration(raw) {
   if (v === "not_registered" || v === "unregistered" || v === "no" || v === "0") {
     return "not_registered";
   }
+  return "";
+}
+
+export function normalizeOpenCompletionsBucket(raw) {
+  const v = String(raw ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/-/g, "_");
+  const allowed = new Set([
+    "total_registered",
+    "pending",
+    "planned",
+    "completed",
+    "pending_by_customer",
+    "pending_for_spares",
+    "pending_over_48h_no_plan",
+  ]);
+  if (allowed.has(v)) return v;
   return "";
 }
 

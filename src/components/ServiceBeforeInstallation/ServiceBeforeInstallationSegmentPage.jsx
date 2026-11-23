@@ -21,6 +21,10 @@ export default async function ServiceBeforeInstallationSegmentPage({
   const initialOpenInstallationBucket = Array.isArray(rawBucket)
     ? String(rawBucket[0] ?? "")
     : String(rawBucket ?? "");
+  const rawOcBucket = sp.openCompletionsBucket ?? sp.open_completions_bucket;
+  const initialOpenCompletionsBucket = Array.isArray(rawOcBucket)
+    ? String(rawOcBucket[0] ?? "")
+    : String(rawOcBucket ?? "");
 
   return (
     <ServiceBeforeInstallationDetailLoader
@@ -28,6 +32,7 @@ export default async function ServiceBeforeInstallationSegmentPage({
       dashboardBase={dashboardBase}
       userRole={userRole}
       initialOpenInstallationBucket={initialOpenInstallationBucket}
+      initialOpenCompletionsBucket={initialOpenCompletionsBucket}
     />
   );
 }

@@ -205,6 +205,151 @@ export function getOpenInstallationDetailKpiCards() {
   return OPEN_INSTALLATION_DETAIL_KPI_STRIP.map((c) => ({ ...c, href: null }));
 }
 
+/** Open Complaints detail — KPI strip (complaint service records). */
+export const OPEN_COMPLETIONS_COMPLAINT_KPI_CARDS = [
+  {
+    id: "oc-total-registered",
+    field: "total_complaints_registered",
+    title: "Total Complaints",
+    subtitle: "Registered complaints",
+    chartColor: "#6366f1",
+    surface: "border-indigo-200/60 bg-indigo-50/30",
+    iconSurface: "bg-gradient-to-br from-indigo-500 to-violet-600",
+    glow: "bg-indigo-400/20",
+  },
+  {
+    id: "oc-pending",
+    field: "pending_complaint",
+    title: "Pending Complaint",
+    subtitle: "Status: PENDING",
+    chartColor: "#eab308",
+    surface: "border-amber-200/60 bg-amber-50/30",
+    iconSurface: "bg-gradient-to-br from-amber-500 to-orange-600",
+    glow: "bg-amber-400/20",
+  },
+  {
+    id: "oc-planned",
+    field: "planned_complaint",
+    title: "Planned Complaint",
+    subtitle: "Status: PLANNED",
+    chartColor: "#8b5cf6",
+    surface: "border-violet-200/60 bg-violet-50/30",
+    iconSurface: "bg-gradient-to-br from-violet-500 to-purple-600",
+    glow: "bg-violet-400/20",
+  },
+  {
+    id: "oc-completed",
+    field: "completed_complaint",
+    title: "Completed Cases",
+    subtitle: "Status: COMPLETED",
+    chartColor: "#10b981",
+    surface: "border-emerald-200/60 bg-emerald-50/30",
+    iconSurface: "bg-gradient-to-br from-emerald-500 to-teal-600",
+    glow: "bg-emerald-400/20",
+  },
+  {
+    id: "oc-pending-customer",
+    field: "pending_by_customer",
+    title: "Pending by Customer",
+    subtitle: "Awaiting customer",
+    chartColor: "#f43f5e",
+    surface: "border-rose-200/60 bg-rose-50/30",
+    iconSurface: "bg-gradient-to-br from-rose-500 to-red-600",
+    glow: "bg-rose-400/20",
+  },
+  {
+    id: "oc-pending-spares",
+    field: "pending_for_spares",
+    title: "PENDING FOR US",
+    subtitle: "Awaiting internal action",
+    chartColor: "#f97316",
+    surface: "border-orange-200/60 bg-orange-50/30",
+    iconSurface: "bg-gradient-to-br from-orange-500 to-amber-600",
+    glow: "bg-orange-400/20",
+  },
+  {
+    id: "oc-pending-48h",
+    field: "pending_over_48h_no_plan",
+    title: "Pending > 48 hrs",
+    subtitle: "No plan made yet",
+    chartColor: "#dc2626",
+    surface: "border-red-200/60 bg-red-50/30",
+    iconSurface: "bg-gradient-to-br from-red-500 to-rose-600",
+    glow: "bg-red-400/20",
+  },
+];
+
+export function getOpenCompletionsComplaintKpiCards() {
+  return OPEN_COMPLETIONS_COMPLAINT_KPI_CARDS.map((c) => ({ ...c, href: null }));
+}
+
+const OPEN_COMPLETIONS_CARD_ID_TO_BUCKET = {
+  "oc-total-registered": "total_registered",
+  "oc-pending": "pending",
+  "oc-planned": "planned",
+  "oc-completed": "completed",
+  "oc-pending-customer": "pending_by_customer",
+  "oc-pending-spares": "pending_for_spares",
+  "oc-pending-48h": "pending_over_48h_no_plan",
+};
+
+export function openCompletionsBucketFromKpiCardId(cardId) {
+  return OPEN_COMPLETIONS_CARD_ID_TO_BUCKET[String(cardId || "").trim()] || "";
+}
+
+export function openCompletionsKpiCardIdFromFilter(openCompletionsBucket) {
+  const v = String(openCompletionsBucket || "").trim().toLowerCase();
+  if (!v || v === "total_registered") return "oc-total-registered";
+  for (const [cardId, bucket] of Object.entries(OPEN_COMPLETIONS_CARD_ID_TO_BUCKET)) {
+    if (bucket === v) return cardId;
+  }
+  return "";
+}
+
+export const OPEN_COMPLETIONS_TABLE_API_SLUGS = [
+  "total-registered",
+  "pending",
+  "planned",
+  "completed",
+  "pending-by-customer",
+  "pending-for-spares",
+  "pending-over-48h",
+];
+
+export function openCompletionsApiSlugFromBucket(openCompletionsBucket) {
+  const v = String(openCompletionsBucket || "").trim().toLowerCase();
+  if (v === "pending_by_customer") return "pending-by-customer";
+  if (v === "pending_for_spares") return "pending-for-spares";
+  if (v === "pending_over_48h_no_plan") return "pending-over-48h";
+  if (v === "total_registered") return "total-registered";
+  if (v === "pending" || v === "planned" || v === "completed") return v;
+  return "total-registered";
+}
+
+export function openCompletionsBucketFromApiSlug(slug) {
+  const v = String(slug || "")
+    .trim()
+    .toLowerCase();
+  if (v === "pending-by-customer") return "pending_by_customer";
+  if (v === "pending-for-spares") return "pending_for_spares";
+  if (v === "pending-over-48h" || v === "pending-over-48h-no-plan") {
+    return "pending_over_48h_no_plan";
+  }
+  if (v === "total-registered") return "total_registered";
+  if (v === "pending" || v === "planned" || v === "completed") return v;
+  return "";
+}
+
+export function openCompletionsTableListApi(openCompletionsBucket) {
+  const slug = openCompletionsApiSlugFromBucket(openCompletionsBucket);
+  return `/api/service-before-installation/open-completions/list/${slug}`;
+}
+
+export function openCompletionsTableCountApi(openCompletionsBucket) {
+  const slug = openCompletionsApiSlugFromBucket(openCompletionsBucket);
+  return `/api/service-before-installation/open-completions/count/${slug}`;
+}
+
 export function openInstallationBucketFromKpiCardId(cardId) {
   if (cardId === "open-installation-delivered-pending") return "delivered_pending";
   if (cardId === "open-installation-delivery-pending") return "delivery_pending";
