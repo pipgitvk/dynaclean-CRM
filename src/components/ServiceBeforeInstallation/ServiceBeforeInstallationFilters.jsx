@@ -20,7 +20,7 @@ const SEARCH_PLACEHOLDER = {
 const SERVICE_RECORD_STATUS_PRESETS = [
   "PENDING",
   "PLANNED",
-  { value: "PENDING FOR SPARES", label: "PENDING FOR US" },
+  { value: "PENDING FOR SPARES", label: "Pending by Us" },
   "PENDING BY CUSTOMER",
   "IN PROGRESS",
   "WORKED",

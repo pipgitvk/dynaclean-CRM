@@ -29,7 +29,7 @@ function actionBtn(colorClass) {
 
 export function formatOpenCompletionsStatusLabel(status) {
   const s = String(status || "").trim().toUpperCase();
-  if (s === "PENDING FOR SPARES") return "PENDING FOR US";
+  if (s === "PENDING FOR SPARES") return "Pending by Us";
   return status || "—";
 }
 

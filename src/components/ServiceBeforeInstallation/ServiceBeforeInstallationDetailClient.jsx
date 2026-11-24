@@ -1007,7 +1007,7 @@ function WarrantyProductRows({ rows, dashboardBase, page, pageSize, segment }) {
 
 function formatComplaintStatusLabel(status) {
   const s = String(status || "").trim().toUpperCase();
-  if (s === "PENDING FOR SPARES") return "PENDING FOR US";
+  if (s === "PENDING FOR SPARES") return "Pending by Us";
   return status || "—";
 }
 
