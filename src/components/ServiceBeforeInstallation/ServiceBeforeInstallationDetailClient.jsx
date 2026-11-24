@@ -2185,11 +2185,7 @@ export default function ServiceBeforeInstallationDetailClient({
 
     setCountLoading(true);
     try {
-      const {
-        openInstallationBucket: _bucket,
-        dispatchStatus: _dispatchStatus,
-        ...countFilters
-      } = appliedFilters;
+      const { openInstallationBucket: _bucket, ...countFilters } = appliedFilters;
       const res = await axios.get(
         segment === "open-installation"
           ? openInstallationTableCountApi(bucket)
@@ -2197,6 +2193,7 @@ export default function ServiceBeforeInstallationDetailClient({
         {
           params: {
             ...countFilters,
+            ...(isFeedbackTable ? { dispatchStatus: "" } : {}),
             ...(segment !== "open-installation" || isFeedbackTable
               ? { countOnly: "1" }
               : {}),
@@ -2287,7 +2284,6 @@ export default function ServiceBeforeInstallationDetailClient({
       try {
         const {
           openInstallationBucket: _bucket,
-          dispatchStatus: _dispatchStatus,
           range: _range,
           ...listFilters
         } = appliedFilters;
@@ -2298,6 +2294,7 @@ export default function ServiceBeforeInstallationDetailClient({
         const compactParams = Object.fromEntries(
           Object.entries({
             ...listFilters,
+            ...(isFeedbackTable ? { dispatchStatus: "" } : {}),
             limit: pageSize,
             skip: page * pageSize,
             includeFilterOptions: "0",
