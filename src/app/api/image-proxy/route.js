@@ -1,6 +1,40 @@
 import { NextResponse } from "next/server";
-import { attachmentStoragePath } from "@/lib/attachmentPathUtils";
+import { ATTACHMENT_DOMAINS, attachmentStoragePath } from "@/lib/attachmentPathUtils";
 import { resolveAttachmentTarget } from "@/lib/resolveAttachmentUrl";
+import { fetchWithTlsFallback } from "@/lib/fetchWithTlsFallback";
+import {
+  normalizeServeAttachmentPathParam,
+  readPublicAttachmentFile,
+} from "@/lib/serveAttachmentFile";
+
+const PROXY_RESPONSE_HEADERS = {
+  "Cache-Control": "public, max-age=3600",
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+function attachmentFallbackOrigin() {
+  const fromEnv = String(process.env.ATTACHMENT_FALLBACK_ORIGIN || "").trim();
+  if (fromEnv) return fromEnv.replace(/\/+$/, "");
+  const service = ATTACHMENT_DOMAINS.find((d) => d.includes("service."));
+  return (service || ATTACHMENT_DOMAINS[0] || "https://service.dynacleanindustries.com").replace(
+    /\/+$/,
+    "",
+  );
+}
+
+async function respondWithLocalAttachment(cleaned) {
+  const result = await readPublicAttachmentFile(cleaned);
+  if (!result.ok) return null;
+  return new NextResponse(result.buffer, {
+    status: 200,
+    headers: {
+      ...PROXY_RESPONSE_HEADERS,
+      "Content-Type": result.contentType,
+    },
+  });
+}
 
 export async function GET(request) {
   try {
@@ -18,12 +52,28 @@ export async function GET(request) {
 
     if (!finalUrl.startsWith("http://") && !finalUrl.startsWith("https://")) {
       const pathParam = attachmentStoragePath(finalUrl) || finalUrl;
+      const cleanedLocal = normalizeServeAttachmentPathParam(pathParam);
+      const localRes = cleanedLocal ? await respondWithLocalAttachment(cleanedLocal) : null;
+      if (localRes) return localRes;
+
       const { url } = await resolveAttachmentTarget(request, pathParam);
       if (url) {
         finalUrl = url;
       } else {
-        const storage = attachmentStoragePath(finalUrl);
-        finalUrl = `https://service.dynacleanindustries.com/${String(storage).replace(/^\/+/, "")}`;
+        const storage = attachmentStoragePath(finalUrl) || finalUrl;
+        const rel = String(storage).replace(/^\/+/, "");
+        finalUrl = `${attachmentFallbackOrigin()}/${rel}`;
+      }
+    }
+
+    if (finalUrl.startsWith("/api/serve-attachment")) {
+      try {
+        const path = new URL(finalUrl, request.url).searchParams.get("path") || "";
+        const cleaned = normalizeServeAttachmentPathParam(path);
+        const localRes = cleaned ? await respondWithLocalAttachment(cleaned) : null;
+        if (localRes) return localRes;
+      } catch {
+        /* fall through to fetch */
       }
     }
 
@@ -33,7 +83,7 @@ export async function GET(request) {
 
     console.log(`[Image Proxy] Fetching image from: ${finalUrl}`);
 
-    const response = await fetch(finalUrl, {
+    const response = await fetchWithTlsFallback(finalUrl, {
       method: "GET",
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
@@ -57,11 +107,8 @@ export async function GET(request) {
     return new NextResponse(imageBuffer, {
       status: 200,
       headers: {
+        ...PROXY_RESPONSE_HEADERS,
         "Content-Type": contentType,
-        "Cache-Control": "public, max-age=3600",
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
       },
     });
   } catch (error) {

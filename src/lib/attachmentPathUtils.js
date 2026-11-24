@@ -1,9 +1,32 @@
 // Pure string helpers — safe to import from Client Components (no Node fs/path).
 
-export const ATTACHMENT_DOMAINS = [
+const DEFAULT_ATTACHMENT_DOMAINS = [
   "https://app.dynacleanindustries.com",
   "https://service.dynacleanindustries.com",
 ];
+
+export const ATTACHMENT_DOMAINS = (() => {
+  const fromEnv = String(process.env.ATTACHMENT_DOMAINS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return fromEnv.length ? fromEnv : DEFAULT_ATTACHMENT_DOMAINS;
+})();
+
+/** When a host only speaks HTTP, try both https and http for server-side fetches. */
+export function attachmentOriginVariants(origin) {
+  const d = String(origin || "").replace(/\/+$/, "");
+  if (!d) return [];
+  if (d.startsWith("https://")) {
+    const host = d.slice("https://".length);
+    return [`https://${host}`, `http://${host}`];
+  }
+  if (d.startsWith("http://")) {
+    const host = d.slice("http://".length);
+    return [`http://${host}`, `https://${host}`];
+  }
+  return [d];
+}
 
 /** Attendance regularization uploads from service CRM live on this host. */
 export const ATTENDANCE_REGULARIZATION_SERVICE_ORIGIN =

@@ -2,14 +2,16 @@ import { existsSync } from "fs";
 import { join } from "path";
 import {
   ATTACHMENT_DOMAINS,
+  attachmentOriginVariants,
   normalizeAttachmentPathParam,
 } from "@/lib/attachmentPathUtils";
+import { fetchWithTlsFallback } from "@/lib/fetchWithTlsFallback";
 
 async function tryHead(url) {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 4000);
-    const res = await fetch(url, {
+    const res = await fetchWithTlsFallback(url, {
       method: "HEAD",
       signal: controller.signal,
       cache: "no-store",
@@ -19,7 +21,7 @@ async function tryHead(url) {
 
     const controllerGet = new AbortController();
     const timeoutGet = setTimeout(() => controllerGet.abort(), 5000);
-    const resGet = await fetch(url, {
+    const resGet = await fetchWithTlsFallback(url, {
       method: "GET",
       headers: { Range: "bytes=0-0" },
       signal: controllerGet.signal,
@@ -104,7 +106,12 @@ export async function resolveAttachmentTarget(request, pathInput) {
   const isLocal =
     localOrigin &&
     (localOrigin.includes("localhost") || localOrigin.includes("127.0.0.1"));
-  const domainsToTry = isLocal ? [localOrigin, ...ATTACHMENT_DOMAINS] : ATTACHMENT_DOMAINS;
+  const baseDomains = isLocal ? [localOrigin, ...ATTACHMENT_DOMAINS] : ATTACHMENT_DOMAINS;
+  const domainsToTry = [
+    ...new Set(
+      baseDomains.flatMap((domain) => attachmentOriginVariants(domain)).filter(Boolean),
+    ),
+  ];
 
   if (expenseFilename) {
     for (const domain of domainsToTry) {
