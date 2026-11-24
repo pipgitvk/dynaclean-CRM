@@ -8,6 +8,11 @@ const INSTALLATION_SR_TYPE_SQL = `UPPER(TRIM(COALESCE(sr2.service_type, ''))) = 
 const SR2_ASSIGNED_OK_SQL = `UPPER(TRIM(COALESCE(sr2.assigned_to, ''))) NOT IN ('', 'NOT ASSIGNED', 'UNASSIGNED')`;
 /** Prefer COMPLETED installation SR when picking report paths (not highest id alone). */
 const SR2_REPORT_PICK_ORDER = `CASE WHEN UPPER(TRIM(COALESCE(sr2.status, ''))) = 'COMPLETED' THEN 0 ELSE 1 END, sr2.service_id DESC`;
+const SR2_GOOGLE_FEEDBACK_PICK_ORDER = `CASE
+  WHEN LOWER(TRIM(COALESCE(sr2.google_feedback_collected, ''))) = 'yes' THEN 0
+  WHEN LOWER(TRIM(COALESCE(sr2.google_feedback_collected, ''))) = 'no' THEN 1
+  ELSE 2
+END, sr2.service_id DESC`;
 
 /** Attach service_id, service_details, engineers for a page of open-installation rows (by quote). */
 export async function enrichOpenInstallationRowsWithServices(conn, rows) {
@@ -84,10 +89,11 @@ export async function enrichOpenInstallationRowsWithServices(conn, rows) {
        SUBSTRING_INDEX(
          GROUP_CONCAT(
            CASE
-             WHEN ${INSTALLATION_SR_TYPE_SQL}
-             THEN NULLIF(TRIM(sr2.google_feedback_collected), '')
+             WHEN LOWER(TRIM(COALESCE(sr2.google_feedback_collected, ''))) = 'yes' THEN 'yes'
+             WHEN LOWER(TRIM(COALESCE(sr2.google_feedback_collected, ''))) = 'no' THEN 'no'
+             ELSE NULL
            END
-           ORDER BY sr2.service_id DESC
+           ORDER BY ${SR2_GOOGLE_FEEDBACK_PICK_ORDER}
            SEPARATOR '||'
          ),
          '||',
@@ -95,16 +101,22 @@ export async function enrichOpenInstallationRowsWithServices(conn, rows) {
        ) AS google_feedback_collected,
        SUBSTRING_INDEX(
          GROUP_CONCAT(
-           CASE
-             WHEN ${INSTALLATION_SR_TYPE_SQL}
-             THEN NULLIF(TRIM(sr2.google_feedback_collection), '')
-           END
-           ORDER BY sr2.service_id DESC
+           NULLIF(TRIM(sr2.google_feedback_collection), '')
+           ORDER BY ${SR2_GOOGLE_FEEDBACK_PICK_ORDER}
            SEPARATOR '||'
          ),
          '||',
          1
        ) AS google_feedback_collection,
+       SUBSTRING_INDEX(
+         GROUP_CONCAT(
+           NULLIF(TRIM(sr2.google_feedback_proof), '')
+           ORDER BY ${SR2_GOOGLE_FEEDBACK_PICK_ORDER}
+           SEPARATOR '||'
+         ),
+         '||',
+         1
+       ) AS google_feedback_proof,
        SUBSTRING_INDEX(
          GROUP_CONCAT(
            CASE
@@ -192,11 +204,15 @@ export async function enrichOpenInstallationRowsWithServices(conn, rows) {
     ) {
       next.installation_report_engineer = String(hit.installation_report_engineer).trim();
     }
-    if (hit.google_feedback_collected != null && String(hit.google_feedback_collected).trim() !== "") {
-      next.google_feedback_collected = String(hit.google_feedback_collected).trim().toLowerCase();
+    {
+      const gf = String(hit.google_feedback_collected ?? "").trim().toLowerCase();
+      next.google_feedback_collected = gf === "yes" || gf === "no" ? gf : "";
     }
     if (hit.google_feedback_collection != null && String(hit.google_feedback_collection).trim() !== "") {
       next.google_feedback_collection = String(hit.google_feedback_collection).trim();
+    }
+    if (hit.google_feedback_proof != null && String(hit.google_feedback_proof).trim() !== "") {
+      next.google_feedback_proof = String(hit.google_feedback_proof).trim();
     }
     if (hit.installation_report != null && String(hit.installation_report).trim() !== "") {
       next.installation_report = String(hit.installation_report).trim();

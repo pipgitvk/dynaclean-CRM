@@ -23,6 +23,7 @@ export function mergeOpenInstallationParallelEnrichment(dispatchRows, serviceRow
         svc.installation_report_engineer ?? row.installation_report_engineer,
       google_feedback_collected: svc.google_feedback_collected ?? row.google_feedback_collected,
       google_feedback_collection: svc.google_feedback_collection ?? row.google_feedback_collection,
+      google_feedback_proof: svc.google_feedback_proof ?? row.google_feedback_proof,
       installation_report: svc.installation_report ?? row.installation_report,
       final_report_path: svc.final_report_path ?? row.final_report_path,
     };

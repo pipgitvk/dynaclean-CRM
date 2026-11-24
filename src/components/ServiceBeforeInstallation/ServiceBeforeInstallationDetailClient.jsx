@@ -26,6 +26,7 @@ import {
   getSegmentMeta,
   openCompletionsTableCountApi,
   openCompletionsTableListApi,
+  OPEN_INSTALLATION_GOOGLE_FEEDBACK_API,
   openInstallationTableCountApi,
   openInstallationTableListApi,
 } from "@/lib/serviceBeforeInstallationHub";
@@ -39,6 +40,10 @@ import {
 import ServiceBeforeInstallationFilters from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationFilters";
 import ServiceBeforeInstallationOpenInstallationKpiStrip from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationOpenInstallationKpiStrip";
 import ServiceBeforeInstallationOpenCompletionsKpiSection from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationOpenCompletionsKpiSection";
+import {
+  OpenCompletionsComplaintRows,
+  OpenCompletionsComplaintTableHead,
+} from "@/components/ServiceBeforeInstallation/OpenCompletionsComplaintTable";
 import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { formatCrmDatetimeForISTDisplay } from "@/lib/timezone";
 import {
@@ -63,6 +68,7 @@ import {
   openInstallationViewMoreBtnClassCompact,
 } from "@/components/installation/openInstallationViewMoreBtnClass";
 import { useWarrantyProductFollowup } from "@/components/warranty/WarrantyProductFollowupControls";
+import GoogleFeedbackProofCell from "@/components/services/GoogleFeedbackProofCell";
 
 const DEFAULT_PAGE_SIZE = 10;
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
@@ -182,7 +188,6 @@ function initialSbiFiltersForSegment(segment, stickyBucket = "") {
       ...base,
       openInstallationBucket: stickyOpenInstallationBucket(stickyBucket),
       itemType: "products",
-      dispatchStatus: "not_completed",
     };
   }
   if (segment === "open-completions") {
@@ -1475,6 +1480,9 @@ function OpenInstallationRows({
           <OpenInstallationRegistrationCell row={row} dashboardBase={dashboardBase} />
         </td>
         <td className="px-4 py-3.5 align-top">
+          <GoogleFeedbackProofCell record={row} showNullState />
+        </td>
+        <td className="px-4 py-3.5 align-top">
           {useCompactViewMore ? (
             <OpenInstallationRowViewMore
               row={row}
@@ -1557,13 +1565,14 @@ function TableHead({ segment }) {
         <th className={th}>Model</th>
         <th className={th}>Order / Delivery</th>
         <th className={th}>Regst. / Registration</th>
+        <th className={th}>Google Feedback</th>
         <th className={th}>Status</th>
         <th className={th}>Action</th>
       </tr>
     );
   }
   if (segment === "open-completions") {
-    return <ServiceRecordTableHead dateLabel="Complaint Date" />;
+    return <OpenCompletionsComplaintTableHead />;
   }
   if (segment === "active-amc" || segment === "due-amc-expiring") {
     return (
@@ -1618,6 +1627,9 @@ function TableBody({
   pageSize,
   userRole,
   onOpenInstallationRowPatch,
+  onOpenCompletionsRowPatch,
+  onMachineFollowUp,
+  onMachineHistory,
   ProductFollowupIcons,
 }) {
   if (segment === "open-installation" || segment === "overdue-delayed-installation") {
@@ -1636,12 +1648,17 @@ function TableBody({
   }
   if (segment === "open-completions") {
     return (
-      <ServiceRows
+      <OpenCompletionsComplaintRows
         rows={rows}
         dashboardBase={dashboardBase}
         page={page}
         pageSize={pageSize}
-        variant="complaint"
+        userRole={userRole}
+        formatDate={formatDate}
+        ProductFollowupIcons={ProductFollowupIcons}
+        onMachineFollowUp={onMachineFollowUp}
+        onMachineHistory={onMachineHistory}
+        onRowUpdated={onOpenCompletionsRowPatch}
       />
     );
   }
@@ -1662,8 +1679,8 @@ function TableBody({
 function colSpanForSegment(segment) {
   if (segment === "total-registered") return 11;
   if (isWarrantyProductSegment(segment)) return 9;
-  if (segment === "open-completions") return 10;
-  if (segment === "open-installation" || segment === "overdue-delayed-installation") return 12;
+  if (segment === "open-completions") return 13;
+  if (segment === "open-installation" || segment === "overdue-delayed-installation") return 13;
   if (segment === "active-amc" || segment === "due-amc-expiring") return 7;
   return 9;
 }
@@ -1684,7 +1701,8 @@ export default function ServiceBeforeInstallationDetailClient({
     : meta;
   const hubHref = `/${dashboardBase}/service-before-installation`;
   const warrantyHref = `/${dashboardBase}/warranty`;
-  const { ProductFollowupIcons, followupModals } = useWarrantyProductFollowup();
+  const { ProductFollowupIcons, followupModals, openMachineFollowUp, openMachineHistory } =
+    useWarrantyProductFollowup();
 
   const initialStickyForSegment =
     segment === "open-completions"
@@ -1941,10 +1959,14 @@ export default function ServiceBeforeInstallationDetailClient({
   const fetchFeedbackCollectedKpiCount = useCallback(
     async (signal) => {
       if (segment !== "open-installation") return;
-      const { openInstallationBucket: _bucket, ...kpiFilters } = appliedFilters;
+      const {
+        openInstallationBucket: _bucket,
+        dispatchStatus: _dispatchStatus,
+        ...kpiFilters
+      } = appliedFilters;
       setFeedbackCollectedKpiLoading(true);
       try {
-        const res = await axios.get("/api/service-before-installation/google-feedback", {
+        const res = await axios.get(OPEN_INSTALLATION_GOOGLE_FEEDBACK_API, {
           params: {
             ...kpiFilters,
             countOnly: "1",
@@ -1952,11 +1974,14 @@ export default function ServiceBeforeInstallationDetailClient({
             skip: 0,
           },
           signal,
-          timeout: 8_000,
+          timeout: 12_000,
         });
         if (res.data?.success) {
           const n = Number(
-            res.data.feedback_collected ?? res.data.pagination?.total ?? 0,
+            res.data.count ??
+              res.data.feedback_collected ??
+              res.data.pagination?.total ??
+              0,
           );
           patchFeedbackCollected(n);
           if (String(appliedFilters.openInstallationBucket || "").trim() === "feedback_collected") {
@@ -2160,7 +2185,11 @@ export default function ServiceBeforeInstallationDetailClient({
 
     setCountLoading(true);
     try {
-      const { openInstallationBucket: _bucket, ...countFilters } = appliedFilters;
+      const {
+        openInstallationBucket: _bucket,
+        dispatchStatus: _dispatchStatus,
+        ...countFilters
+      } = appliedFilters;
       const res = await axios.get(
         segment === "open-installation"
           ? openInstallationTableCountApi(bucket)
@@ -2168,7 +2197,9 @@ export default function ServiceBeforeInstallationDetailClient({
         {
           params: {
             ...countFilters,
-            ...(segment !== "open-installation" ? { countOnly: "1" } : {}),
+            ...(segment !== "open-installation" || isFeedbackTable
+              ? { countOnly: "1" }
+              : {}),
             limit: pageSize,
             skip: page * pageSize,
           },
@@ -2254,23 +2285,31 @@ export default function ServiceBeforeInstallationDetailClient({
         }
       }
       try {
-        const { openInstallationBucket: _bucket, ...listFilters } = appliedFilters;
+        const {
+          openInstallationBucket: _bucket,
+          dispatchStatus: _dispatchStatus,
+          range: _range,
+          ...listFilters
+        } = appliedFilters;
         const listUrl =
           segment === "open-installation"
             ? openInstallationTableListApi(activeBucket)
             : `/api/service-before-installation/${segment}`;
-        const res = await axios.get(listUrl, {
-          params: {
+        const compactParams = Object.fromEntries(
+          Object.entries({
             ...listFilters,
             limit: pageSize,
             skip: page * pageSize,
             includeFilterOptions: "0",
             skipTotal: "1",
             includeOpenInstallationBreakdown: "0",
-            deferServiceEnrich: "1",
-          },
+            deferServiceEnrich: isFeedbackTable ? "0" : "1",
+          }).filter(([, v]) => v !== "" && v != null && v !== false),
+        );
+        const res = await axios.get(listUrl, {
+          params: compactParams,
           signal,
-          timeout: 12_000,
+          timeout: 30_000,
         });
         if (res.data?.success && requestId === rowsRequestIdRef.current) {
           const data = res.data.data || [];
@@ -2297,7 +2336,7 @@ export default function ServiceBeforeInstallationDetailClient({
         }
       } catch (e) {
         if (e?.code === "ERR_CANCELED") return;
-        console.error(e);
+        console.error("[open-installation list]", e?.response?.data || e.message || e);
       } finally {
         if (!signal.aborted && requestId === rowsRequestIdRef.current) {
           setLoading(false);
@@ -2516,6 +2555,14 @@ export default function ServiceBeforeInstallationDetailClient({
     if (key == null) return;
     setRows((prev) =>
       prev.map((r) => ((r.order_id ?? r.id) === key ? { ...r, ...patchedRow } : r)),
+    );
+  }, []);
+
+  const handleOpenCompletionsRowPatch = useCallback((serviceId, patch) => {
+    const id = String(serviceId || "").trim();
+    if (!id) return;
+    setRows((prev) =>
+      prev.map((r) => (String(r.service_id) === id ? { ...r, ...patch } : r)),
     );
   }, []);
   const showAddRegistered = isWarrantyProductSegment(segment);
@@ -2781,9 +2828,13 @@ export default function ServiceBeforeInstallationDetailClient({
                     pageSize={pageSize}
                     userRole={userRole}
                     onOpenInstallationRowPatch={handleOpenInstallationRowPatch}
+                    onOpenCompletionsRowPatch={handleOpenCompletionsRowPatch}
+                    onMachineFollowUp={openMachineFollowUp}
+                    onMachineHistory={openMachineHistory}
                     ProductFollowupIcons={
                       segment === "open-installation" ||
-                      segment === "overdue-delayed-installation"
+                      segment === "overdue-delayed-installation" ||
+                      segment === "open-completions"
                         ? ProductFollowupIcons
                         : null
                     }

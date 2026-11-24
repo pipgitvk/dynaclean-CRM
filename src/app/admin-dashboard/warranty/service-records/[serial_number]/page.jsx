@@ -7,6 +7,10 @@ import {
   attachmentServeHref,
   splitAttachmentList,
 } from "@/lib/attachmentPathUtils";
+import {
+  displayComplaintDateForServiceRecord,
+  displayRegDateForServiceRecord,
+} from "@/lib/serviceRecordComplaintDisplay";
 
 function attachmentItemsFromRow(row) {
   const list = splitAttachmentList(row?.attachments);
@@ -165,7 +169,7 @@ export default function ServiceRecordsPage() {
                 return (
                   <tr key={row.service_id} className={bgColorClass}>
                     <td className="p-2 border border-gray-300">
-                      {row.reg_date}
+                      {displayRegDateForServiceRecord(row)}
                     </td>
                     <td className="p-2 border border-gray-300">
                       {row.serial_number}
@@ -174,7 +178,7 @@ export default function ServiceRecordsPage() {
                       {row.service_type}
                     </td>
                     <td className="p-2 border border-gray-300">
-                      {row.complaint_date}
+                      {displayComplaintDateForServiceRecord(row)}
                     </td>
                     <td className="p-2 border border-gray-300">
                       {row.complaint_summary}

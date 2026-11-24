@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import { assertSuperAdminApiAccess } from "@/lib/serviceBeforeInstallationAccess";
 import { parseSbiFiltersFromSearchParams } from "@/lib/serviceBeforeInstallationFilters";
 import {
-  fetchServiceBeforeInstallationSegmentPage,
+  fetchOpenInstallationBucketList,
   withDefaultOpenInstallationItemType,
 } from "@/lib/serviceBeforeInstallationQueries";
-import { fetchOpenInstallationGoogleFeedbackPage } from "@/lib/openInstallationGoogleFeedbackQueries";
+import { fetchOpenInstallationGoogleFeedbackCollectedPage } from "@/lib/openInstallationGoogleFeedbackCardQueries";
 import {
   OPEN_INSTALLATION_TABLE_API_SLUGS,
   openInstallationBucketFromApiSlug,
@@ -45,12 +45,11 @@ export async function GET(request, context) {
     });
 
     if (filterBucket === "feedback_collected") {
-      const page = await fetchOpenInstallationGoogleFeedbackPage(
+      const page = await fetchOpenInstallationGoogleFeedbackCollectedPage(
         filters,
-        "feedback_collected",
         limit,
         skip,
-        { skipTotal: true },
+        { skipTotal: true, skipServiceEnrich: deferServiceEnrich },
       );
       const data = page.data || [];
       return NextResponse.json({
@@ -67,25 +66,19 @@ export async function GET(request, context) {
       });
     }
 
-    const result = await fetchServiceBeforeInstallationSegmentPage("open-installation", {
-      ...filters,
-      limit,
-      skip,
-      includeOpenInstallationBreakdown: false,
-      skipTotal: true,
+    const page = await fetchOpenInstallationBucketList(filters, limit, skip, {
       deferServiceEnrich,
     });
-
-    const data = result.data || [];
+    const data = page.data || [];
     return NextResponse.json({
       success: true,
       bucket: filterBucket,
       data,
       pagination: {
-        total: null,
+        total: page.total ?? null,
         limit,
         skip,
-        hasMore: result.hasMore ?? data.length >= limit,
+        hasMore: Boolean(page.hasMore) || data.length >= limit,
         totalPending: true,
       },
     });

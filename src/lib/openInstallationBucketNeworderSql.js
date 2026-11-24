@@ -3,13 +3,11 @@ import {
   NO_ACTUALLY_DELIVERED_SQL,
   NO_DELIVERY_PENDING_AFTER_DISPATCH_SQL,
 } from "@/lib/openInstallationKpiSql";
-import {
-  sqlOrderGoogleFeedbackCollected,
-  sqlOrderGoogleFeedbackNotCollected,
-} from "@/lib/openInstallationGoogleFeedbackSql";
 
 /**
  * Narrow {@code neworder} before dispatch/service aggregates when a KPI bucket is active.
+ * Google-feedback YES is NOT applied here — only the dedicated Google Feedback card API
+ * may filter google_feedback_collected = yes.
  */
 export function buildNeworderOpenInstallationBucketWhereSql(openInstallationBucket) {
   const b = String(openInstallationBucket || "").trim().toLowerCase();
@@ -38,12 +36,6 @@ export function buildNeworderOpenInstallationBucketWhereSql(openInstallationBuck
           AND UPPER(TRIM(COALESCE(sr_ob.status, ''))) = 'COMPLETED'
       )
     )`;
-  }
-  if (b === "no_feedback") {
-    return `AND ${sqlOrderGoogleFeedbackNotCollected("no")}`;
-  }
-  if (b === "feedback_collected") {
-    return `AND ${sqlOrderGoogleFeedbackCollected("no")}`;
   }
   return "";
 }

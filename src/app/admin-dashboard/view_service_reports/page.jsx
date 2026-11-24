@@ -9,6 +9,7 @@ import { getSessionPayload } from "@/lib/auth";
 import { ensureServiceReportStepsTable } from "@/lib/ensureServiceReportStepsTable";
 import { ensureServiceRecordsFollowupColumns } from "@/lib/ensureServiceRecordsFollowupColumns";
 import { ensureServiceRecordsPlannedDateColumn } from "@/lib/ensureServiceRecordsPlannedDateColumn";
+import { ensureServiceRecordsInstallationManualColumns } from "@/lib/ensureServiceRecordsInstallationManualColumns";
 
 // ✅ Disable caching to always fetch fresh data from database
 export const revalidate = 0;
@@ -36,6 +37,7 @@ export default async function AdminViewServiceReportsPage() {
     await ensureServiceRecordsFollowupColumns();
     await ensureServiceRecordsPlannedDateColumn();
     const conn = await getDbConnection();
+    await ensureServiceRecordsInstallationManualColumns(conn);
     const sql = `
       SELECT
         sr.*,

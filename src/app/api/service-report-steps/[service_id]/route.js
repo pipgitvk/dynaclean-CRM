@@ -165,6 +165,9 @@ function missingBefore(steps, action) {
   if (action === "work_start" && !steps.video_damaged) return "Upload the damaged parts video first.";
   if (action === "work_complete" && !steps.work_started_at) return "Start the work first.";
   if (action === "video_completion" && !steps.work_completed_at) return "Mark the work completed first.";
+  if (action === "google_feedback" && !steps.video_completion) {
+    return "Upload the completion video first.";
+  }
   return null;
 }
 
@@ -225,6 +228,7 @@ export async function POST(request, context) {
     const isInstallationService = String(existing.service_type || "").trim().toUpperCase() === "INSTALLATION";
     const isInstallationVideoAction = action === "installation_completion_video";
     const isManualInstallationReport = action === "manual_installation_report";
+    const isGoogleFeedbackAction = action === "google_feedback";
 
     if ((isInstallationVideoAction || isManualInstallationReport) && !isInstallationService) {
       return NextResponse.json(
@@ -233,14 +237,34 @@ export async function POST(request, context) {
       );
     }
 
-    if (!isInstallationVideoAction && !isManualInstallationReport && !isComplaintService) {
+    if (
+      !isInstallationVideoAction &&
+      !isManualInstallationReport &&
+      !isGoogleFeedbackAction &&
+      !isComplaintService
+    ) {
       return NextResponse.json(
         { message: "Video steps are only for complaint services." },
         { status: 400 },
       );
     }
 
-    if (!isInstallationVideoAction && !isManualInstallationReport) {
+    if (isGoogleFeedbackAction && !isComplaintService) {
+      return NextResponse.json(
+        { message: "Google feedback is only for complaint services." },
+        { status: 400 },
+      );
+    }
+
+    if (!isInstallationVideoAction && !isManualInstallationReport && !isGoogleFeedbackAction) {
+      const current = payloadFromRow(existing).steps;
+      const blocked = missingBefore(current, action);
+      if (blocked) {
+        return NextResponse.json({ message: blocked }, { status: 400 });
+      }
+    }
+
+    if (isGoogleFeedbackAction) {
       const current = payloadFromRow(existing).steps;
       const blocked = missingBefore(current, action);
       if (blocked) {
@@ -417,6 +441,55 @@ export async function POST(request, context) {
         );
       }
       await conn.execute(`INSERT IGNORE INTO service_reports (service_id) VALUES (?)`, [serviceId]);
+    } else if (isGoogleFeedbackAction) {
+      const manualMeta = parseInstallationManualMetaFromForm(formData);
+      if (!manualMeta.googleFeedbackCollected) {
+        return NextResponse.json(
+          { message: "Please select Yes or No for Google feedback collected." },
+          { status: 400 },
+        );
+      }
+      let googleFeedbackProof = String(existing.google_feedback_proof || "").trim();
+      let googleFeedbackCollection = manualMeta.googleFeedbackCollection;
+
+      if (manualMeta.googleFeedbackCollected === "yes") {
+        if (!googleFeedbackCollection) {
+          return NextResponse.json(
+            { message: "Please select Google feedback collection status." },
+            { status: 400 },
+          );
+        }
+        const gfFile = formData.get("google_feedback_file");
+        if (gfFile && typeof gfFile !== "string" && gfFile.size > 0) {
+          const gfSaved = await saveManualAttachment(gfFile, serviceId, "google-feedback");
+          if (gfSaved.error) {
+            return NextResponse.json({ message: gfSaved.error }, { status: 400 });
+          }
+          googleFeedbackProof = gfSaved.fileName;
+        } else if (!googleFeedbackProof) {
+          return NextResponse.json(
+            { message: "Google feedback proof upload is required when feedback is Yes." },
+            { status: 400 },
+          );
+        }
+      } else {
+        googleFeedbackProof = "";
+        googleFeedbackCollection = "not_collected";
+      }
+
+      await conn.execute(
+        `UPDATE service_records
+         SET google_feedback_collected = ?,
+             google_feedback_collection = ?,
+             google_feedback_proof = ?
+         WHERE service_id = ?`,
+        [
+          manualMeta.googleFeedbackCollected,
+          googleFeedbackCollection,
+          googleFeedbackProof || null,
+          serviceId,
+        ],
+      );
     } else if (action === "work_start") {
       await conn.execute(
         `INSERT INTO service_report_steps (service_id, work_started_at)

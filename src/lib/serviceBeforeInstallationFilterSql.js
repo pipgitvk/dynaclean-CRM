@@ -14,7 +14,6 @@ import {
   U_DELIVERED_INSTALLATION_PENDING_SQL,
   U_DELIVERY_PENDING_AFTER_DISPATCH_SQL,
   U_INSTALLATION_COMPLETED_SQL,
-  U_NO_FEEDBACK_COLLECTED_SQL,
   U_OPEN_INSTALLATION_ORDER_SQL,
   U_INSTALLATION_PLANNED_SQL,
 } from "@/lib/openInstallationKpiSql";
@@ -180,9 +179,9 @@ export function buildUpcomingInstallationListFilterSql(
   }
 
   if (f.dispatchStatus === "not_completed") {
-    sql += ` AND (u.dispatch_date IS NULL OR TRIM(CAST(u.dispatch_date AS CHAR)) = '')`;
+    sql += ` AND COALESCE(u.order_dispatch_status, 0) = 0`;
   } else if (f.dispatchStatus === "completed") {
-    sql += ` AND u.dispatch_date IS NOT NULL AND TRIM(CAST(u.dispatch_date AS CHAR)) <> ''`;
+    sql += ` AND COALESCE(u.order_dispatch_status, 0) = 1`;
   }
 
   if (f.serviceStatus) {
@@ -222,10 +221,6 @@ export function buildUpcomingInstallationListFilterSql(
       sql += ` AND ${U_INSTALLATION_PLANNED_SQL}`;
     } else if (f.openInstallationBucket === "completed") {
       sql += ` AND ${U_INSTALLATION_COMPLETED_SQL}`;
-    } else if (f.openInstallationBucket === "feedback_collected") {
-      sql += ` AND LOWER(TRIM(COALESCE(u.google_feedback_collected, ''))) = 'yes'`;
-    } else if (f.openInstallationBucket === "no_feedback") {
-      sql += ` AND ${U_NO_FEEDBACK_COLLECTED_SQL}`;
     }
   }
 

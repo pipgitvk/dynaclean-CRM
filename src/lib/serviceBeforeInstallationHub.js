@@ -402,12 +402,19 @@ export function openInstallationBucketFromApiSlug(slug) {
   return "";
 }
 
+export const OPEN_INSTALLATION_GOOGLE_FEEDBACK_API =
+  "/api/service-before-installation/open-installation/google-feedback";
+
 export function openInstallationTableListApi(openInstallationBucket) {
+  const bucket = String(openInstallationBucket || "").trim().toLowerCase();
+  if (bucket === "feedback_collected") return OPEN_INSTALLATION_GOOGLE_FEEDBACK_API;
   const slug = openInstallationApiSlugFromBucket(openInstallationBucket);
   return `/api/service-before-installation/open-installation/list/${slug}`;
 }
 
 export function openInstallationTableCountApi(openInstallationBucket) {
+  const bucket = String(openInstallationBucket || "").trim().toLowerCase();
+  if (bucket === "feedback_collected") return OPEN_INSTALLATION_GOOGLE_FEEDBACK_API;
   const slug = openInstallationApiSlugFromBucket(openInstallationBucket);
   return `/api/service-before-installation/open-installation/count/${slug}`;
 }

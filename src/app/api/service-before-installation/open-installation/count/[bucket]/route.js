@@ -5,7 +5,7 @@ import {
   countOpenInstallationSegment,
   withDefaultOpenInstallationItemType,
 } from "@/lib/serviceBeforeInstallationQueries";
-import { countOpenInstallationGoogleFeedbackStats } from "@/lib/openInstallationGoogleFeedbackQueries";
+import { countOpenInstallationGoogleFeedbackCollected } from "@/lib/openInstallationGoogleFeedbackCardQueries";
 import {
   OPEN_INSTALLATION_TABLE_API_SLUGS,
   openInstallationBucketFromApiSlug,
@@ -43,9 +43,7 @@ export async function GET(request, context) {
 
     const total =
       filterBucket === "feedback_collected"
-        ? Number(
-            (await countOpenInstallationGoogleFeedbackStats(filters)).feedback_collected || 0,
-          )
+        ? await countOpenInstallationGoogleFeedbackCollected(filters)
         : await countOpenInstallationSegment("open-installation", filters);
 
     return NextResponse.json({

@@ -10,6 +10,7 @@ import Modal from "./Modal";
 import ServiceAttachmentLink from "./ServiceAttachmentLink";
 import ServiceReportPrintButton from "./ServiceReportPrintButton";
 import ServiceCompletionDateCell from "./ServiceCompletionDateCell";
+import GoogleFeedbackProofCell from "./GoogleFeedbackProofCell";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import {
   Eye,
@@ -427,6 +428,8 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
     dashboardPath === "user-dashboard" ||
     dashboardPath === "sales-dashboard";
 
+  const showGoogleFeedbackColumn = dashboardPath === "admin-dashboard";
+
   const renderStepVideos = (record) => {
     const serviceType = String(record.service_type || "").trim().toUpperCase();
     
@@ -492,6 +495,7 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
   const tableColSpan =
     (role === "ADMIN" ? 12 : 11) +
     (showStepVideos ? 1 : 0) +
+    (showGoogleFeedbackColumn ? 1 : 0) +
     (showServiceFollowupColumn ? 1 : 0);
 
   const formatDate = (value) => formatCrmDateOnly(value, "");
@@ -1524,6 +1528,9 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
                 {showStepVideos && (
                   <th className="px-6 py-3 text-left">Step Videos</th>
                 )}
+                {showGoogleFeedbackColumn && (
+                  <th className="px-6 py-3 text-left min-w-[6rem]">Google Upload</th>
+                )}
                 <th className="px-6 py-3 text-left">Reports</th>
                 {role === "ADMIN" && (
                   <th className="px-6 py-3 text-left">Company Cost</th>
@@ -1655,6 +1662,11 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
                       </td>
                       {showStepVideos && (
                         <td className="px-6 py-3">{renderStepVideos(record)}</td>
+                      )}
+                      {showGoogleFeedbackColumn && (
+                        <td className="px-6 py-3 align-top">
+                          <GoogleFeedbackProofCell record={record} />
+                        </td>
                       )}
                       <td className="px-6 py-3">{renderReportCell(record)}</td>
 
@@ -1909,6 +1921,16 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
                           Step Videos:
                         </span>
                         <div className="mt-0.5">{renderStepVideos(record)}</div>
+                      </div>
+                    )}
+                    {showGoogleFeedbackColumn && (
+                      <div className="text-gray-500 mt-1">
+                        <span className="font-semibold text-gray-700">
+                          Google Upload:
+                        </span>
+                        <div className="mt-0.5">
+                          <GoogleFeedbackProofCell record={record} />
+                        </div>
                       </div>
                     )}
                     <div className="text-gray-500 mt-1">

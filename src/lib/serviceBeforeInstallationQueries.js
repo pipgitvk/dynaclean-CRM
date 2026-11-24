@@ -13,6 +13,7 @@ import {
 } from "@/lib/upcomingInstallationsQuery";
 import { buildNeworderOpenInstallationBucketWhereSql } from "@/lib/openInstallationBucketNeworderSql";
 import { buildOpenCompletionsBucketWhereSql } from "@/lib/openCompletionsBucketSql";
+import { ensureServiceReportStepsTable } from "@/lib/ensureServiceReportStepsTable";
 import {
   dispatchSerialEligibleForInstallation,
   pendingNeworderPredicates,
@@ -65,7 +66,7 @@ const OPEN_INSTALLATION_KPI_CACHE = new Map();
 const OPEN_INSTALLATION_KPI_INFLIGHT = new Map();
 const OPEN_INSTALLATION_KPI_TTL_MS = 90_000;
 /** Bump when count semantics change so stale under-counts (e.g. forced products) are dropped. */
-const OPEN_INSTALLATION_KPI_CACHE_VER = "v5-fast-joins";
+const OPEN_INSTALLATION_KPI_CACHE_VER = "v8-no-dispatch-filter";
 
 const DELIVERED_ON_SQL = `(
   no.delivered_on IS NOT NULL
@@ -102,16 +103,6 @@ function sqlQuoteHasAnyWarrantyRegistration(quoteNoColumn) {
   )`;
 }
 
-/** Dispatch Date column: MAX(COALESCE(dispatch.updated_at, created_at)). */
-function sqlQuoteHasDispatchDate(quoteColumn) {
-  return `EXISTS (
-    SELECT 1
-    FROM dispatch d_ds
-    WHERE ${sqlTrimUtf8EqColumns("d_ds.quote_number", quoteColumn)}
-      AND COALESCE(d_ds.updated_at, d_ds.created_at) IS NOT NULL
-  )`;
-}
-
 function sqlQuoteHasProductOnQuotation(quoteColumn) {
   return `EXISTS (
     SELECT 1
@@ -122,37 +113,19 @@ function sqlQuoteHasProductOnQuotation(quoteColumn) {
   )`;
 }
 
-/**
- * Default Open Installation filters (products + dispatch not completed) used correlated
- * EXISTS per neworder row and timed out the pool. Materialize quote sets once.
- */
-function openInstallationNeworderJoinPlan(filters) {
-  const f = parseSbiFilters(filters);
-  const type = resolveUpcomingInstallationType(f.itemType);
-  let joinSql = "";
-  let extraWhere = "";
-  let skipItemType = false;
-  let skipDispatchStatus = false;
-
-  if (f.dispatchStatus === "not_completed" || f.dispatchStatus === "completed") {
-    const joinKind = f.dispatchStatus === "not_completed" ? "LEFT JOIN" : "INNER JOIN";
-    joinSql += `
-    ${joinKind} (
-      SELECT DISTINCT ${sqlUtf8TrimExpr("d.quote_number")} AS quote_key
-      FROM dispatch d
-      WHERE d.quote_number IS NOT NULL
-        AND ${sqlUtf8TrimExpr("d.quote_number")} <> ''
-        AND COALESCE(d.updated_at, d.created_at) IS NOT NULL
-    ) oi_has_disp ON oi_has_disp.quote_key = ${sqlUtf8TrimExpr("no.quote_number")}`;
-    if (f.dispatchStatus === "not_completed") {
-      extraWhere += ` AND oi_has_disp.quote_key IS NULL`;
-    }
-    skipDispatchStatus = true;
+function sqlNeworderDispatchStatusWhere(dispatchStatus) {
+  if (dispatchStatus === "not_completed") {
+    return ` AND COALESCE(no.dispatch_status, 0) = 0`;
   }
+  if (dispatchStatus === "completed") {
+    return ` AND COALESCE(no.dispatch_status, 0) = 1`;
+  }
+  return "";
+}
 
-  if (type === "products" && f.dispatchStatus === "not_completed") {
-    joinSql += `
-    INNER JOIN (
+function sqlOpenInstallationProductsJoin(dispatchStatus) {
+  if (dispatchStatus === "not_completed") {
+    return `INNER JOIN (
       SELECT DISTINCT ${sqlUtf8TrimExpr("qi.quote_number")} AS quote_key
       FROM quotation_items qi
       INNER JOIN products_list pl
@@ -160,6 +133,28 @@ function openInstallationNeworderJoinPlan(filters) {
       WHERE qi.quote_number IS NOT NULL
         AND ${sqlUtf8TrimExpr("qi.quote_number")} <> ''
     ) oi_qi_prod ON oi_qi_prod.quote_key = ${sqlUtf8TrimExpr("no.quote_number")}`;
+  }
+  if (dispatchStatus === "completed") {
+    return sqlOpenInstallationItemTypeJoin("products");
+  }
+  // Dispatch All: do not gate on products_list (that hid rows / timed out the table).
+  return "";
+}
+
+/**
+ * Open Installation list/KPI joins. Dispatch All (default) does not require a dispatch row.
+ */
+function openInstallationNeworderJoinPlan(filters) {
+  const f = parseSbiFilters(filters);
+  const type = resolveUpcomingInstallationType(f.itemType);
+  let joinSql = "";
+  let extraWhere = sqlNeworderDispatchStatusWhere(f.dispatchStatus);
+  let skipItemType = false;
+  const skipDispatchStatus = Boolean(extraWhere);
+
+  if (type === "products") {
+    const prodJoin = sqlOpenInstallationProductsJoin(f.dispatchStatus);
+    if (prodJoin) joinSql += `\n    ${prodJoin}`;
     skipItemType = true;
   } else {
     const itemJoin = sqlOpenInstallationItemTypeJoin(f.itemType);
@@ -257,18 +252,14 @@ function appendOpenInstallationNeworderExtraFilters(
     params.push(`%${f.model}%`);
   }
   if (!skipDispatchStatus) {
-    if (f.dispatchStatus === "not_completed") {
-      sql += ` AND NOT ${sqlQuoteHasDispatchDate("no.quote_number")}`;
-    } else if (f.dispatchStatus === "completed") {
-      sql += ` AND ${sqlQuoteHasDispatchDate("no.quote_number")}`;
-    }
+    sql += sqlNeworderDispatchStatusWhere(f.dispatchStatus);
   }
 
   const itemType = resolveUpcomingInstallationType(f.itemType);
   if (!skipItemType && itemType === "products") {
     if (f.dispatchStatus === "not_completed") {
       sql += ` AND ${sqlQuoteHasProductOnQuotation("no.quote_number")}`;
-    } else {
+    } else if (f.dispatchStatus === "completed") {
       sql += ` AND EXISTS (
       SELECT 1
       FROM dispatch d_it
@@ -871,8 +862,6 @@ function buildOpenInstallationNeworderWhereSql(
     // Quote keys from PLANNED INSTALLATION service_records (see buildOpenInstallationNeworderWhereWithQuotePrefilters).
   } else if (bucket === "completed") {
     sql += ` AND COALESCE(no.installation_status, 0) = 1`;
-  } else if (bucket === "feedback_collected" || bucket === "no_feedback") {
-    sql += ` AND COALESCE(no.installation_status, 0) = 1`;
   } else {
     sql += ` AND COALESCE(no.installation_status, 0) = 0 AND no.delivery_date IS NOT NULL`;
   }
@@ -1007,7 +996,10 @@ const OPEN_INSTALLATION_LIST_SELECT = `
        '' AS name,
        no.delivery_location AS delivery_address,
        no.company_name,
-       NULLIF(TRIM(no.client_name), '') AS contact_person,
+       CASE
+         WHEN ${sqlUtf8HasText("no.client_name")} THEN ${sqlUtf8TrimExpr("no.client_name")}
+         ELSE NULL
+       END AS contact_person,
        no.contact,
        no.state,
        no.created_by AS emp_name,
@@ -1016,11 +1008,12 @@ const OPEN_INSTALLATION_LIST_SELECT = `
        COALESCE(no.installation_status, 0) AS order_installation_status,
        COALESCE(no.dispatch_status, 0) AS order_dispatch_status,
        COALESCE(no.delivery_status, 0) AS order_delivery_status,
-       DATE_FORMAT(no.delivery_date, '%Y-%m-%d') AS delivery_date,
-       DATE_FORMAT(no.delivered_on, '%Y-%m-%d') AS delivered_on,
+       DATE_FORMAT(NULLIF(no.delivery_date, '0000-00-00'), '%Y-%m-%d') AS delivery_date,
+       DATE_FORMAT(NULLIF(no.delivered_on, '0000-00-00'), '%Y-%m-%d') AS delivered_on,
        0 AS pricing_total,
        0 AS total_qty,
        CASE
+         WHEN no.delivery_date IS NULL OR no.delivery_date <= '1970-01-01' THEN 'scheduled'
          WHEN no.delivery_date < CURDATE() THEN 'overdue'
          WHEN no.delivery_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 10 DAY) THEN 'upcoming'
          ELSE 'scheduled'
@@ -1028,7 +1021,7 @@ const OPEN_INSTALLATION_LIST_SELECT = `
        CASE
          WHEN no.delivered_on IS NOT NULL AND no.delivered_on > '1970-01-01'
          THEN DATEDIFF(no.delivered_on, CURDATE())
-         ELSE DATEDIFF(no.delivery_date, CURDATE())
+         ELSE DATEDIFF(NULLIF(no.delivery_date, '0000-00-00'), CURDATE())
        END AS days_until_installation,
        0 AS warranty_registered,
        NULL AS registered_at,
@@ -1125,6 +1118,41 @@ async function countDeliveryStatusPending(conn, filters) {
     where.params,
   );
   return Number(row?.cnt || 0);
+}
+
+function jsonSafeOpenInstallationRows(rows) {
+  return (rows || []).map((row) => {
+    const out = {};
+    for (const [key, value] of Object.entries(row)) {
+      out[key] = typeof value === "bigint" ? Number(value) : value;
+    }
+    return out;
+  });
+}
+
+/** Same WHERE as KPI/count — used by per-card table APIs so rows cannot go empty while cards show totals. */
+export async function fetchOpenInstallationBucketList(
+  filters = {},
+  limit = 10,
+  skip = 0,
+  { deferServiceEnrich = true } = {},
+) {
+  const conn = await getDbConnection();
+  const page = await fetchOpenInstallationNeworderPage(
+    conn,
+    withDefaultOpenInstallationItemType(filters),
+    Math.min(Math.max(Number(limit) || 10, 1), 200),
+    Math.max(Number(skip) || 0, 0),
+    {
+      skipTotal: true,
+      deferServiceEnrich,
+      deferDispatchEnrich: deferServiceEnrich,
+    },
+  );
+  return {
+    ...page,
+    data: jsonSafeOpenInstallationRows(page.data),
+  };
 }
 
 async function countOpenInstallationNeworder(conn, filters, { overdueDelayedOnly = false } = {}) {
@@ -1597,16 +1625,18 @@ function openCompletionsListFilters(filters) {
 }
 
 async function fetchOpenCompletionsComplaintsPage(conn, filters, limit, skip, { skipTotal = false } = {}) {
+  await ensureServiceReportStepsTable();
   const f = openCompletionsListFilters(filters);
   const bucketSql = buildOpenCompletionsBucketWhereSql(f.openCompletionsBucket);
   const srFilter = buildServiceRecordFilterSql(f, {
-    dateExpr: "COALESCE(sr.planned_date, sr.complaint_date)",
+    dateExpr: "COALESCE(sr.planned_date, sr.complaint_date, sr.reg_date)",
   });
   const where = `WHERE ${OPEN_COMPLAINTS_SQL} ${bucketSql.sql} ${srFilter.sql}`;
   const baseParams = [...bucketSql.params, ...srFilter.params];
   const join = `FROM service_records sr
     LEFT JOIN warranty_products wp
-      ON TRIM(sr.serial_number) COLLATE utf8mb4_unicode_ci = TRIM(wp.serial_number) COLLATE utf8mb4_unicode_ci`;
+      ON TRIM(sr.serial_number) COLLATE utf8mb4_unicode_ci = TRIM(wp.serial_number) COLLATE utf8mb4_unicode_ci
+    LEFT JOIN service_report_steps srs ON srs.service_id = sr.service_id`;
 
   let total = 0;
   if (!skipTotal) {
@@ -1623,17 +1653,48 @@ async function fetchOpenCompletionsComplaintsPage(conn, filters, limit, skip, { 
        sr.serial_number,
        sr.service_type,
        sr.status,
+       sr.status_description,
        sr.complaint_date,
+       sr.reg_date,
        sr.planned_date,
        sr.complaint_summary,
        sr.assigned_to,
+       sr.assigned_to_type,
+       sr.assigned_to_id,
+       sr.third_party_engineer_id,
+       sr.engineer_assigned_by,
+       (
+         SELECT TRIM(COALESCE(wp_reg.created_by, ''))
+         FROM warranty_products wp_reg
+         WHERE ${sqlTrimUtf8EqColumns("wp_reg.serial_number", "sr.serial_number")}
+         ORDER BY wp_reg.id DESC
+         LIMIT 1
+       ) AS registered_by,
+       sr.completed_date,
+       sr.completed_by_service_engineer,
+       sr.pre_completion,
+       sr.after_completion,
+       sr.mail_sent,
+       sr.service_rating,
+       sr.final_feedback_on_call,
+       sr.service_followup_at,
+       wp.id AS machine_id,
        wp.customer_name,
        wp.model,
        wp.contact,
-       wp.product_name
+       wp.email,
+       wp.state,
+       wp.installed_address,
+       wp.site_person,
+       wp.contact_person,
+       wp.product_name,
+       srs.video_360,
+       srs.video_problem,
+       srs.video_damaged,
+       srs.video_completion
      ${join}
      ${where}
-     ORDER BY sr.service_id DESC
+     ORDER BY COALESCE(sr.complaint_date, sr.reg_date) DESC, sr.service_id DESC
      LIMIT ? OFFSET ?`,
     [...baseParams, limit, skip],
   );
@@ -1648,10 +1709,11 @@ async function fetchOpenCompletionsComplaintsPage(conn, filters, limit, skip, { 
 /** Fast total for one open-completions KPI card table. */
 export async function countOpenCompletionsComplaintSegment(filters = {}) {
   const conn = await getDbConnection();
+  await ensureServiceReportStepsTable();
   const f = openCompletionsListFilters(filters);
   const bucketSql = buildOpenCompletionsBucketWhereSql(f.openCompletionsBucket);
   const srFilter = buildServiceRecordFilterSql(f, {
-    dateExpr: "COALESCE(sr.planned_date, sr.complaint_date)",
+    dateExpr: "COALESCE(sr.planned_date, sr.complaint_date, sr.reg_date)",
   });
   const where = `WHERE ${OPEN_COMPLAINTS_SQL} ${bucketSql.sql} ${srFilter.sql}`;
   const baseParams = [...bucketSql.params, ...srFilter.params];
@@ -1671,7 +1733,7 @@ export async function fetchOpenCompletionsComplaintKpiBreakdown(conn, filters = 
   const f = parseSbiFilters(filters);
   const kpiFilters = { ...f, serviceStatus: "" };
   const srFilter = buildServiceRecordFilterSql(kpiFilters, {
-    dateExpr: "COALESCE(sr.planned_date, sr.complaint_date)",
+    dateExpr: "COALESCE(sr.planned_date, sr.complaint_date, sr.reg_date)",
   });
   const where = `WHERE ${OPEN_COMPLAINTS_SQL} ${srFilter.sql}`;
 

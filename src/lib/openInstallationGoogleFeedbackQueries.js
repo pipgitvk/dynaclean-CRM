@@ -8,11 +8,13 @@ import {
   sqlUtf8TrimExpr,
 } from "@/lib/sqlUtf8Compare";
 import { enrichOpenInstallationRowsWithServices } from "@/lib/openInstallationServiceEnrich";
+import {
+  sqlOrderGoogleFeedbackCollected,
+  sqlOrderGoogleFeedbackNotCollected,
+} from "@/lib/openInstallationGoogleFeedbackSql";
 
 const GF_COUNT_CACHE = new Map();
-const GF_QUOTE_CACHE = new Map();
-const GF_CACHE_TTL_MS = 30_000;
-const GF_IN_CHUNK = 800;
+const GF_CACHE_TTL_MS = 8_000;
 
 function gfCacheGet(map, key) {
   const hit = map.get(key);
@@ -77,76 +79,14 @@ async function enrichDispatchLite(conn, rows) {
   });
 }
 
-/**
- * Quote numbers that already have Google feedback = yes on an INSTALLATION SR
- * (products dispatch only). Small set — do not scan all neworder.
- */
-async function loadGoogleFeedbackCollectedQuoteNumbers(conn, filters = {}) {
-  const f = parseSbiFilters(forceOpenInstallationProductsOnly(filters));
-  const cacheKey = JSON.stringify({
-    model: f.model || "",
-    itemType: f.itemType || "products",
-  });
-  const cached = gfCacheGet(GF_QUOTE_CACHE, cacheKey);
-  if (cached) return cached;
-
-  let sql = `
-    SELECT DISTINCT d.quote_number AS quote_number
-    FROM service_records sr
-    INNER JOIN dispatch d
-      ON ${sqlTrimUtf8EqColumns("d.serial_no", "sr.serial_number")}
-    INNER JOIN products_list pl
-      ON ${sqlTrimUtf8EqColumns("pl.item_code", "d.item_code")}
-    WHERE UPPER(TRIM(COALESCE(sr.service_type, ''))) = 'INSTALLATION'
-      AND LOWER(TRIM(COALESCE(sr.google_feedback_collected, ''))) = 'yes'
-      AND d.quote_number IS NOT NULL
-      AND TRIM(d.quote_number) <> ''
-      AND d.serial_no IS NOT NULL
-      AND TRIM(d.serial_no) <> ''
-  `;
-  const params = [];
-  if (f.model) {
-    sql += ` AND d.item_code LIKE ?`;
-    params.push(`%${f.model}%`);
-  }
-
-  const [rows] = await conn.execute(sql, params);
-  const quotes = [
-    ...new Set(
-      (rows || [])
-        .map((r) => String(r.quote_number || "").trim())
-        .filter(Boolean),
-    ),
-  ];
-  gfCacheSet(GF_QUOTE_CACHE, cacheKey, quotes);
-  return quotes;
-}
-
-function sqlQuoteInChunks(column, quotes) {
-  if (!quotes.length) return { sql: "1=0", params: [] };
-  const parts = [];
-  const params = [];
-  for (let i = 0; i < quotes.length; i += GF_IN_CHUNK) {
-    const chunk = quotes.slice(i, i + GF_IN_CHUNK);
-    parts.push(`${column} IN (${chunk.map(() => "?").join(",")})`);
-    params.push(...chunk);
-  }
-  return { sql: `(${parts.join(" OR ")})`, params };
-}
-
-/** Shared neworder WHERE for installed orders + hub filters (quotes already scoped). */
-export function buildInstalledOrderGoogleFeedbackWhereSql(filters, { quoteInSql } = {}) {
+/** Shared neworder WHERE for installed orders + hub filters. */
+export function buildInstalledOrderGoogleFeedbackWhereSql(filters) {
   const f = parseSbiFilters(forceOpenInstallationProductsOnly(filters));
   let sql = `
     WHERE (no.is_cancelled = 0 OR no.is_cancelled IS NULL)
       AND (no.is_returned = 0 OR no.is_returned = 2 OR no.is_returned IS NULL)
-      AND COALESCE(no.installation_status, 0) = 1
   `;
   const params = [];
-  if (quoteInSql) {
-    sql += ` AND ${quoteInSql.sql}`;
-    params.push(...quoteInSql.params);
-  }
 
   if (f.search) {
     const term = `%${f.search}%`;
@@ -178,17 +118,9 @@ export function buildInstalledOrderGoogleFeedbackWhereSql(filters, { quoteInSql 
     params.push(f.salesPerson);
   }
   if (f.dispatchStatus === "not_completed") {
-    sql += ` AND NOT EXISTS (
-      SELECT 1 FROM dispatch d_ds
-      WHERE ${sqlTrimUtf8EqColumns("d_ds.quote_number", "no.quote_number")}
-        AND COALESCE(d_ds.updated_at, d_ds.created_at) IS NOT NULL
-    )`;
+    sql += ` AND COALESCE(no.dispatch_status, 0) = 0`;
   } else if (f.dispatchStatus === "completed") {
-    sql += ` AND EXISTS (
-      SELECT 1 FROM dispatch d_ds
-      WHERE ${sqlTrimUtf8EqColumns("d_ds.quote_number", "no.quote_number")}
-        AND COALESCE(d_ds.updated_at, d_ds.created_at) IS NOT NULL
-    )`;
+    sql += ` AND COALESCE(no.dispatch_status, 0) = 1`;
   }
   if (f.warrantyRegistration === "registered") {
     sql += ` AND EXISTS (
@@ -231,24 +163,24 @@ export async function countOpenInstallationGoogleFeedbackStats(filters = {}) {
   if (cached) return cached;
 
   const conn = await getDbConnection();
-  const quotes = await loadGoogleFeedbackCollectedQuoteNumbers(conn, f);
-  if (!quotes.length) {
-    const empty = { feedback_collected: 0, no_feedback_collected: 0 };
-    gfCacheSet(GF_COUNT_CACHE, cacheKey, empty);
-    return empty;
-  }
-
-  const quoteIn = sqlQuoteInChunks("no.quote_number", quotes);
-  const where = buildInstalledOrderGoogleFeedbackWhereSql(f, { quoteInSql: quoteIn });
-  const [[row]] = await conn.execute(
+  const where = buildInstalledOrderGoogleFeedbackWhereSql(f);
+  const [[yesRow]] = await conn.execute(
     `SELECT COUNT(*) AS feedback_collected
      FROM neworder no
-     ${where.sql}`,
+     ${where.sql}
+     AND ${sqlOrderGoogleFeedbackCollected("no")}`,
+    where.params,
+  );
+  const [[noRow]] = await conn.execute(
+    `SELECT COUNT(*) AS no_feedback_collected
+     FROM neworder no
+     ${where.sql}
+     AND ${sqlOrderGoogleFeedbackNotCollected("no")}`,
     where.params,
   );
   const data = {
-    feedback_collected: Number(row?.feedback_collected || 0),
-    no_feedback_collected: 0,
+    feedback_collected: Number(yesRow?.feedback_collected || 0),
+    no_feedback_collected: Number(noRow?.no_feedback_collected || 0),
   };
   gfCacheSet(GF_COUNT_CACHE, cacheKey, data);
   return data;
@@ -309,16 +241,18 @@ export async function fetchOpenInstallationGoogleFeedbackPage(
   { skipTotal = true, skipServiceEnrich = true } = {},
 ) {
   const conn = await getDbConnection();
-  const quotes = await loadGoogleFeedbackCollectedQuoteNumbers(conn, filters);
   const safeLimit = Math.min(Math.max(Number(limit) || 10, 1), 200);
   const safeSkip = Math.max(Number(skip) || 0, 0);
 
-  if (!quotes.length) {
-    return { total: skipTotal ? undefined : 0, hasMore: false, data: [] };
-  }
-
-  const quoteIn = sqlQuoteInChunks("no.quote_number", quotes);
-  const where = buildInstalledOrderGoogleFeedbackWhereSql(filters, { quoteInSql: quoteIn });
+  const baseWhere = buildInstalledOrderGoogleFeedbackWhereSql(filters);
+  const bucketSql =
+    bucket === "no_feedback"
+      ? sqlOrderGoogleFeedbackNotCollected("no")
+      : sqlOrderGoogleFeedbackCollected("no");
+  const where = {
+    sql: `${baseWhere.sql} AND ${bucketSql}`,
+    params: baseWhere.params,
+  };
 
   let total;
   if (!skipTotal) {

@@ -298,6 +298,33 @@ export default function Modal({
                   )}
               </p>
             )}
+            {(selectedService.google_feedback_collected ||
+              selectedService.google_feedback_proof) &&
+              String(selectedService.service_type || "")
+                .trim()
+                .toUpperCase() === "INSTALLATION" && (
+                <p>
+                  <strong>Google feedback:</strong>{" "}
+                  {String(selectedService.google_feedback_collected || "")
+                    .trim()
+                    .toLowerCase() === "yes"
+                    ? "Yes"
+                    : selectedService.google_feedback_collected
+                      ? "No"
+                      : "—"}
+                  {selectedService.google_feedback_proof ? (
+                    <>
+                      {" · "}
+                      <ServiceAttachmentLink
+                        filePath={selectedService.google_feedback_proof.trim()}
+                        fileName="Google feedback upload"
+                        className="text-blue-600 hover:underline"
+                      />
+                    </>
+                  ) : null}
+                </p>
+              )}
+
             {selectedService.after_completion && (
               <p>
                 <strong>After Completion:</strong>{" "}

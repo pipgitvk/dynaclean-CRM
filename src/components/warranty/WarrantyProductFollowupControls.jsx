@@ -51,5 +51,13 @@ export function useWarrantyProductFollowup(onSaved) {
     </>
   );
 
-  return { ProductFollowupIcons, followupModals };
+  function openMachineFollowUp(product) {
+    setFollowUpTarget(toFollowupTarget(product));
+  }
+
+  function openMachineHistory(product) {
+    setHistoryTarget(product);
+  }
+
+  return { ProductFollowupIcons, followupModals, openMachineFollowUp, openMachineHistory };
 }

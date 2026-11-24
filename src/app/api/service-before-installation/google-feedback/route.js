@@ -5,12 +5,12 @@ import {
   parseSbiFiltersFromSearchParams,
 } from "@/lib/serviceBeforeInstallationFilters";
 import {
-  countOpenInstallationGoogleFeedbackStats,
-  fetchOpenInstallationGoogleFeedbackPage,
-} from "@/lib/openInstallationGoogleFeedbackQueries";
+  countOpenInstallationGoogleFeedbackCollected,
+  fetchOpenInstallationGoogleFeedbackCollectedPage,
+} from "@/lib/openInstallationGoogleFeedbackCardQueries";
 
 /**
- * Open Installation — Google feedback collected (installed, google_feedback_collected = yes).
+ * Alias of /open-installation/google-feedback (Google Feedback Collected card).
  */
 export async function GET(request) {
   try {
@@ -29,34 +29,37 @@ export async function GET(request) {
     const skipTotal = String(searchParams.get("skipTotal") || "1").trim() !== "0";
 
     if (countOnly) {
-      const stats = await countOpenInstallationGoogleFeedbackStats(filters);
-      const total = stats.feedback_collected;
+      const total = await countOpenInstallationGoogleFeedbackCollected(filters);
       return NextResponse.json({
         success: true,
         data: [],
+        bucket: "feedback_collected",
+        count: total,
         feedback_collected: total,
         pagination: { total, limit, skip, hasMore: skip + limit < total },
       });
     }
 
-    const page = await fetchOpenInstallationGoogleFeedbackPage(
+    const page = await fetchOpenInstallationGoogleFeedbackCollectedPage(
       filters,
-      "feedback_collected",
       limit,
       skip,
-      { skipTotal },
+      { skipTotal, skipServiceEnrich: false },
     );
+    const data = page.data || [];
     const total = page.total != null ? page.total : null;
 
     return NextResponse.json({
       success: true,
-      data: page.data || [],
+      data,
+      bucket: "feedback_collected",
+      count: total,
       feedback_collected: total,
       pagination: {
         total,
         limit,
         skip,
-        hasMore: Boolean(page.hasMore),
+        hasMore: Boolean(page.hasMore) || data.length >= limit,
       },
     });
   } catch (error) {
