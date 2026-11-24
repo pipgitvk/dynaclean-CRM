@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
+import { Toaster } from "react-hot-toast";
 import {
   AlertTriangle,
   Building2,
@@ -79,6 +80,11 @@ import {
   openInstallationViewMoreBtnClassCompact,
 } from "@/components/installation/openInstallationViewMoreBtnClass";
 import { useWarrantyProductFollowup } from "@/components/warranty/WarrantyProductFollowupControls";
+import {
+  WarrantyComplaintModal,
+  WarrantyProductEditModal,
+  WarrantyInstallRequestModal,
+} from "@/components/warranty/WarrantyProductServiceModals";
 import GoogleFeedbackProofCell from "@/components/services/GoogleFeedbackProofCell";
 
 const DEFAULT_PAGE_SIZE = 10;
@@ -1000,7 +1006,78 @@ function DetailSegmentHeader({ meta, segment }) {
   );
 }
 
-function WarrantyProductRows({ rows, dashboardBase, page, pageSize, segment }) {
+function registeredProductHistoryPayload(row) {
+  return {
+    machine_id: row.id,
+    serial_number: row.serial_number,
+    model: row.model,
+    contact: row.contact,
+    email: row.email,
+    includeCustomerFollowups: true,
+  };
+}
+
+function RegisteredProductActionCell({ row, onMachineHistory, onWarrantyAction }) {
+  const serial = String(row.serial_number || "").trim();
+  if (!serial) return <span className="text-slate-300">—</span>;
+
+  const installed = Boolean(String(row.installed_address || "").trim());
+  const btn =
+    "block w-full min-w-[6.5rem] rounded-md px-2.5 py-1.5 text-center text-[11px] font-semibold text-white shadow-sm transition-colors";
+
+  const runAction = (type) => {
+    if (type === "history") {
+      onMachineHistory?.(registeredProductHistoryPayload(row));
+      return;
+    }
+    onWarrantyAction?.(type, serial);
+  };
+
+  return (
+    <div className="flex flex-col gap-1">
+      {!installed ? (
+        <button
+          type="button"
+          className={`${btn} bg-green-700 hover:bg-green-800`}
+          onClick={() => runAction("install")}
+        >
+          Install
+        </button>
+      ) : null}
+      <button
+        type="button"
+        className={`${btn} bg-red-700 hover:bg-red-800`}
+        onClick={() => runAction("complaint")}
+      >
+        Complaint
+      </button>
+      <button
+        type="button"
+        className={`${btn} bg-amber-600 hover:bg-amber-700`}
+        onClick={() => runAction("edit")}
+      >
+        Edit
+      </button>
+      <button
+        type="button"
+        className={`${btn} bg-indigo-700 hover:bg-indigo-800`}
+        onClick={() => runAction("history")}
+      >
+        History
+      </button>
+    </div>
+  );
+}
+
+function WarrantyProductRows({
+  rows,
+  dashboardBase,
+  page,
+  pageSize,
+  segment,
+  onMachineHistory,
+  onWarrantyAction,
+}) {
   const detailLayout = segment === "total-registered";
 
   return rows.map((row, idx) => {
@@ -1145,18 +1222,12 @@ function WarrantyProductRows({ rows, dashboardBase, page, pageSize, segment }) {
         <td className="px-4 py-3.5 align-top">
           <SalesServiceTeamBlock row={row} />
         </td>
-        <td className="whitespace-nowrap px-4 py-3.5 text-right align-top">
-          {serialHref ? (
-            <Link
-              href={serialHref}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-violet-200 hover:text-violet-700"
-              title="View product"
-            >
-              <Eye className="h-4 w-4" />
-            </Link>
-          ) : (
-            <span className="text-slate-300">—</span>
-          )}
+        <td className="px-4 py-3.5 text-right align-top">
+          <RegisteredProductActionCell
+            row={row}
+            onMachineHistory={onMachineHistory}
+            onWarrantyAction={onWarrantyAction}
+          />
         </td>
       </tr>
     );
@@ -1776,7 +1847,7 @@ function TableHead({ segment }) {
         <th className={th}>Installed Address</th>
         <th className={th}>Invoice</th>
         <th className={th}>Sales / Service</th>
-        <th className={`${th} text-right`}>View</th>
+        <th className={`${th} text-right min-w-[7rem]`}>Action</th>
       </tr>
     );
   }
@@ -1806,6 +1877,7 @@ function TableBody({
   onOpenCompletionsRowPatch,
   onMachineFollowUp,
   onMachineHistory,
+  onWarrantyAction,
   ProductFollowupIcons,
 }) {
   if (segment === "open-installation" || segment === "overdue-delayed-installation") {
@@ -1848,6 +1920,8 @@ function TableBody({
       page={page}
       pageSize={pageSize}
       segment={segment}
+      onMachineHistory={segment === "total-registered" ? onMachineHistory : undefined}
+      onWarrantyAction={segment === "total-registered" ? onWarrantyAction : undefined}
     />
   );
 }
@@ -1876,6 +1950,14 @@ export default function ServiceBeforeInstallationDetailClient({
   const warrantyHref = `/${dashboardBase}/warranty`;
   const { ProductFollowupIcons, followupModals, openMachineFollowUp, openMachineHistory } =
     useWarrantyProductFollowup();
+  const [warrantyRowModal, setWarrantyRowModal] = useState(null);
+
+  const handleWarrantyRowAction = useCallback((type, serial) => {
+    setWarrantyRowModal({
+      type: String(type || "").trim(),
+      serial: String(serial || "").trim(),
+    });
+  }, []);
 
   const initialStickyForSegment =
     segment === "open-completions"
@@ -3441,6 +3523,9 @@ export default function ServiceBeforeInstallationDetailClient({
                     onOpenCompletionsRowPatch={handleOpenCompletionsRowPatch}
                     onMachineFollowUp={openMachineFollowUp}
                     onMachineHistory={openMachineHistory}
+                    onWarrantyAction={
+                      segment === "total-registered" ? handleWarrantyRowAction : undefined
+                    }
                     ProductFollowupIcons={
                       segment === "open-installation" ||
                       segment === "overdue-delayed-installation" ||
@@ -3531,6 +3616,28 @@ export default function ServiceBeforeInstallationDetailClient({
         </div>
       </div>
       {followupModals}
+      {segment === "total-registered" ? <Toaster position="top-right" /> : null}
+      {warrantyRowModal?.type === "install" && warrantyRowModal.serial ? (
+        <WarrantyInstallRequestModal
+          serialNumber={warrantyRowModal.serial}
+          onClose={() => setWarrantyRowModal(null)}
+          onSuccess={() => setWarrantyRowModal(null)}
+        />
+      ) : null}
+      {warrantyRowModal?.type === "complaint" && warrantyRowModal.serial ? (
+        <WarrantyComplaintModal
+          serialNumber={warrantyRowModal.serial}
+          onClose={() => setWarrantyRowModal(null)}
+          onSuccess={() => setWarrantyRowModal(null)}
+        />
+      ) : null}
+      {warrantyRowModal?.type === "edit" && warrantyRowModal.serial ? (
+        <WarrantyProductEditModal
+          serialNumber={warrantyRowModal.serial}
+          onClose={() => setWarrantyRowModal(null)}
+          onSuccess={() => setWarrantyRowModal(null)}
+        />
+      ) : null}
     </div>
   );
 }

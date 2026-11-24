@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
@@ -41,10 +41,22 @@ const STATES = [
   "Ladakh (38)"
 ];
 
-export default function EditWarrantyPage() {
+export default function EditWarrantyPage({
+  serialNumberOverride = "",
+  forceEmbedded = false,
+  onCloseModal,
+} = {}) {
   const router = useRouter();
   const params = useParams();
-  const initialSerialNumber = params?.serial_number; // Serial number from URL
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const embedded =
+    forceEmbedded ||
+    pathname.includes("/warranty/popup/") ||
+    searchParams.get("embedded") === "1" ||
+    searchParams.get("embed") === "1";
+  const initialSerialNumber =
+    String(serialNumberOverride || "").trim() || params?.serial_number;
   const [productData, setProductData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -162,10 +174,13 @@ export default function EditWarrantyPage() {
 
       toast.success("Product warranty updated successfully!");
 
-      // After editing from the admin dashboard, return to the admin warranty list
-      router.push(`/admin-dashboard/warranty/products`);
+      if (embedded && typeof onCloseModal === "function") {
+        onCloseModal();
+        return;
+      }
 
-      router.refresh(); // This will re-run the useEffect for the current page
+      router.push(`/admin-dashboard/warranty/products`);
+      router.refresh();
     } catch (err) {
       toast.error(`Failed to update product warranty: ${err.message}`);
       console.error("Error updating product warranty:", err);
@@ -173,25 +188,31 @@ export default function EditWarrantyPage() {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-screen bg-gray-100">
+    return embedded ? (
+      <p className="py-10 text-center text-sm text-gray-600">Loading product data…</p>
+    ) : (
+      <div className="flex h-screen items-center justify-center bg-gray-100">
         <p className="text-xl text-gray-700">Loading product data...</p>
       </div>
     );
   }
 
   if (error && !productData) {
-    // Only show global error if no data could be loaded
-    return (
-      <div className="flex flex-col justify-center items-center h-screen bg-gray-100 p-4">
-        <p className="text-xl text-red-600 text-center mb-4">Error: {error}</p>
-        <p className="text-md text-gray-700 text-center">
+    return embedded ? (
+      <div className="py-6 text-center">
+        <p className="text-sm font-semibold text-red-600">Error: {error}</p>
+        <p className="mt-2 text-sm text-gray-600">Could not load this serial number.</p>
+      </div>
+    ) : (
+      <div className="flex h-screen flex-col items-center justify-center bg-gray-100 p-4">
+        <p className="mb-4 text-center text-xl text-red-600">Error: {error}</p>
+        <p className="text-md text-center text-gray-700">
           Please ensure a valid serial number is provided in the URL (e.g.,
           `/warranty/YOUR_SERIAL_NUMBER`).
         </p>
         <Link
           href="/view_warranty"
-          className="mt-6 text-blue-600 hover:underline text-lg font-medium"
+          className="mt-6 text-lg font-medium text-blue-600 hover:underline"
         >
           &larr; Back to Warranty List
         </Link>
@@ -210,16 +231,24 @@ export default function EditWarrantyPage() {
     : [];
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 sm:p-8">
-      <div className="max-w-4xl mx-auto bg-white shadow-lg rounded-lg p-6 sm:p-8">
-        <h2 className="text-3xl font-bold text-gray-800 mb-6 text-center">
-          Product Warranty Edit
-        </h2>
+    <div className={embedded ? "" : "min-h-screen bg-gray-100 p-4 sm:p-8"}>
+      <div className={embedded ? "" : "mx-auto max-w-4xl rounded-lg bg-white p-6 shadow-lg sm:p-8"}>
+        {!embedded ? (
+          <h2 className="mb-6 text-center text-3xl font-bold text-gray-800">
+            Product Warranty Edit
+          </h2>
+        ) : null}
 
         {productData && (
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={handleSubmit(onSubmit)} className={embedded ? "space-y-4" : "space-y-6"}>
             {/* Product Information */}
-            <h3 className="text-2xl font-semibold text-gray-700 border-b pb-2 mb-4">
+            <h3
+              className={
+                embedded
+                  ? "mb-3 border-b border-gray-200 pb-2 text-sm font-semibold text-gray-800"
+                  : "mb-4 border-b pb-2 text-2xl font-semibold text-gray-700"
+              }
+            >
               Product Information
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -728,12 +757,15 @@ export default function EditWarrantyPage() {
               </div>
             </div>
 
-            {/* Submit Button */}
-            <div className="mt-8 text-center">
+            <div className={embedded ? "pt-2" : "mt-8 text-center"}>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className=" cursor-pointer w-full sm:w-auto px-8 py-3 bg-green-600 text-white font-semibold rounded-md shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                className={
+                  embedded
+                    ? "w-full cursor-pointer rounded bg-slate-800 py-2 font-semibold text-white hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+                    : "cursor-pointer w-full rounded-md bg-green-600 px-8 py-3 font-semibold text-white shadow-md transition-colors duration-200 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                }
               >
                 {isSubmitting ? "Updating..." : "Update Product Warranty"}
               </button>
@@ -741,15 +773,17 @@ export default function EditWarrantyPage() {
           </form>
         )}
 
-        {/* Back button */}
-        <div className="mt-8 text-center">
-          <button
-            onClick={() => router.back()}
-            className="text-blue-600 hover:underline text-lg font-medium cursor-pointer"
-          >
-            &larr; Back
-          </button>
-        </div>
+        {!embedded ? (
+          <div className="mt-8 text-center">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="cursor-pointer text-lg font-medium text-blue-600 hover:underline"
+            >
+              &larr; Back
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   );

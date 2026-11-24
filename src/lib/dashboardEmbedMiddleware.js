@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { DASHBOARD_EMBED_COOKIE } from "@/lib/dashboardEmbed";
 
+const WARRANTY_POPUP_PATH = /\/warranty\/popup(?:\/|$)/;
+
 export function shouldUseDashboardEmbed(request) {
+  if (WARRANTY_POPUP_PATH.test(request.nextUrl.pathname)) return true;
   if (request.nextUrl.searchParams.get("embed") === "1") return true;
   const cookie = request.cookies.get(DASHBOARD_EMBED_COOKIE)?.value === "1";
   const dest = (request.headers.get("sec-fetch-dest") || "").toLowerCase();
@@ -9,7 +12,10 @@ export function shouldUseDashboardEmbed(request) {
 }
 
 function stampEmbedCookie(request, response) {
-  if (request.nextUrl.searchParams.get("embed") === "1") {
+  if (
+    request.nextUrl.searchParams.get("embed") === "1" ||
+    WARRANTY_POPUP_PATH.test(request.nextUrl.pathname)
+  ) {
     response.cookies.set(DASHBOARD_EMBED_COOKIE, "1", {
       path: "/",
       maxAge: 60 * 60,

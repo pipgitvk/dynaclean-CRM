@@ -8,7 +8,9 @@ export function EmbedHeightReporter({ enabled = true }) {
   useEffect(() => {
     if (!enabled) return;
     if (typeof window === "undefined") return;
-    if (new URLSearchParams(window.location.search).get("embed") !== "1") return;
+    const inWarrantyPopup = window.location.pathname.includes("/warranty/popup/");
+    const embedQuery = new URLSearchParams(window.location.search).get("embed") === "1";
+    if (!embedQuery && !inWarrantyPopup) return;
 
     const report = () => {
       const height = Math.ceil(document.documentElement.scrollHeight);
