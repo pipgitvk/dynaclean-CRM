@@ -139,8 +139,8 @@ export const SERVICE_BEFORE_INSTALLATION_SEGMENTS = [
   },
   {
     id: "active-amc",
-    title: "Active AMC",
-    subtitle: "AMC coverage",
+    title: "AMC Records",
+    subtitle: "Active, expiring in 30 days & expired AMC",
     countKey: "active_amc",
     accent: "from-blue-500 to-indigo-600",
     surface:
@@ -149,26 +149,17 @@ export const SERVICE_BEFORE_INSTALLATION_SEGMENTS = [
     iconSurface: "bg-gradient-to-br from-blue-500 to-indigo-600",
     chartColor: "#3b82f6",
   },
-  {
-    id: "due-amc-expiring",
-    title: "Due AMC Expiring",
-    subtitle: "Within 30 days or expired",
-    countKey: "due_amc_expiring",
-    accent: "from-fuchsia-500 to-pink-600",
-    surface:
-      "bg-white/80 backdrop-blur-xl border-fuchsia-200/40 shadow-[0_8px_30px_-8px_rgba(217,70,239,0.35)]",
-    glow: "bg-fuchsia-400/25",
-    iconSurface: "bg-gradient-to-br from-fuchsia-500 to-pink-600",
-    chartColor: "#d946ef",
-  },
 ];
 
 const SEGMENT_SET = new Set(
   SERVICE_BEFORE_INSTALLATION_SEGMENTS.map((s) => s.id),
 );
 
+const LEGACY_SBI_SEGMENT_IDS = new Set(["due-amc-expiring", "due-warranty-expiry"]);
+
 export function isServiceBeforeInstallationSegment(id) {
-  return SEGMENT_SET.has(String(id || "").trim());
+  const v = String(id || "").trim();
+  return SEGMENT_SET.has(v) || LEGACY_SBI_SEGMENT_IDS.has(v);
 }
 
 export function getTotalRegisteredDetailKpiCards(dashboardBase) {
@@ -323,6 +314,71 @@ const ACTIVE_WARRANTY_BUCKET_TO_CARD_ID = Object.fromEntries(
 
 export function getActiveWarrantyDetailKpiCards() {
   return ACTIVE_WARRANTY_DETAIL_KPI_CARDS.map((c) => ({ ...c, href: null }));
+}
+
+/** Active AMC detail — KPI strip (amc_cmc). */
+export const ACTIVE_AMC_DETAIL_KPI_CARDS = [
+  {
+    id: "aa-active",
+    field: "active_amc",
+    title: "Active AMC",
+    subtitle: "Currently under AMC",
+    countCaption: "Currently under AMC",
+    chartColor: "#3b82f6",
+    surface: "border-blue-200/60 bg-blue-50/30",
+    iconSurface: "bg-gradient-to-br from-blue-500 to-indigo-600",
+    glow: "bg-blue-400/20",
+  },
+  {
+    id: "aa-expiring-30",
+    field: "expiring_30_days",
+    title: "Expiring in 30 Days",
+    subtitle: "AMC ends within 30 days",
+    countCaption: "AMC ends within 30 days",
+    chartColor: "#f59e0b",
+    surface: "border-amber-200/60 bg-amber-50/30",
+    iconSurface: "bg-gradient-to-br from-amber-500 to-orange-600",
+    glow: "bg-amber-400/20",
+  },
+  {
+    id: "aa-expired",
+    field: "expired_amc",
+    title: "Expired AMC",
+    subtitle: "AMC period ended",
+    countCaption: "AMC period ended",
+    chartColor: "#64748b",
+    surface: "border-slate-200/80 bg-slate-50/50",
+    iconSurface: "bg-gradient-to-br from-slate-500 to-slate-600",
+    glow: "bg-slate-400/20",
+  },
+];
+
+const ACTIVE_AMC_CARD_ID_TO_BUCKET = {
+  "aa-active": "active",
+  "aa-expiring-30": "expiring_30",
+  "aa-expired": "expired",
+};
+
+const ACTIVE_AMC_BUCKET_TO_CARD_ID = Object.fromEntries(
+  Object.entries(ACTIVE_AMC_CARD_ID_TO_BUCKET).map(([id, bucket]) => [bucket, id]),
+);
+
+export function getActiveAmcDetailKpiCards() {
+  return ACTIVE_AMC_DETAIL_KPI_CARDS.map((c) => ({ ...c, href: null }));
+}
+
+export function amcBucketFromKpiCardId(cardId) {
+  return ACTIVE_AMC_CARD_ID_TO_BUCKET[String(cardId || "").trim()] || "active";
+}
+
+export function activeAmcKpiCardIdFromFilter(amcBucket) {
+  const v = String(amcBucket || "active").trim().toLowerCase();
+  return ACTIVE_AMC_BUCKET_TO_CARD_ID[v] || "aa-active";
+}
+
+export function getActiveAmcKpiMeta(amcBucket) {
+  const cardId = activeAmcKpiCardIdFromFilter(amcBucket);
+  return ACTIVE_AMC_DETAIL_KPI_CARDS.find((c) => c.id === cardId) || ACTIVE_AMC_DETAIL_KPI_CARDS[0];
 }
 
 export function warrantyBucketFromKpiCardId(cardId) {

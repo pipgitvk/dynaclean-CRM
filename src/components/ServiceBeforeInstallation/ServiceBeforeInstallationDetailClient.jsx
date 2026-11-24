@@ -23,6 +23,7 @@ import {
   Wrench,
 } from "lucide-react";
 import {
+  getActiveAmcKpiMeta,
   getActiveWarrantyKpiMeta,
   getSegmentMeta,
   openCompletionsTableCountApi,
@@ -33,9 +34,11 @@ import {
 } from "@/lib/serviceBeforeInstallationHub";
 import { openCompletionsBucketRecordCount } from "@/lib/openCompletionsKpiSql";
 import { openInstallationBucketRecordCount } from "@/lib/openInstallationKpiSql";
+import { activeAmcBucketRecordCount } from "@/lib/activeAmcKpiSql";
 import { activeWarrantyBucketRecordCount } from "@/lib/activeWarrantyKpiSql";
 import {
   defaultSbiSelectFilters,
+  normalizeAmcBucket,
   normalizeOpenCompletionsBucket,
   normalizeOpenInstallationBucket,
   normalizeWarrantyBucket,
@@ -44,6 +47,7 @@ import ServiceBeforeInstallationFilters from "@/components/ServiceBeforeInstalla
 import ServiceBeforeInstallationOpenInstallationKpiStrip from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationOpenInstallationKpiStrip";
 import ServiceBeforeInstallationOpenCompletionsKpiSection from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationOpenCompletionsKpiSection";
 import ServiceBeforeInstallationActiveWarrantyKpiStrip from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationActiveWarrantyKpiStrip";
+import ServiceBeforeInstallationActiveAmcKpiStrip from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationActiveAmcKpiStrip";
 import {
   OpenCompletionsComplaintRows,
   OpenCompletionsComplaintTableHead,
@@ -79,6 +83,7 @@ const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 const OPEN_INSTALLATION_BUCKET_STORAGE_KEY = "sbi.openInstallationBucket";
 const OPEN_COMPLETIONS_BUCKET_STORAGE_KEY = "sbi.openCompletionsBucket";
 const WARRANTY_BUCKET_STORAGE_KEY = "sbi.warrantyBucket";
+const AMC_BUCKET_STORAGE_KEY = "sbi.amcBucket";
 
 function readStoredOpenInstallationBucket() {
   if (typeof window === "undefined") return "";
@@ -193,6 +198,41 @@ function stickyWarrantyBucket(preferred) {
   return normalizeWarrantyBucket(preferred) || readStoredWarrantyBucket() || "active";
 }
 
+function readStoredAmcBucket() {
+  if (typeof window === "undefined") return "";
+  try {
+    const fromUrl = new URLSearchParams(window.location.search).get("amcBucket");
+    const fromStore = window.localStorage.getItem(AMC_BUCKET_STORAGE_KEY);
+    return normalizeAmcBucket(fromUrl || fromStore);
+  } catch {
+    return "";
+  }
+}
+
+function persistAmcBucket(bucket) {
+  const v = normalizeAmcBucket(bucket) || "active";
+  if (typeof window === "undefined") return v;
+  try {
+    window.localStorage.setItem(AMC_BUCKET_STORAGE_KEY, v);
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("amcBucket") !== v) {
+      url.searchParams.set("amcBucket", v);
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${url.pathname}${url.search}${url.hash}`,
+      );
+    }
+  } catch {
+    // ignore
+  }
+  return v;
+}
+
+function stickyAmcBucket(preferred) {
+  return normalizeAmcBucket(preferred) || readStoredAmcBucket() || "active";
+}
+
 const SEGMENT_ICONS = {
   "total-registered": Package,
   "open-installation": Wrench,
@@ -240,6 +280,12 @@ function initialSbiFiltersForSegment(segment, stickyBucket = "") {
     return {
       ...base,
       warrantyBucket: stickyWarrantyBucket(stickyBucket),
+    };
+  }
+  if (segment === "active-amc") {
+    return {
+      ...base,
+      amcBucket: stickyAmcBucket(stickyBucket),
     };
   }
   return base;
@@ -1820,6 +1866,7 @@ export default function ServiceBeforeInstallationDetailClient({
   initialOpenInstallationBucket = "",
   initialOpenCompletionsBucket = "",
   initialWarrantyBucket = "",
+  initialAmcBucket = "",
 }) {
   const meta = getSegmentMeta(segment);
   const hubHref = `/${dashboardBase}/service-before-installation`;
@@ -1832,7 +1879,9 @@ export default function ServiceBeforeInstallationDetailClient({
       ? initialOpenCompletionsBucket
       : segment === "active-warranty"
         ? initialWarrantyBucket
-        : initialOpenInstallationBucket;
+        : segment === "active-amc"
+          ? initialAmcBucket
+          : initialOpenInstallationBucket;
 
   const [draftFilters, setDraftFilters] = useState(() =>
     initialSbiFiltersForSegment(segment, initialStickyForSegment),
@@ -1850,8 +1899,12 @@ export default function ServiceBeforeInstallationDetailClient({
       const kpiMeta = getActiveWarrantyKpiMeta(appliedFilters.warrantyBucket || "active");
       return { ...base, subtitle: kpiMeta.subtitle || base.subtitle };
     }
+    if (segment === "active-amc") {
+      const kpiMeta = getActiveAmcKpiMeta(appliedFilters.amcBucket || "active");
+      return { ...base, subtitle: kpiMeta.subtitle || base.subtitle };
+    }
     return base;
-  }, [meta, segment, appliedFilters.warrantyBucket]);
+  }, [meta, segment, appliedFilters.warrantyBucket, appliedFilters.amcBucket]);
   const stickyBucketRef = useRef(
     segment === "open-installation"
       ? stickyOpenInstallationBucket(initialOpenInstallationBucket)
@@ -1859,7 +1912,9 @@ export default function ServiceBeforeInstallationDetailClient({
         ? stickyOpenCompletionsBucket(initialOpenCompletionsBucket)
         : segment === "active-warranty"
           ? stickyWarrantyBucket(initialWarrantyBucket)
-          : "",
+          : segment === "active-amc"
+            ? stickyAmcBucket(initialAmcBucket)
+            : "",
   );
   const prevSegmentRef = useRef(segment);
   const [openInstallationBucketReady, setOpenInstallationBucketReady] = useState(
@@ -1874,6 +1929,9 @@ export default function ServiceBeforeInstallationDetailClient({
   );
   const [warrantyBucketReady, setWarrantyBucketReady] = useState(
     () => segment !== "active-warranty" || Boolean(normalizeWarrantyBucket(initialWarrantyBucket)),
+  );
+  const [amcBucketReady, setAmcBucketReady] = useState(
+    () => segment !== "active-amc" || Boolean(normalizeAmcBucket(initialAmcBucket)),
   );
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -1966,6 +2024,18 @@ export default function ServiceBeforeInstallationDetailClient({
   openInstallationBreakdownRef.current = openInstallationBreakdown;
   openCompletionsBreakdownRef.current = openCompletionsBreakdown;
   activeWarrantyBreakdownRef.current = activeWarrantyBreakdown;
+  const [activeAmcBreakdown, setActiveAmcBreakdown] = useState({
+    active_amc: null,
+    expiring_30_days: null,
+    expired_amc: null,
+  });
+  const [activeAmcKpiLoading, setActiveAmcKpiLoading] = useState(() => segment === "active-amc");
+  const activeAmcBreakdownRef = useRef({
+    active_amc: null,
+    expiring_30_days: null,
+    expired_amc: null,
+  });
+  activeAmcBreakdownRef.current = activeAmcBreakdown;
 
   useEffect(() => {
     if (segment !== "open-installation") {
@@ -2031,6 +2101,23 @@ export default function ServiceBeforeInstallationDetailClient({
   }, [segment, initialWarrantyBucket]);
 
   useEffect(() => {
+    if (segment !== "active-amc") {
+      setAmcBucketReady(true);
+      return;
+    }
+    const nextBucket = stickyAmcBucket(stickyBucketRef.current || initialAmcBucket);
+    stickyBucketRef.current = nextBucket;
+    persistAmcBucket(nextBucket);
+    setAppliedFilters((prev) =>
+      prev.amcBucket === nextBucket ? prev : { ...prev, amcBucket: nextBucket },
+    );
+    setDraftFilters((prev) =>
+      prev.amcBucket === nextBucket ? prev : { ...prev, amcBucket: nextBucket },
+    );
+    setAmcBucketReady(true);
+  }, [segment, initialAmcBucket]);
+
+  useEffect(() => {
     if (prevSegmentRef.current === segment) return;
     prevSegmentRef.current = segment;
     setPage(0);
@@ -2042,6 +2129,8 @@ export default function ServiceBeforeInstallationDetailClient({
       stickyBucketRef.current = stickyOpenCompletionsBucket(stickyBucketRef.current);
     } else if (segment === "active-warranty") {
       stickyBucketRef.current = stickyWarrantyBucket(stickyBucketRef.current);
+    } else if (segment === "active-amc") {
+      stickyBucketRef.current = stickyAmcBucket(stickyBucketRef.current);
     } else {
       stickyBucketRef.current = "";
     }
@@ -2102,6 +2191,43 @@ export default function ServiceBeforeInstallationDetailClient({
       }
     }
   }, [segment, appliedFilters, activeWarrantyKpiFilterKey]);
+
+  const activeAmcKpiFilterKey = useMemo(() => {
+    if (segment !== "active-amc") return "";
+    const { amcBucket: _bucket, ...rest } = appliedFilters;
+    return JSON.stringify(rest);
+  }, [segment, appliedFilters]);
+
+  const fetchActiveAmcKpis = useCallback(async () => {
+    if (segment !== "active-amc") return;
+    const filterKey = activeAmcKpiFilterKey;
+    if (kpiFetchedKeyRef.current === filterKey) return;
+
+    kpiFetchAbortRef.current?.abort();
+    const controller = new AbortController();
+    kpiFetchAbortRef.current = controller;
+
+    kpiFetchedKeyRef.current = filterKey;
+    setActiveAmcKpiLoading(true);
+    try {
+      const { amcBucket: _bucket, ...params } = appliedFilters;
+      const res = await axios.get("/api/service-before-installation/active-amc/kpi", {
+        params,
+        signal: controller.signal,
+        timeout: 12_000,
+      });
+      if (res.data?.success && res.data.breakdown) {
+        setActiveAmcBreakdown(res.data.breakdown);
+        activeAmcBreakdownRef.current = res.data.breakdown;
+      }
+    } catch (e) {
+      if (e?.code !== "ERR_CANCELED") console.error(e);
+    } finally {
+      if (!controller.signal.aborted) {
+        setActiveAmcKpiLoading(false);
+      }
+    }
+  }, [segment, appliedFilters, activeAmcKpiFilterKey]);
 
   const fetchOpenCompletionsKpis = useCallback(async () => {
     if (segment !== "open-completions") return;
@@ -2705,6 +2831,63 @@ export default function ServiceBeforeInstallationDetailClient({
       return;
     }
 
+    if (segment === "active-amc") {
+      const activeBucket = String(appliedFilters.amcBucket || "active").trim();
+      const knownTotal =
+        listTotalRef.current ||
+        activeAmcBucketRecordCount(activeBucket, activeAmcBreakdownRef.current);
+
+      if (kpiFetchedKeyRef.current !== activeAmcKpiFilterKey) {
+        void fetchActiveAmcKpis();
+      }
+
+      try {
+        const { amcBucket: _bucket, ...listFilters } = appliedFilters;
+        const res = await axios.get(`/api/service-before-installation/active-amc`, {
+          params: {
+            ...listFilters,
+            amcBucket: activeBucket,
+            limit: pageSize,
+            skip: page * pageSize,
+          },
+          signal,
+          timeout: 20_000,
+        });
+        if (res.data?.success && requestId === rowsRequestIdRef.current) {
+          const data = res.data.data || [];
+          const pag = res.data.pagination || {};
+          const total =
+            Number(pag.total) || knownTotal || listTotalRef.current || 0;
+          if (total > 0) listTotalRef.current = total;
+          setRows(data);
+          setPagination({
+            total,
+            hasMore: total > 0 ? page * pageSize + data.length < total : Boolean(pag.hasMore),
+          });
+        }
+      } catch (e) {
+        if (e?.code === "ERR_CANCELED") return;
+        console.error(e);
+      } finally {
+        if (!signal.aborted && requestId === rowsRequestIdRef.current) {
+          setLoading(false);
+          setApplyingFilters(false);
+        }
+      }
+
+      if (signal.aborted || requestId !== rowsRequestIdRef.current) return;
+
+      const fromCards = activeAmcBucketRecordCount(
+        activeBucket,
+        activeAmcBreakdownRef.current,
+      );
+      if (fromCards > 0) {
+        applyListTotal(fromCards);
+        setCountLoading(false);
+      }
+      return;
+    }
+
     try {
       const res = await axios.get(`/api/service-before-installation/${segment}`, {
         params: {
@@ -2753,6 +2936,8 @@ export default function ServiceBeforeInstallationDetailClient({
     fetchOpenCompletionsKpis,
     fetchActiveWarrantyKpis,
     activeWarrantyKpiFilterKey,
+    fetchActiveAmcKpis,
+    activeAmcKpiFilterKey,
     fetchFeedbackCollectedKpiCount,
     patchFeedbackCollected,
     enrichOpenInstallationServiceColumns,
@@ -2820,12 +3005,25 @@ export default function ServiceBeforeInstallationDetailClient({
   }, [segment, activeWarrantyKpiFilterKey, fetchActiveWarrantyKpis]);
 
   useEffect(() => {
+    if (segment !== "active-amc") return;
+    void fetchActiveAmcKpis();
+  }, [segment, activeAmcKpiFilterKey, fetchActiveAmcKpis]);
+
+  useEffect(() => {
     if (segment === "open-installation" && !openInstallationBucketReady) return;
     if (segment === "open-completions" && !openCompletionsBucketReady) return;
     if (segment === "active-warranty" && !warrantyBucketReady) return;
+    if (segment === "active-amc" && !amcBucketReady) return;
     fetchRows();
     return () => rowsFetchAbortRef.current?.abort();
-  }, [fetchRows, segment, openInstallationBucketReady, openCompletionsBucketReady, warrantyBucketReady]);
+  }, [
+    fetchRows,
+    segment,
+    openInstallationBucketReady,
+    openCompletionsBucketReady,
+    warrantyBucketReady,
+    amcBucketReady,
+  ]);
 
   const totalPages = pagination.totalPending
     ? Math.max(1, page + (pagination.hasMore ? 2 : 1))
@@ -2972,6 +3170,37 @@ export default function ServiceBeforeInstallationDetailClient({
           />
         ) : null}
 
+        {segment === "active-amc" ? (
+          <ServiceBeforeInstallationActiveAmcKpiStrip
+            amcBucket={appliedFilters.amcBucket || "active"}
+            totals={activeAmcBreakdown}
+            loading={activeAmcKpiLoading}
+            onCardSelect={(amcBucket) => {
+              const nextBucket = normalizeAmcBucket(amcBucket) || "active";
+              const current = String(appliedFilters.amcBucket || "active").trim();
+              if (nextBucket === current) return;
+              stickyBucketRef.current = persistAmcBucket(nextBucket);
+              setPage(0);
+              listTotalRef.current = 0;
+              setRows([]);
+              setPagination({ total: 0, hasMore: false });
+              setLoading(true);
+              setCountLoading(true);
+              const estTotal = activeAmcBucketRecordCount(
+                nextBucket,
+                activeAmcBreakdownRef.current,
+              );
+              if (estTotal > 0) {
+                applyListTotal(estTotal);
+                setPagination({ total: estTotal, hasMore: estTotal > pageSize });
+              }
+              const next = { ...appliedFilters, amcBucket: nextBucket };
+              setAppliedFilters(next);
+              setDraftFilters(next);
+            }}
+          />
+        ) : null}
+
         <ServiceBeforeInstallationFilters
           segment={segment}
           tableFilterOptions={mergedTableFilterOptions}
@@ -3008,6 +3237,15 @@ export default function ServiceBeforeInstallationDetailClient({
                       "active",
                   }
                 : {}),
+              ...(segment === "active-amc"
+                ? {
+                    amcBucket:
+                      stickyBucketRef.current ||
+                      appliedFilters.amcBucket ||
+                      next.amcBucket ||
+                      "active",
+                  }
+                : {}),
             });
           }}
           loading={applyingFilters}
@@ -3028,6 +3266,7 @@ export default function ServiceBeforeInstallationDetailClient({
             setFeedbackCollectedKpiLoading(true);
             setOpenCompletionsKpiLoading(segment === "open-completions");
             setActiveWarrantyKpiLoading(segment === "active-warranty");
+            setActiveAmcKpiLoading(segment === "active-amc");
             if (segment === "open-installation") {
               const keptBucket = persistOpenInstallationBucket(
                 stickyBucketRef.current ||
@@ -3061,6 +3300,17 @@ export default function ServiceBeforeInstallationDetailClient({
                 ...draftFilters,
                 warrantyBucket: keptBucket,
               });
+            } else if (segment === "active-amc") {
+              const keptBucket = persistAmcBucket(
+                stickyBucketRef.current ||
+                  appliedFilters.amcBucket ||
+                  draftFilters.amcBucket,
+              );
+              stickyBucketRef.current = keptBucket;
+              setAppliedFilters({
+                ...draftFilters,
+                amcBucket: keptBucket,
+              });
             } else {
               setAppliedFilters(draftFilters);
             }
@@ -3089,6 +3339,15 @@ export default function ServiceBeforeInstallationDetailClient({
             if (segment === "active-warranty") {
               const keptBucket = persistWarrantyBucket(
                 stickyBucketRef.current || appliedFilters.warrantyBucket,
+              );
+              stickyBucketRef.current = keptBucket;
+              const next = initialSbiFiltersForSegment(segment, keptBucket);
+              applyFilterState(setDraftFilters, setAppliedFilters, next);
+              return;
+            }
+            if (segment === "active-amc") {
+              const keptBucket = persistAmcBucket(
+                stickyBucketRef.current || appliedFilters.amcBucket,
               );
               stickyBucketRef.current = keptBucket;
               const next = initialSbiFiltersForSegment(segment, keptBucket);

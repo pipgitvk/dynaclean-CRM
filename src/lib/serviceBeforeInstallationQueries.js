@@ -14,6 +14,13 @@ import {
 import { buildNeworderOpenInstallationBucketWhereSql } from "@/lib/openInstallationBucketNeworderSql";
 import { buildOpenCompletionsBucketWhereSql } from "@/lib/openCompletionsBucketSql";
 import { activeWarrantyBucketBaseSql } from "@/lib/activeWarrantyBucketSql";
+import {
+  ACTIVE_AMC_SQL,
+  AMC_EXPIRING_30_DAYS_SQL,
+  activeAmcBucketBaseSql,
+  DUE_AMC_SQL,
+  EXPIRED_AMC_SQL,
+} from "@/lib/activeAmcSql";
 import { ensureServiceReportStepsTable } from "@/lib/ensureServiceReportStepsTable";
 import {
   dispatchSerialEligibleForInstallation,
@@ -1840,23 +1847,28 @@ export const OPEN_INSTALLATIONS_SQL = `(
   UPPER(TRIM(COALESCE(sr.service_type, ''))) = 'INSTALLATION'
 )`;
 
-export const ACTIVE_AMC_SQL = `(
-  LOWER(TRIM(status)) = 'approved'
-  AND amc_end_datetime IS NOT NULL
-  AND DATE(amc_end_datetime) >= CURDATE()
-)`;
-
-export const DUE_AMC_SQL = `(
-  LOWER(TRIM(status)) = 'approved'
-  AND amc_end_datetime IS NOT NULL
-  AND (
-    DATE(amc_end_datetime) < CURDATE()
-    OR DATE(amc_end_datetime) <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
-  )
-)`;
-
 function serviceRecordFilterNeedsWpJoin(f) {
   return Boolean(f.search || f.model || f.serial || (f.state && !f.assignedTo));
+}
+
+export async function fetchActiveAmcKpiBreakdown(conn, filters = {}) {
+  const f = parseSbiFilters(filters);
+  const amcFilter = buildAmcFilterSql(f);
+  const [rows] = await conn.execute(
+    `SELECT
+       SUM(CASE WHEN ${ACTIVE_AMC_SQL} THEN 1 ELSE 0 END) AS active_amc,
+       SUM(CASE WHEN ${AMC_EXPIRING_30_DAYS_SQL} THEN 1 ELSE 0 END) AS expiring_30_days,
+       SUM(CASE WHEN ${EXPIRED_AMC_SQL} THEN 1 ELSE 0 END) AS expired_amc
+     FROM amc_cmc
+     WHERE 1=1 ${amcFilter.sql}`,
+    amcFilter.params,
+  );
+  const row = rows?.[0] || {};
+  return {
+    active_amc: Number(row.active_amc || 0),
+    expiring_30_days: Number(row.expiring_30_days || 0),
+    expired_amc: Number(row.expired_amc || 0),
+  };
 }
 
 export async function fetchActiveWarrantyKpiBreakdown(conn, filters = {}) {
@@ -2004,7 +2016,10 @@ export async function fetchServiceBeforeInstallationSegmentPage(segment, options
   }
 
   if (segment === "active-amc" || segment === "due-amc-expiring") {
-    const filterSql = segment === "active-amc" ? ACTIVE_AMC_SQL : DUE_AMC_SQL;
+    const filterSql =
+      segment === "due-amc-expiring"
+        ? DUE_AMC_SQL
+        : activeAmcBucketBaseSql(parseSbiFilters(filters).amcBucket);
     const amcFilter = buildAmcFilterSql(filters);
     const where = `WHERE ${filterSql} ${amcFilter.sql}`;
     const baseParams = [...amcFilter.params];

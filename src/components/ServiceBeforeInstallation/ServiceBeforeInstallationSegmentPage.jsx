@@ -29,6 +29,10 @@ export default async function ServiceBeforeInstallationSegmentPage({
   const initialWarrantyBucket = Array.isArray(rawWarrantyBucket)
     ? String(rawWarrantyBucket[0] ?? "")
     : String(rawWarrantyBucket ?? "");
+  const rawAmcBucket = sp.amcBucket ?? sp.amc_bucket;
+  const initialAmcBucket = Array.isArray(rawAmcBucket)
+    ? String(rawAmcBucket[0] ?? "")
+    : String(rawAmcBucket ?? "");
 
   return (
     <ServiceBeforeInstallationDetailLoader
@@ -38,6 +42,7 @@ export default async function ServiceBeforeInstallationSegmentPage({
       initialOpenInstallationBucket={initialOpenInstallationBucket}
       initialOpenCompletionsBucket={initialOpenCompletionsBucket}
       initialWarrantyBucket={initialWarrantyBucket}
+      initialAmcBucket={initialAmcBucket}
     />
   );
 }

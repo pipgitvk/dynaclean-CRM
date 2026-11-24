@@ -29,6 +29,8 @@ export const EMPTY_SBI_FILTERS = {
   openCompletionsBucket: "",
   /** active-warranty KPI card bucket */
   warrantyBucket: "",
+  /** active-amc KPI card bucket */
+  amcBucket: "",
   /** open-installation list: "" | "registered" | "not_registered" */
   warrantyRegistration: "",
   /** open-installation list: "" | "delivered" | "not_delivered" */
@@ -113,6 +115,7 @@ export function parseSbiFilters(input) {
       src.openCompletionsBucket ?? src.open_completions_bucket,
     ),
     warrantyBucket: normalizeWarrantyBucket(src.warrantyBucket ?? src.warranty_bucket),
+    amcBucket: normalizeAmcBucket(src.amcBucket ?? src.amc_bucket),
     warrantyRegistration: normalizeWarrantyRegistration(
       src.warrantyRegistration ?? src.warranty_registration ?? src.registration,
     ),
@@ -151,6 +154,7 @@ export function parseSbiFiltersFromSearchParams(searchParams) {
     openCompletionsBucket:
       searchParams.get("openCompletionsBucket") ?? searchParams.get("open_completions_bucket"),
     warrantyBucket: searchParams.get("warrantyBucket") ?? searchParams.get("warranty_bucket"),
+    amcBucket: searchParams.get("amcBucket") ?? searchParams.get("amc_bucket"),
     warrantyRegistration:
       searchParams.get("warrantyRegistration") ??
       searchParams.get("warranty_registration") ??
@@ -182,6 +186,16 @@ function normalizeWarrantyRegistration(raw) {
   if (v === "not_registered" || v === "unregistered" || v === "no" || v === "0") {
     return "not_registered";
   }
+  return "";
+}
+
+export function normalizeAmcBucket(raw) {
+  const v = String(raw ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/-/g, "_");
+  if (v === "expiring30" || v === "expiring_30_days") return "expiring_30";
+  if (v === "active" || v === "expiring_30" || v === "expired") return v;
   return "";
 }
 
