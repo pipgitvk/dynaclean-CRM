@@ -295,10 +295,10 @@ export const ACTIVE_WARRANTY_DETAIL_KPI_CARDS = [
     title: "Expired Warranty",
     subtitle: "Warranty period ended",
     countCaption: "Warranty period ended",
-    chartColor: "#64748b",
-    surface: "border-slate-200/80 bg-slate-50/50",
-    iconSurface: "bg-gradient-to-br from-slate-500 to-slate-600",
-    glow: "bg-slate-400/20",
+    chartColor: "#ef4444",
+    surface: "border-red-200/60 bg-red-50/30",
+    iconSurface: "bg-gradient-to-br from-red-500 to-rose-600",
+    glow: "bg-red-400/20",
   },
 ];
 

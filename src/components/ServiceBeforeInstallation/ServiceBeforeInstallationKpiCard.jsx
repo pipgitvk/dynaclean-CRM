@@ -251,7 +251,9 @@ export default function ServiceBeforeInstallationKpiCard({
           : card.id === "open-installation-feedback-collected" ||
               card.id === "open-installation-no-feedback"
             ? "ring-2 ring-rose-500/75 ring-offset-2 ring-offset-rose-50/60"
-            : "ring-2 ring-violet-500/75 ring-offset-2 ring-offset-violet-50/60";
+            : card.id === "aw-expired" || card.id === "aa-expired"
+              ? "ring-2 ring-red-500/75 ring-offset-2 ring-offset-red-50/60"
+              : "ring-2 ring-violet-500/75 ring-offset-2 ring-offset-violet-50/60";
   const className = `group relative block overflow-hidden rounded-2xl ${shell} ${active ? activeRing : ""}`;
 
   const inner = (
