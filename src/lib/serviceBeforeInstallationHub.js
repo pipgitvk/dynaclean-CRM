@@ -20,7 +20,7 @@ export const OPEN_INSTALLATION_DETAIL_KPI_STRIP = [
   {
     id: "open-installation-delivery-pending",
     title: "On the Way Machine",
-    subtitle: "Orders with delivery status still pending",
+    subtitle: "Dispatched, delivery still pending",
     countCaption: "No. of product delivery pending after dispatch OR on the way machine",
     countKey: "delivery_pending_after_dispatch",
     accent: "from-sky-500 to-blue-600",

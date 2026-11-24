@@ -77,7 +77,7 @@ const OPEN_INSTALLATION_KPI_CACHE = new Map();
 const OPEN_INSTALLATION_KPI_INFLIGHT = new Map();
 const OPEN_INSTALLATION_KPI_TTL_MS = 90_000;
 /** Bump when count semantics change so stale under-counts (e.g. forced products) are dropped. */
-const OPEN_INSTALLATION_KPI_CACHE_VER = "v14-temp-serial";
+const OPEN_INSTALLATION_KPI_CACHE_VER = "v15-dispatched-only";
 
 const DELIVERED_ON_SQL = `(
   no.delivered_on IS NOT NULL

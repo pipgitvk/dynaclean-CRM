@@ -39,12 +39,13 @@ export const U_INSTALLATION_COMPLETED_SQL = `(
 export const U_OPEN_INSTALLATION_ORDER_SQL = `(COALESCE(u.order_installation_status, 0) = 0)`;
 
 /**
- * Delivery pending: neworder.delivery_status = 0
- * (list/KPI for this bucket use a dedicated neworder query — no dispatch gate).
+ * On the way: dispatched (full or partial) but delivery not marked done.
+ * Orders that are not dispatched yet are excluded.
  * Temp placeholder serials (`temp`, `temp1`, …) are excluded from this card/table.
  */
 export const U_DELIVERY_PENDING_AFTER_DISPATCH_SQL = `(
   COALESCE(u.order_delivery_status, 0) = 0
+  AND COALESCE(u.order_dispatch_status, 0) IN (1, 2)
   AND NOT ${SQL_QUOTE_HAS_TEMP_DISPATCH_SERIAL("u.quote_number")}
 )`;
 
@@ -100,9 +101,10 @@ export const NO_ACTUALLY_DELIVERED_SQL = `(
   AND DATE(no.delivered_on) > '1970-01-01'
 )`;
 
-/** neworder: delivery not marked done, excluding temp placeholder serials. */
+/** Dispatched (1 full / 2 partial) but delivery not marked done; skip undispatched + temp serials. */
 export const NO_DELIVERY_PENDING_AFTER_DISPATCH_SQL = `(
   COALESCE(no.delivery_status, 0) = 0
+  AND COALESCE(no.dispatch_status, 0) IN (1, 2)
   AND ${NO_TEMP_DISPATCH_SERIAL_SQL}
 )`;
 
