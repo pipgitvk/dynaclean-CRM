@@ -66,7 +66,7 @@ const OPEN_INSTALLATION_KPI_CACHE = new Map();
 const OPEN_INSTALLATION_KPI_INFLIGHT = new Map();
 const OPEN_INSTALLATION_KPI_TTL_MS = 90_000;
 /** Bump when count semantics change so stale under-counts (e.g. forced products) are dropped. */
-const OPEN_INSTALLATION_KPI_CACHE_VER = "v8-no-dispatch-filter";
+const OPEN_INSTALLATION_KPI_CACHE_VER = "v10-products-only";
 
 const DELIVERED_ON_SQL = `(
   no.delivered_on IS NOT NULL
@@ -123,48 +123,42 @@ function sqlNeworderDispatchStatusWhere(dispatchStatus) {
   return "";
 }
 
+function sqlOpenInstallationQuotationProductsJoin() {
+  return `INNER JOIN (
+    SELECT DISTINCT ${sqlUtf8TrimExpr("qi.quote_number")} AS quote_key
+    FROM quotation_items qi
+    INNER JOIN products_list pl
+      ON ${sqlTrimUtf8EqColumns("pl.item_code", "qi.item_code")}
+    WHERE qi.quote_number IS NOT NULL
+      AND ${sqlUtf8TrimExpr("qi.quote_number")} <> ''
+  ) oi_qi_prod ON oi_qi_prod.quote_key = ${sqlUtf8TrimExpr("no.quote_number")}`;
+}
+
 function sqlOpenInstallationProductsJoin(dispatchStatus) {
-  if (dispatchStatus === "not_completed") {
-    return `INNER JOIN (
-      SELECT DISTINCT ${sqlUtf8TrimExpr("qi.quote_number")} AS quote_key
-      FROM quotation_items qi
-      INNER JOIN products_list pl
-        ON ${sqlTrimUtf8EqColumns("pl.item_code", "qi.item_code")}
-      WHERE qi.quote_number IS NOT NULL
-        AND ${sqlUtf8TrimExpr("qi.quote_number")} <> ''
-    ) oi_qi_prod ON oi_qi_prod.quote_key = ${sqlUtf8TrimExpr("no.quote_number")}`;
-  }
   if (dispatchStatus === "completed") {
     return sqlOpenInstallationItemTypeJoin("products");
   }
-  // Dispatch All: do not gate on products_list (that hid rows / timed out the table).
-  return "";
+  // All + not_completed: product quotes only (no dispatch row required; spare-only excluded).
+  return sqlOpenInstallationQuotationProductsJoin();
 }
 
 /**
- * Open Installation list/KPI joins. Dispatch All (default) does not require a dispatch row.
+ * Open Installation list/KPI joins. Always products-only; dispatch All does not require a dispatch row.
  */
 function openInstallationNeworderJoinPlan(filters) {
-  const f = parseSbiFilters(filters);
-  const type = resolveUpcomingInstallationType(f.itemType);
+  const f = parseSbiFilters(forceOpenInstallationProductsOnly(filters));
   let joinSql = "";
   let extraWhere = sqlNeworderDispatchStatusWhere(f.dispatchStatus);
-  let skipItemType = false;
   const skipDispatchStatus = Boolean(extraWhere);
+  const prodJoin = sqlOpenInstallationProductsJoin(f.dispatchStatus);
+  if (prodJoin) joinSql += `\n    ${prodJoin}`;
 
-  if (type === "products") {
-    const prodJoin = sqlOpenInstallationProductsJoin(f.dispatchStatus);
-    if (prodJoin) joinSql += `\n    ${prodJoin}`;
-    skipItemType = true;
-  } else {
-    const itemJoin = sqlOpenInstallationItemTypeJoin(f.itemType);
-    if (itemJoin) {
-      joinSql += `\n    ${itemJoin}`;
-      skipItemType = true;
-    }
-  }
-
-  return { joinSql, extraWhere, skipItemType, skipDispatchStatus };
+  return {
+    joinSql,
+    extraWhere,
+    skipItemType: Boolean(prodJoin),
+    skipDispatchStatus,
+  };
 }
 
 /** One-shot product/spare quote set — avoids correlated EXISTS per neworder row. */
@@ -257,9 +251,7 @@ function appendOpenInstallationNeworderExtraFilters(
 
   const itemType = resolveUpcomingInstallationType(f.itemType);
   if (!skipItemType && itemType === "products") {
-    if (f.dispatchStatus === "not_completed") {
-      sql += ` AND ${sqlQuoteHasProductOnQuotation("no.quote_number")}`;
-    } else if (f.dispatchStatus === "completed") {
+    if (f.dispatchStatus === "completed") {
       sql += ` AND EXISTS (
       SELECT 1
       FROM dispatch d_it
@@ -267,6 +259,8 @@ function appendOpenInstallationNeworderExtraFilters(
         ON ${sqlTrimUtf8EqColumns("pl.item_code", "d_it.item_code")}
       WHERE ${sqlTrimUtf8EqColumns("d_it.quote_number", "no.quote_number")}
     )`;
+    } else {
+      sql += ` AND ${sqlQuoteHasProductOnQuotation("no.quote_number")}`;
     }
   } else if (!skipItemType && itemType === "spares") {
     sql += ` AND EXISTS (
@@ -838,8 +832,7 @@ function sqlOpenInstallationQuoteLatestRegisteredByEquals(quoteNoColumn) {
 }
 
 /**
- * Ultra-fast neworder WHERE for open-installation buckets.
- * No dispatch/products join — those were timing out the pool.
+ * Open-installation bucket WHERE. Products join lives on the FROM clause (join plan).
  */
 function buildOpenInstallationNeworderWhereSql(
   filters,
@@ -1047,8 +1040,10 @@ async function fetchOpenInstallationNeworderPage(
     deferDispatchEnrich = false,
   } = {},
 ) {
-  const parsed = parseSbiFilters(filters);
-  const plan = prebuiltWhere ? { joinSql: "", extraWhere: "", skipItemType: false, skipDispatchStatus: false } : openInstallationNeworderJoinPlan(parsed);
+  const parsed = parseSbiFilters(withDefaultOpenInstallationItemType(filters));
+  const plan = prebuiltWhere
+    ? { joinSql: "", extraWhere: "", skipItemType: false, skipDispatchStatus: false }
+    : openInstallationNeworderJoinPlan(parsed);
   const where =
     prebuiltWhere ??
     (await buildOpenInstallationNeworderWhereWithQuotePrefilters(
@@ -1156,7 +1151,7 @@ export async function fetchOpenInstallationBucketList(
 }
 
 async function countOpenInstallationNeworder(conn, filters, { overdueDelayedOnly = false } = {}) {
-  const parsed = parseSbiFilters(filters);
+  const parsed = parseSbiFilters(withDefaultOpenInstallationItemType(filters));
   const plan = openInstallationNeworderJoinPlan(parsed);
   const where = await buildOpenInstallationNeworderWhereWithQuotePrefilters(conn, filters, {
     overdueDelayedOnly,
@@ -1174,7 +1169,7 @@ async function countOpenInstallationNeworder(conn, filters, { overdueDelayedOnly
 /**
  * KPI cards — same COUNT(*) as the table per bucket (accurate).
  * Sequential on one connection (mysql2 cannot multiplex one conn).
- * Empty itemType = full universe (matches legacy 142 delivered-pending).
+ * Products only (spare-only quotes excluded).
  */
 async function fetchOpenInstallationBreakdownByBuckets(conn, filters) {
   const kpiFilters = sbiFiltersForOpenInstallationKpi(
@@ -1298,15 +1293,16 @@ export async function countOpenInstallationSegment(segment, filters = {}) {
     if (openInstallationNeedsFullListShape(filters)) {
       return countUpcomingInstallations(conn, filters, { overdueDelayedOnly });
     }
-    return countOpenInstallationNeworder(conn, filters, { overdueDelayedOnly });
+    return countOpenInstallationNeworder(
+      conn,
+      withDefaultOpenInstallationItemType(filters),
+      { overdueDelayedOnly },
+    );
   }
   return 0;
 }
 
-/**
- * Do NOT force itemType=products — that under-counted cards (e.g. 142 → 11).
- * Empty / all = full open-installation universe (same as legacy countOnly).
- */
+/** Open Installation is products-only (no spare-only quotes). */
 export function withDefaultOpenInstallationItemType(filters) {
   return forceOpenInstallationProductsOnly(filters);
 }
@@ -1877,7 +1873,6 @@ export async function fetchServiceBeforeInstallationSegmentPage(segment, options
   const safeSkip = skip;
 
   if (segment === "open-installation") {
-    // Keep caller's itemType — do not force products (that cut delivered-pending ~142 → ~11).
     if (options.breakdownOnly) {
       const openInstallationBreakdown = await fetchOpenInstallationBreakdownByBuckets(
         conn,
