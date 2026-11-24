@@ -72,6 +72,22 @@ export function formatSbiNum(n) {
   return Number(n || 0).toLocaleString("en-IN");
 }
 
+function CountCaptionText({ text }) {
+  const caption = String(text || "");
+  const marker = " OR ";
+  const splitAt = caption.indexOf(marker);
+  if (splitAt === -1) return caption;
+  return (
+    <>
+      {caption.slice(0, splitAt)}
+      {" "}
+      <span className="text-red-600">OR</span>
+      {" "}
+      {caption.slice(splitAt + marker.length)}
+    </>
+  );
+}
+
 function sparkSeries(seed, value) {
   const base = Math.max(1, Number(value) || 0);
   return Array.from({ length: 12 }, (_, i) => ({
@@ -312,7 +328,7 @@ export default function ServiceBeforeInstallationKpiCard({
               </div>
               {card.countCaption ? (
                 <p className="mt-2 text-sm font-bold leading-snug text-slate-800 sm:text-[0.9375rem]">
-                  {card.countCaption}
+                  <CountCaptionText text={card.countCaption} />
                 </p>
               ) : null}
             </div>

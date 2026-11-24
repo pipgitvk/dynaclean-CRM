@@ -66,7 +66,7 @@ const OPEN_INSTALLATION_KPI_CACHE = new Map();
 const OPEN_INSTALLATION_KPI_INFLIGHT = new Map();
 const OPEN_INSTALLATION_KPI_TTL_MS = 90_000;
 /** Bump when count semantics change so stale under-counts (e.g. forced products) are dropped. */
-const OPEN_INSTALLATION_KPI_CACHE_VER = "v10-products-only";
+const OPEN_INSTALLATION_KPI_CACHE_VER = "v12-reg-join";
 
 const DELIVERED_ON_SQL = `(
   no.delivered_on IS NOT NULL
@@ -99,8 +99,33 @@ function sqlQuoteHasAnyWarrantyRegistration(quoteNoColumn) {
       ON ${sqlTrimUtf8EqColumns("wp_wr.serial_number", "d_wr.serial_no")}
     WHERE ${sqlTrimUtf8EqColumns("d_wr.quote_number", quoteNoColumn)}
       AND d_wr.serial_no IS NOT NULL
-      AND ${sqlUtf8TrimExpr("d_wr.serial_no")} <> ''
+      AND ${sqlUtf8HasText("d_wr.serial_no")}
   )`;
+}
+
+/** One-shot registered-quote set — same rule as table Registered badge (dispatch serial in warranty_products). */
+function sqlOpenInstallationWarrantyJoin(warrantyRegistration) {
+  if (warrantyRegistration !== "registered" && warrantyRegistration !== "not_registered") {
+    return { joinSql: "", extraWhere: "" };
+  }
+  const sub = `(
+    SELECT DISTINCT ${sqlUtf8TrimExpr("d_wr.quote_number")} AS quote_key
+    FROM dispatch d_wr
+    INNER JOIN warranty_products wp_wr
+      ON ${sqlTrimUtf8EqColumns("wp_wr.serial_number", "d_wr.serial_no")}
+    WHERE d_wr.quote_number IS NOT NULL
+      AND ${sqlUtf8HasText("d_wr.quote_number")}
+      AND d_wr.serial_no IS NOT NULL
+      AND ${sqlUtf8HasText("d_wr.serial_no")}
+  ) oi_wr`;
+  const on = `oi_wr.quote_key = ${sqlUtf8TrimExpr("no.quote_number")}`;
+  if (warrantyRegistration === "registered") {
+    return { joinSql: `\n    INNER JOIN ${sub} ON ${on}`, extraWhere: "" };
+  }
+  return {
+    joinSql: `\n    LEFT JOIN ${sub} ON ${on}`,
+    extraWhere: ` AND oi_wr.quote_key IS NULL`,
+  };
 }
 
 function sqlQuoteHasProductOnQuotation(quoteColumn) {
@@ -152,12 +177,16 @@ function openInstallationNeworderJoinPlan(filters) {
   const skipDispatchStatus = Boolean(extraWhere);
   const prodJoin = sqlOpenInstallationProductsJoin(f.dispatchStatus);
   if (prodJoin) joinSql += `\n    ${prodJoin}`;
+  const wr = sqlOpenInstallationWarrantyJoin(f.warrantyRegistration);
+  if (wr.joinSql) joinSql += wr.joinSql;
+  if (wr.extraWhere) extraWhere += wr.extraWhere;
 
   return {
     joinSql,
     extraWhere,
     skipItemType: Boolean(prodJoin),
     skipDispatchStatus,
+    skipWarrantyRegistration: Boolean(wr.joinSql),
   };
 }
 
@@ -191,7 +220,12 @@ function appendOpenInstallationNeworderExtraFilters(
   filters,
   sql,
   params,
-  { overdueDelayedOnly = false, skipItemType = false, skipDispatchStatus = false } = {},
+  {
+    overdueDelayedOnly = false,
+    skipItemType = false,
+    skipDispatchStatus = false,
+    skipWarrantyRegistration = false,
+  } = {},
 ) {
   const f = parseSbiFilters(filters);
 
@@ -271,10 +305,12 @@ function appendOpenInstallationNeworderExtraFilters(
       WHERE ${sqlTrimUtf8EqColumns("d_it.quote_number", "no.quote_number")}
     )`;
   }
-  if (f.warrantyRegistration === "registered") {
-    sql += ` AND ${sqlQuoteHasAnyWarrantyRegistration("no.quote_number")}`;
-  } else if (f.warrantyRegistration === "not_registered") {
-    sql += ` AND NOT ${sqlQuoteHasAnyWarrantyRegistration("no.quote_number")}`;
+  if (!skipWarrantyRegistration) {
+    if (f.warrantyRegistration === "registered") {
+      sql += ` AND ${sqlQuoteHasAnyWarrantyRegistration("no.quote_number")}`;
+    } else if (f.warrantyRegistration === "not_registered") {
+      sql += ` AND NOT ${sqlQuoteHasAnyWarrantyRegistration("no.quote_number")}`;
+    }
   }
   if (f.assignedBy) {
     sql += ` AND ${sqlOpenInstallationQuoteLatestRegisteredByEquals("no.quote_number")}`;
@@ -499,6 +535,7 @@ async function fetchOpenInstallationBreakdownLite(
   const merged = appendOpenInstallationNeworderExtraFilters(kpiFilters, filterSql, params, {
     overdueDelayedOnly,
     skipItemType: plan.skipItemType,
+    skipWarrantyRegistration: plan.skipWarrantyRegistration,
     skipDispatchStatus: plan.skipDispatchStatus,
   });
   const baseOrderSql = `${merged.sql}${plan.extraWhere}`;
@@ -707,8 +744,10 @@ async function countInstallationPlannedServiceRecords(conn, filters = {}) {
     f.dispatchStatus === "not_completed"
       ? ""
       : sqlOpenInstallationItemTypeJoin(f.itemType);
+  const wr = sqlOpenInstallationWarrantyJoin(f.warrantyRegistration);
   const mergedNo = appendOpenInstallationNeworderExtraFilters(kpiFilters, noSql, noParams, {
     skipItemType: Boolean(itemJoin),
+    skipWarrantyRegistration: Boolean(wr.joinSql),
   });
 
   const [[row]] = await conn.execute(
@@ -719,9 +758,10 @@ async function countInstallationPlannedServiceRecords(conn, filters = {}) {
      INNER JOIN neworder no
        ON ${sqlTrimUtf8EqColumns("no.quote_number", "d.quote_number")}
      ${itemJoin}
+     ${wr.joinSql}
      WHERE ${SQL_SERVICE_RECORD_INSTALLATION_PLANNED}
        ${dateSql}
-       AND ${mergedNo.sql}`,
+       AND ${mergedNo.sql}${wr.extraWhere}`,
     [...dateParams, ...mergedNo.params],
   );
   return Number(row?.cnt || 0);
@@ -770,13 +810,19 @@ function appendNeworderQuoteKeyInSql(whereSql, whereParams, quoteKeys) {
 async function buildOpenInstallationNeworderWhereWithQuotePrefilters(
   conn,
   filters,
-  { overdueDelayedOnly = false, skipItemType = false, skipDispatchStatus = false } = {},
+  {
+    overdueDelayedOnly = false,
+    skipItemType = false,
+    skipDispatchStatus = false,
+    skipWarrantyRegistration = false,
+  } = {},
 ) {
   const parsed = parseSbiFilters(filters);
   const base = buildOpenInstallationNeworderWhereSql(filters, {
     overdueDelayedOnly,
     skipItemType,
     skipDispatchStatus,
+    skipWarrantyRegistration,
   });
 
   if (parsed.instCompletedBy) {
@@ -836,7 +882,12 @@ function sqlOpenInstallationQuoteLatestRegisteredByEquals(quoteNoColumn) {
  */
 function buildOpenInstallationNeworderWhereSql(
   filters,
-  { overdueDelayedOnly = false, skipItemType = false, skipDispatchStatus = false } = {},
+  {
+    overdueDelayedOnly = false,
+    skipItemType = false,
+    skipDispatchStatus = false,
+    skipWarrantyRegistration = false,
+  } = {},
 ) {
   const f = parseSbiFilters(filters);
   const bucket = String(f.openInstallationBucket || "").trim().toLowerCase();
@@ -863,6 +914,7 @@ function buildOpenInstallationNeworderWhereSql(
     overdueDelayedOnly,
     skipItemType,
     skipDispatchStatus,
+    skipWarrantyRegistration,
   });
 }
 
@@ -1042,7 +1094,13 @@ async function fetchOpenInstallationNeworderPage(
 ) {
   const parsed = parseSbiFilters(withDefaultOpenInstallationItemType(filters));
   const plan = prebuiltWhere
-    ? { joinSql: "", extraWhere: "", skipItemType: false, skipDispatchStatus: false }
+    ? {
+        joinSql: "",
+        extraWhere: "",
+        skipItemType: false,
+        skipDispatchStatus: false,
+        skipWarrantyRegistration: false,
+      }
     : openInstallationNeworderJoinPlan(parsed);
   const where =
     prebuiltWhere ??
@@ -1053,6 +1111,7 @@ async function fetchOpenInstallationNeworderPage(
         overdueDelayedOnly,
         skipItemType: plan.skipItemType,
         skipDispatchStatus: plan.skipDispatchStatus,
+        skipWarrantyRegistration: plan.skipWarrantyRegistration,
       },
     ));
   if (!prebuiltWhere && plan.extraWhere) {
@@ -1157,6 +1216,7 @@ async function countOpenInstallationNeworder(conn, filters, { overdueDelayedOnly
     overdueDelayedOnly,
     skipItemType: plan.skipItemType,
     skipDispatchStatus: plan.skipDispatchStatus,
+    skipWarrantyRegistration: plan.skipWarrantyRegistration,
   });
   if (plan.extraWhere) where.sql += plan.extraWhere;
   const [[row]] = await conn.execute(

@@ -24,6 +24,7 @@ export default function UpcomingInstallationReferenceIds({
 
   const invoice = record?.invoice_number?.trim() || "—";
   const orderId = record?.order_id ?? "—";
+  const quoteNumber = String(record?.quote_number || "").trim() || "—";
   const serviceIds = listUpcomingInstallationServiceIds(record);
   const serials = listOpenInstallationSerialNumbers(record);
 
@@ -64,6 +65,9 @@ export default function UpcomingInstallationReferenceIds({
       </div>
       <div>
         <span className="text-green-600 font-bold">Ord:</span> {orderId}
+      </div>
+      <div>
+        <span className="text-cyan-700 font-bold">Quote:</span> {quoteNumber}
       </div>
       {hideServiceAndSerialLists ? null : (
         <>

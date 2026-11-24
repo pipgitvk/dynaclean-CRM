@@ -31,7 +31,7 @@ export const EMPTY_SBI_FILTERS = {
   warrantyRegistration: "",
   /** open-installation list: "" | "delivered" | "not_delivered" */
   orderDeliveryStatus: "",
-  /** open-installation: "" (All) | "completed" | "not_completed" */
+  /** Removed from Open Installation UI — always empty. */
   dispatchStatus: "",
   range: SBI_RANGE_SELECT.id,
 };
@@ -116,7 +116,7 @@ export function parseSbiFilters(input) {
     orderDeliveryStatus: normalizeOrderDeliveryStatus(
       src.orderDeliveryStatus ?? src.order_delivery_status,
     ),
-    dispatchStatus: normalizeDispatchStatus(src.dispatchStatus ?? src.dispatch_status),
+    dispatchStatus: "",
   };
 }
 
@@ -153,32 +153,10 @@ export function parseSbiFiltersFromSearchParams(searchParams) {
       searchParams.get("registration"),
     orderDeliveryStatus:
       searchParams.get("orderDeliveryStatus") ?? searchParams.get("order_delivery_status"),
-    dispatchStatus:
-      searchParams.get("dispatchStatus") ?? searchParams.get("dispatch_status"),
+    dispatchStatus: "",
     assignedBy: searchParams.get("assignedBy") ?? searchParams.get("assigned_by"),
     registeredBy: searchParams.get("registeredBy") ?? searchParams.get("registered_by"),
   });
-}
-
-function normalizeDispatchStatus(raw) {
-  const v = String(raw ?? "")
-    .trim()
-    .toLowerCase();
-  if (v === "completed" || v === "done" || v === "dispatched" || v === "yes" || v === "1") {
-    return "completed";
-  }
-  if (
-    v === "not_completed" ||
-    v === "not-completed" ||
-    v === "pending" ||
-    v === "not_dispatched" ||
-    v === "not-dispatched" ||
-    v === "no" ||
-    v === "0"
-  ) {
-    return "not_completed";
-  }
-  return "";
 }
 
 function normalizeOrderDeliveryStatus(raw) {

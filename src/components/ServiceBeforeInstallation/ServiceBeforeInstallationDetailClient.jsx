@@ -707,7 +707,7 @@ function exportRowsCsv(rows, segment) {
     ],
     "open-installation": [
       "Dispatch Date",
-      "Inv | Ord | Ser | S/N",
+      "Inv | Ord | Quote | Ser | S/N",
       "Company / State · Delivery",
       "Contact Person · Contact No",
       "Sales Person",
@@ -720,7 +720,7 @@ function exportRowsCsv(rows, segment) {
     ],
     "overdue-delayed-installation": [
       "Dispatch Date",
-      "Inv | Ord | Ser | S/N",
+      "Inv | Ord | Quote | Ser | S/N",
       "Company / State · Delivery",
       "Contact Person · Contact No",
       "Sales Person",
@@ -775,6 +775,7 @@ function exportRowsCsv(rows, segment) {
         [
           row.invoice_number,
           row.order_id,
+          row.quote_number,
           row.service_id,
           row.serial_number,
         ]
@@ -1557,7 +1558,7 @@ function TableHead({ segment }) {
       <tr>
         <th className={th}>#</th>
         <th className={th}>Dispatch Date</th>
-        <th className={th}>Inv | Ord | Ser | S/N</th>
+        <th className={th}>Inv | Ord | Quote | Ser | S/N</th>
         <th className={th}>Company / State · Delivery</th>
         <th className={th}>Contact Person · Contact No</th>
         <th className={th}>Sales Person</th>
@@ -2193,7 +2194,6 @@ export default function ServiceBeforeInstallationDetailClient({
         {
           params: {
             ...countFilters,
-            ...(isFeedbackTable ? { dispatchStatus: "" } : {}),
             ...(segment !== "open-installation" || isFeedbackTable
               ? { countOnly: "1" }
               : {}),
@@ -2294,7 +2294,6 @@ export default function ServiceBeforeInstallationDetailClient({
         const compactParams = Object.fromEntries(
           Object.entries({
             ...listFilters,
-            ...(isFeedbackTable ? { dispatchStatus: "" } : {}),
             limit: pageSize,
             skip: page * pageSize,
             includeFilterOptions: "0",
