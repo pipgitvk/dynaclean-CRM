@@ -2,6 +2,7 @@ import { sqlTrimUtf8EqColumns } from "@/lib/sqlUtf8Compare";
 import {
   NO_ACTUALLY_DELIVERED_SQL,
   NO_DELIVERY_PENDING_AFTER_DISPATCH_SQL,
+  NO_TEMP_DISPATCH_SERIAL_SQL,
 } from "@/lib/openInstallationKpiSql";
 
 /**
@@ -17,7 +18,7 @@ export function buildNeworderOpenInstallationBucketWhereSql(openInstallationBuck
     return `AND ${NO_DELIVERY_PENDING_AFTER_DISPATCH_SQL}`;
   }
   if (b === "delivered_pending") {
-    return `AND COALESCE(no.installation_status, 0) = 0 AND (${NO_ACTUALLY_DELIVERED_SQL})`;
+    return `AND COALESCE(no.installation_status, 0) = 0 AND (${NO_ACTUALLY_DELIVERED_SQL}) AND ${NO_TEMP_DISPATCH_SERIAL_SQL}`;
   }
   if (b === "installation_planned") {
     // Quote list resolved from PLANNED INSTALLATION service_records (see quote prefilter).

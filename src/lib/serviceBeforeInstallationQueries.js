@@ -50,8 +50,11 @@ import {
   U_INSTALLATION_COMPLETED_SQL,
   U_INSTALLATION_PLANNED_SQL,
   U_NO_FEEDBACK_COLLECTED_SQL,
+  NO_DELIVERY_PENDING_AFTER_DISPATCH_SQL,
   NO_INSTALLATION_PLANNED_SQL,
+  NO_TEMP_DISPATCH_SERIAL_SQL,
   SQL_SERVICE_RECORD_INSTALLATION_PLANNED,
+  sqlDispatchSerialIsTemp,
   openInstallationBucketRecordCount,
 } from "@/lib/openInstallationKpiSql";
 import {
@@ -74,7 +77,7 @@ const OPEN_INSTALLATION_KPI_CACHE = new Map();
 const OPEN_INSTALLATION_KPI_INFLIGHT = new Map();
 const OPEN_INSTALLATION_KPI_TTL_MS = 90_000;
 /** Bump when count semantics change so stale under-counts (e.g. forced products) are dropped. */
-const OPEN_INSTALLATION_KPI_CACHE_VER = "v12-reg-join";
+const OPEN_INSTALLATION_KPI_CACHE_VER = "v14-temp-serial";
 
 const DELIVERED_ON_SQL = `(
   no.delivered_on IS NOT NULL
@@ -559,11 +562,13 @@ async function fetchOpenInstallationBreakdownLite(
        ) AS total,
        SUM(
          CASE
-           WHEN COALESCE(no.installation_status, 0) = 0 AND ${deliveredOnSql}
+           WHEN COALESCE(no.installation_status, 0) = 0
+            AND ${deliveredOnSql}
+            AND ${NO_TEMP_DISPATCH_SERIAL_SQL}
            THEN 1 ELSE 0
          END
        ) AS delivered_installation_pending,
-       SUM(CASE WHEN COALESCE(no.delivery_status, 0) = 0 THEN 1 ELSE 0 END) AS delivery_pending_after_dispatch,
+       SUM(CASE WHEN ${NO_DELIVERY_PENDING_AFTER_DISPATCH_SQL} THEN 1 ELSE 0 END) AS delivery_pending_after_dispatch,
        0 AS installation_planned,
        SUM(CASE WHEN COALESCE(no.installation_status, 0) = 1 THEN 1 ELSE 0 END) AS completed_installation,
        0 AS no_feedback_collected,
@@ -907,9 +912,9 @@ function buildOpenInstallationNeworderWhereSql(
   const params = [];
 
   if (bucket === "delivery_pending") {
-    sql += ` AND COALESCE(no.delivery_status, 0) = 0`;
+    sql += ` AND ${NO_DELIVERY_PENDING_AFTER_DISPATCH_SQL}`;
   } else if (bucket === "delivered_pending") {
-    sql += ` AND COALESCE(no.installation_status, 0) = 0 AND ${DELIVERED_ON_SQL}`;
+    sql += ` AND COALESCE(no.installation_status, 0) = 0 AND ${DELIVERED_ON_SQL} AND ${NO_TEMP_DISPATCH_SERIAL_SQL}`;
   } else if (bucket === "installation_planned") {
     // Quote keys from PLANNED INSTALLATION service_records (see buildOpenInstallationNeworderWhereWithQuotePrefilters).
   } else if (bucket === "completed") {
@@ -1085,6 +1090,31 @@ const OPEN_INSTALLATION_LIST_SELECT = `
        CASE WHEN COALESCE(no.installation_status, 0) = 1 THEN 1 ELSE 0 END AS installation_completed,
        0 AS no_feedback_collected`;
 
+async function excludeOpenInstallationTempSerialRows(conn, rows) {
+  if (!rows?.length) return rows || [];
+  const quotes = [
+    ...new Set(rows.map((r) => String(r.quote_number || "").trim()).filter(Boolean)),
+  ];
+  if (!quotes.length) return rows;
+  const placeholders = quotes.map(() => "?").join(",");
+  const [hits] = await conn.execute(
+    `SELECT DISTINCT ${sqlUtf8TrimExpr("d.quote_number")} AS quote_key
+     FROM dispatch d
+     WHERE ${sqlUtf8TrimExpr("d.quote_number")} IN (${placeholders})
+       AND d.serial_no IS NOT NULL
+       AND ${sqlUtf8HasText("d.serial_no")}
+       AND ${sqlDispatchSerialIsTemp("d.serial_no")}`,
+    quotes,
+  );
+  if (!hits?.length) return rows;
+  const hide = new Set(
+    hits.map((r) => String(r.quote_key || "").trim().toLowerCase()).filter(Boolean),
+  );
+  return rows.filter(
+    (r) => !hide.has(String(r.quote_number || "").trim().toLowerCase()),
+  );
+}
+
 async function fetchOpenInstallationNeworderPage(
   conn,
   filters,
@@ -1137,13 +1167,19 @@ async function fetchOpenInstallationNeworderPage(
     [...where.params, limit, skip],
   );
 
-  let enriched = rows;
+  const bucket = String(parsed.openInstallationBucket || "").trim().toLowerCase();
+  const withoutTemp =
+    bucket === "delivery_pending" || bucket === "delivered_pending"
+      ? await excludeOpenInstallationTempSerialRows(conn, rows)
+      : rows;
+
+  let enriched = withoutTemp;
   if (!deferDispatchEnrich || !deferServiceEnrich) {
-    if (parallelEnrich && rows.length && !deferDispatchEnrich && !deferServiceEnrich) {
+    if (parallelEnrich && withoutTemp.length && !deferDispatchEnrich && !deferServiceEnrich) {
       const c2 = enrichConn ?? (await getDbConnection());
       const [dispatchRows, serviceRows] = await Promise.all([
-        enrichOpenInstallationRowsWithDispatch(conn, rows),
-        enrichOpenInstallationRowsWithServices(c2, rows),
+        enrichOpenInstallationRowsWithDispatch(conn, withoutTemp),
+        enrichOpenInstallationRowsWithServices(c2, withoutTemp),
       ]);
       enriched = mergeOpenInstallationParallelEnrichment(dispatchRows, serviceRows);
     } else {

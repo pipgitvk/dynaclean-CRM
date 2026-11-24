@@ -33,7 +33,10 @@ import {
   openInstallationTableListApi,
 } from "@/lib/serviceBeforeInstallationHub";
 import { openCompletionsBucketRecordCount } from "@/lib/openCompletionsKpiSql";
-import { openInstallationBucketRecordCount } from "@/lib/openInstallationKpiSql";
+import {
+  isTempSerialNumber,
+  openInstallationBucketRecordCount,
+} from "@/lib/openInstallationKpiSql";
 import { activeAmcBucketRecordCount } from "@/lib/activeAmcKpiSql";
 import { activeWarrantyBucketRecordCount } from "@/lib/activeWarrantyKpiSql";
 import {
@@ -2498,10 +2501,12 @@ export default function ServiceBeforeInstallationDetailClient({
         );
         if (patchByQuote.size) {
           setRows((prev) =>
-            prev.map((row) => {
-              const hit = patchByQuote.get(String(row.quote_number || "").trim().toLowerCase());
-              return hit ? { ...row, ...hit } : row;
-            }),
+            prev
+              .map((row) => {
+                const hit = patchByQuote.get(String(row.quote_number || "").trim().toLowerCase());
+                return hit ? { ...row, ...hit } : row;
+              })
+              .filter((row) => !isTempSerialNumber(row.serial_number)),
           );
         }
       }
@@ -2645,7 +2650,9 @@ export default function ServiceBeforeInstallationDetailClient({
           timeout: 30_000,
         });
         if (res.data?.success && requestId === rowsRequestIdRef.current) {
-          const data = res.data.data || [];
+          const data = (res.data.data || []).filter(
+            (row) => !isTempSerialNumber(row.serial_number),
+          );
           const pag = res.data.pagination || {};
           const hasMoreFlag = Boolean(pag.hasMore) || data.length >= pageSize;
           const total = knownTotal > 0 ? knownTotal : listTotalRef.current || 0;

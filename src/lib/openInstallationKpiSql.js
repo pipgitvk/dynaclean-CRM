@@ -1,4 +1,24 @@
-import { sqlTrimUtf8EqColumns } from "@/lib/sqlUtf8Compare";
+import {
+  sqlTrimUtf8EqColumns,
+  sqlUtf8HasText,
+  sqlUtf8TrimExpr,
+} from "@/lib/sqlUtf8Compare";
+
+/** Placeholder dispatch serials from backfill (`temp`, `temp1`, `temp1-…`). */
+export function sqlDispatchSerialIsTemp(columnExpr) {
+  return `LOWER(${sqlUtf8TrimExpr(columnExpr)}) LIKE 'temp%'`;
+}
+
+export const SQL_QUOTE_HAS_TEMP_DISPATCH_SERIAL = (quoteNumberColumn) => `EXISTS (
+  SELECT 1
+  FROM dispatch d_tmp_sn
+  WHERE ${sqlTrimUtf8EqColumns("d_tmp_sn.quote_number", quoteNumberColumn)}
+    AND d_tmp_sn.serial_no IS NOT NULL
+    AND ${sqlUtf8HasText("d_tmp_sn.serial_no")}
+    AND ${sqlDispatchSerialIsTemp("d_tmp_sn.serial_no")}
+)`;
+
+export const NO_TEMP_DISPATCH_SERIAL_SQL = `(NOT ${SQL_QUOTE_HAS_TEMP_DISPATCH_SERIAL("no.quote_number")})`;
 
 /** Row flags on upcoming-installations inner query alias `u`. */
 
@@ -21,17 +41,29 @@ export const U_OPEN_INSTALLATION_ORDER_SQL = `(COALESCE(u.order_installation_sta
 /**
  * Delivery pending: neworder.delivery_status = 0
  * (list/KPI for this bucket use a dedicated neworder query — no dispatch gate).
+ * Temp placeholder serials (`temp`, `temp1`, …) are excluded from this card/table.
  */
 export const U_DELIVERY_PENDING_AFTER_DISPATCH_SQL = `(
   COALESCE(u.order_delivery_status, 0) = 0
+  AND NOT ${SQL_QUOTE_HAS_TEMP_DISPATCH_SERIAL("u.quote_number")}
 )`;
 
-/** Open + delivered + installation not done. */
+/** Open + delivered + installation not done. Temp placeholder serials are excluded. */
 export const U_DELIVERED_INSTALLATION_PENDING_SQL = `(
   ${U_OPEN_INSTALLATION_ORDER_SQL}
   AND ${U_ACTUALLY_DELIVERED_SQL}
   AND NOT ${U_INSTALLATION_COMPLETED_SQL}
+  AND NOT ${SQL_QUOTE_HAS_TEMP_DISPATCH_SERIAL("u.quote_number")}
 )`;
+
+export function isTempSerialNumber(value) {
+  const parts = String(value || "")
+    .trim()
+    .toLowerCase()
+    .split(/[\s,;/|]+/)
+    .filter(Boolean);
+  return parts.some((part) => part.startsWith("temp"));
+}
 
 /** Installation done on order but no installation report uploaded/saved on any INSTALLATION SR. */
 export const U_NO_FEEDBACK_COLLECTED_SQL = `(COALESCE(u.no_feedback_collected, 0) = 1)`;
@@ -68,9 +100,10 @@ export const NO_ACTUALLY_DELIVERED_SQL = `(
   AND DATE(no.delivered_on) > '1970-01-01'
 )`;
 
-/** neworder: delivery not marked done. */
+/** neworder: delivery not marked done, excluding temp placeholder serials. */
 export const NO_DELIVERY_PENDING_AFTER_DISPATCH_SQL = `(
   COALESCE(no.delivery_status, 0) = 0
+  AND ${NO_TEMP_DISPATCH_SERIAL_SQL}
 )`;
 
 export function openInstallationBucketRecordCount(bucket, breakdown = {}) {
