@@ -494,6 +494,17 @@ export default function ServiceBeforeInstallationFilters({
               onChange={setField("serial")}
               className={row2Field}
             />
+            {segment === "active-warranty" ? (
+              <TableDistinctNameFilterSelect
+                label="Sales person"
+                placeholder="All sales persons"
+                names={tableFilterOptions?.salesPersons || []}
+                value={draft.salesPerson}
+                onChange={setField("salesPerson")}
+                onRequestOptions={onRequestTableFilterOptions}
+                className={row2Field}
+              />
+            ) : null}
             {segment === "total-registered" ? (
               <>
                 <TableDistinctNameFilterSelect

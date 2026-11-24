@@ -23,6 +23,7 @@ import {
   Wrench,
 } from "lucide-react";
 import {
+  getActiveWarrantyKpiMeta,
   getSegmentMeta,
   openCompletionsTableCountApi,
   openCompletionsTableListApi,
@@ -32,14 +33,17 @@ import {
 } from "@/lib/serviceBeforeInstallationHub";
 import { openCompletionsBucketRecordCount } from "@/lib/openCompletionsKpiSql";
 import { openInstallationBucketRecordCount } from "@/lib/openInstallationKpiSql";
+import { activeWarrantyBucketRecordCount } from "@/lib/activeWarrantyKpiSql";
 import {
   defaultSbiSelectFilters,
   normalizeOpenCompletionsBucket,
   normalizeOpenInstallationBucket,
+  normalizeWarrantyBucket,
 } from "@/lib/serviceBeforeInstallationFilters";
 import ServiceBeforeInstallationFilters from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationFilters";
 import ServiceBeforeInstallationOpenInstallationKpiStrip from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationOpenInstallationKpiStrip";
 import ServiceBeforeInstallationOpenCompletionsKpiSection from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationOpenCompletionsKpiSection";
+import ServiceBeforeInstallationActiveWarrantyKpiStrip from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationActiveWarrantyKpiStrip";
 import {
   OpenCompletionsComplaintRows,
   OpenCompletionsComplaintTableHead,
@@ -74,6 +78,7 @@ const DEFAULT_PAGE_SIZE = 10;
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 const OPEN_INSTALLATION_BUCKET_STORAGE_KEY = "sbi.openInstallationBucket";
 const OPEN_COMPLETIONS_BUCKET_STORAGE_KEY = "sbi.openCompletionsBucket";
+const WARRANTY_BUCKET_STORAGE_KEY = "sbi.warrantyBucket";
 
 function readStoredOpenInstallationBucket() {
   if (typeof window === "undefined") return "";
@@ -153,6 +158,41 @@ function stickyOpenCompletionsBucket(preferred) {
   );
 }
 
+function readStoredWarrantyBucket() {
+  if (typeof window === "undefined") return "";
+  try {
+    const fromUrl = new URLSearchParams(window.location.search).get("warrantyBucket");
+    const fromStore = window.localStorage.getItem(WARRANTY_BUCKET_STORAGE_KEY);
+    return normalizeWarrantyBucket(fromUrl || fromStore);
+  } catch {
+    return "";
+  }
+}
+
+function persistWarrantyBucket(bucket) {
+  const v = normalizeWarrantyBucket(bucket) || "active";
+  if (typeof window === "undefined") return v;
+  try {
+    window.localStorage.setItem(WARRANTY_BUCKET_STORAGE_KEY, v);
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("warrantyBucket") !== v) {
+      url.searchParams.set("warrantyBucket", v);
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${url.pathname}${url.search}${url.hash}`,
+      );
+    }
+  } catch {
+    // ignore
+  }
+  return v;
+}
+
+function stickyWarrantyBucket(preferred) {
+  return normalizeWarrantyBucket(preferred) || readStoredWarrantyBucket() || "active";
+}
+
 const SEGMENT_ICONS = {
   "total-registered": Package,
   "open-installation": Wrench,
@@ -194,6 +234,12 @@ function initialSbiFiltersForSegment(segment, stickyBucket = "") {
     return {
       ...base,
       openCompletionsBucket: stickyOpenCompletionsBucket(stickyBucket),
+    };
+  }
+  if (segment === "active-warranty") {
+    return {
+      ...base,
+      warrantyBucket: stickyWarrantyBucket(stickyBucket),
     };
   }
   return base;
@@ -744,6 +790,17 @@ function exportRowsCsv(rows, segment) {
       "Invoice",
       "Sales / Service",
     ],
+    "active-warranty": [
+      "Serial",
+      "Customer",
+      "State",
+      "Order / Sales",
+      "Model",
+      "Contact",
+      "Installation",
+      "Warranty End",
+      "Installed Address",
+    ],
   };
   const defaultHeaders = [
     "Serial",
@@ -799,6 +856,21 @@ function exportRowsCsv(rows, segment) {
         row.status,
         formatDate(row.amc_start_datetime),
         formatDate(row.amc_end_datetime),
+      ];
+    }
+    if (segment === "active-warranty") {
+      const orderId = String(row.order_id || "").trim();
+      const sales = salesPersonLabel(row);
+      return [
+        row.serial_number,
+        row.customer_name,
+        row.state,
+        [orderId ? `Order: ${orderId}` : "", sales ? `Sales: ${sales}` : ""].filter(Boolean).join(" · "),
+        row.model,
+        row.contact,
+        formatDate(row.installation_date),
+        formatDate(row.warranty_end_date),
+        row.installed_address,
       ];
     }
     if (segment === "total-registered") {
@@ -891,7 +963,10 @@ function WarrantyProductRows({ rows, dashboardBase, page, pageSize, segment }) {
       ? `/${dashboardBase}/view-customer/${row.customer_id}`
       : null;
     const zebra = idx % 2 === 0 ? "bg-white" : "bg-violet-50/35";
+    const warrantyRecordsLayout = segment === "active-warranty";
     if (!detailLayout) {
+      const orderId = String(row.order_id || "").trim();
+      const salesName = salesPersonLabel(row);
       return (
         <tr key={row.id || row.serial_number || rowNum} className={`${zebra} hover:bg-violet-50/55`}>
           <td className="whitespace-nowrap px-4 py-3.5 text-sm tabular-nums text-slate-500">{rowNum}</td>
@@ -910,6 +985,40 @@ function WarrantyProductRows({ rows, dashboardBase, page, pageSize, segment }) {
               <span className="font-medium">{row.customer_name || "—"}</span>
             </span>
           </td>
+          {warrantyRecordsLayout ? (
+            <td className="whitespace-nowrap px-4 py-3.5 text-sm text-slate-700">
+              {row.state?.trim() || "—"}
+            </td>
+          ) : null}
+          {warrantyRecordsLayout ? (
+            <td className="px-4 py-3.5 text-sm text-slate-800">
+              {!orderId && !salesName ? (
+                "—"
+              ) : (
+                <div className="min-w-[6.5rem] space-y-1">
+                  <div className="leading-snug">
+                    <span className="text-xs font-semibold text-slate-500">Order</span>
+                    <span className="mx-1 text-slate-300">·</span>
+                    {orderId ? (
+                      <Link
+                        href={`/${dashboardBase}/order/${encodeURIComponent(orderId)}`}
+                        className="font-semibold text-violet-700 hover:underline"
+                      >
+                        {orderId}
+                      </Link>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </div>
+                  <div className="leading-snug">
+                    <span className="text-xs font-semibold text-slate-500">Sales</span>
+                    <span className="mx-1 text-slate-300">·</span>
+                    <span className="font-medium text-slate-900">{salesName || "—"}</span>
+                  </div>
+                </div>
+              )}
+            </td>
+          ) : null}
           <td className="px-4 py-3.5">
             {row.model ? (
               <span
@@ -1588,6 +1697,23 @@ function TableHead({ segment }) {
       </tr>
     );
   }
+  if (segment === "active-warranty") {
+    return (
+      <tr>
+        <th className={th}>#</th>
+        <th className={th}>Serial</th>
+        <th className={th}>Customer</th>
+        <th className={th}>State</th>
+        <th className={th}>Order / Sales</th>
+        <th className={th}>Model</th>
+        <th className={th}>Contact</th>
+        <th className={th}>Installation</th>
+        <th className={th}>Warranty End</th>
+        <th className={th}>Installed Address</th>
+        <th className={`${th} text-right`}>Actions</th>
+      </tr>
+    );
+  }
   if (segment === "total-registered") {
     return (
       <tr>
@@ -1679,6 +1805,7 @@ function TableBody({
 
 function colSpanForSegment(segment) {
   if (segment === "total-registered") return 11;
+  if (segment === "active-warranty") return 11;
   if (isWarrantyProductSegment(segment)) return 9;
   if (segment === "open-completions") return 13;
   if (segment === "open-installation" || segment === "overdue-delayed-installation") return 13;
@@ -1692,14 +1819,9 @@ export default function ServiceBeforeInstallationDetailClient({
   userRole = "",
   initialOpenInstallationBucket = "",
   initialOpenCompletionsBucket = "",
+  initialWarrantyBucket = "",
 }) {
   const meta = getSegmentMeta(segment);
-  const headerMeta = meta
-    ? {
-        ...meta,
-        title: meta.detailTitle || meta.title,
-      }
-    : meta;
   const hubHref = `/${dashboardBase}/service-before-installation`;
   const warrantyHref = `/${dashboardBase}/warranty`;
   const { ProductFollowupIcons, followupModals, openMachineFollowUp, openMachineHistory } =
@@ -1708,7 +1830,9 @@ export default function ServiceBeforeInstallationDetailClient({
   const initialStickyForSegment =
     segment === "open-completions"
       ? initialOpenCompletionsBucket
-      : initialOpenInstallationBucket;
+      : segment === "active-warranty"
+        ? initialWarrantyBucket
+        : initialOpenInstallationBucket;
 
   const [draftFilters, setDraftFilters] = useState(() =>
     initialSbiFiltersForSegment(segment, initialStickyForSegment),
@@ -1716,12 +1840,26 @@ export default function ServiceBeforeInstallationDetailClient({
   const [appliedFilters, setAppliedFilters] = useState(() =>
     initialSbiFiltersForSegment(segment, initialStickyForSegment),
   );
+  const headerMeta = useMemo(() => {
+    if (!meta) return meta;
+    const base = {
+      ...meta,
+      title: meta.detailTitle || meta.title,
+    };
+    if (segment === "active-warranty") {
+      const kpiMeta = getActiveWarrantyKpiMeta(appliedFilters.warrantyBucket || "active");
+      return { ...base, subtitle: kpiMeta.subtitle || base.subtitle };
+    }
+    return base;
+  }, [meta, segment, appliedFilters.warrantyBucket]);
   const stickyBucketRef = useRef(
     segment === "open-installation"
       ? stickyOpenInstallationBucket(initialOpenInstallationBucket)
       : segment === "open-completions"
         ? stickyOpenCompletionsBucket(initialOpenCompletionsBucket)
-        : "",
+        : segment === "active-warranty"
+          ? stickyWarrantyBucket(initialWarrantyBucket)
+          : "",
   );
   const prevSegmentRef = useRef(segment);
   const [openInstallationBucketReady, setOpenInstallationBucketReady] = useState(
@@ -1733,6 +1871,9 @@ export default function ServiceBeforeInstallationDetailClient({
     () =>
       segment !== "open-completions" ||
       Boolean(normalizeOpenCompletionsBucket(initialOpenCompletionsBucket)),
+  );
+  const [warrantyBucketReady, setWarrantyBucketReady] = useState(
+    () => segment !== "active-warranty" || Boolean(normalizeWarrantyBucket(initialWarrantyBucket)),
   );
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -1800,6 +1941,19 @@ export default function ServiceBeforeInstallationDetailClient({
   const [openCompletionsKpiLoading, setOpenCompletionsKpiLoading] = useState(
     () => segment === "open-completions",
   );
+  const [activeWarrantyBreakdown, setActiveWarrantyBreakdown] = useState({
+    active_warranty: null,
+    expiring_30_days: null,
+    expired_warranty: null,
+  });
+  const [activeWarrantyKpiLoading, setActiveWarrantyKpiLoading] = useState(
+    () => segment === "active-warranty",
+  );
+  const activeWarrantyBreakdownRef = useRef({
+    active_warranty: null,
+    expiring_30_days: null,
+    expired_warranty: null,
+  });
   const openCompletionsBreakdownRef = useRef({
     total_complaints_registered: null,
     pending_complaint: null,
@@ -1811,6 +1965,7 @@ export default function ServiceBeforeInstallationDetailClient({
   });
   openInstallationBreakdownRef.current = openInstallationBreakdown;
   openCompletionsBreakdownRef.current = openCompletionsBreakdown;
+  activeWarrantyBreakdownRef.current = activeWarrantyBreakdown;
 
   useEffect(() => {
     if (segment !== "open-installation") {
@@ -1859,6 +2014,23 @@ export default function ServiceBeforeInstallationDetailClient({
   }, [segment, initialOpenCompletionsBucket]);
 
   useEffect(() => {
+    if (segment !== "active-warranty") {
+      setWarrantyBucketReady(true);
+      return;
+    }
+    const nextBucket = stickyWarrantyBucket(stickyBucketRef.current || initialWarrantyBucket);
+    stickyBucketRef.current = nextBucket;
+    persistWarrantyBucket(nextBucket);
+    setAppliedFilters((prev) =>
+      prev.warrantyBucket === nextBucket ? prev : { ...prev, warrantyBucket: nextBucket },
+    );
+    setDraftFilters((prev) =>
+      prev.warrantyBucket === nextBucket ? prev : { ...prev, warrantyBucket: nextBucket },
+    );
+    setWarrantyBucketReady(true);
+  }, [segment, initialWarrantyBucket]);
+
+  useEffect(() => {
     if (prevSegmentRef.current === segment) return;
     prevSegmentRef.current = segment;
     setPage(0);
@@ -1868,6 +2040,8 @@ export default function ServiceBeforeInstallationDetailClient({
       stickyBucketRef.current = stickyOpenInstallationBucket(stickyBucketRef.current);
     } else if (segment === "open-completions") {
       stickyBucketRef.current = stickyOpenCompletionsBucket(stickyBucketRef.current);
+    } else if (segment === "active-warranty") {
+      stickyBucketRef.current = stickyWarrantyBucket(stickyBucketRef.current);
     } else {
       stickyBucketRef.current = "";
     }
@@ -1891,6 +2065,43 @@ export default function ServiceBeforeInstallationDetailClient({
     const { serviceStatus: _status, openCompletionsBucket: _bucket, ...rest } = appliedFilters;
     return JSON.stringify(rest);
   }, [segment, appliedFilters]);
+
+  const activeWarrantyKpiFilterKey = useMemo(() => {
+    if (segment !== "active-warranty") return "";
+    const { warrantyBucket: _bucket, ...rest } = appliedFilters;
+    return JSON.stringify(rest);
+  }, [segment, appliedFilters]);
+
+  const fetchActiveWarrantyKpis = useCallback(async () => {
+    if (segment !== "active-warranty") return;
+    const filterKey = activeWarrantyKpiFilterKey;
+    if (kpiFetchedKeyRef.current === filterKey) return;
+
+    kpiFetchAbortRef.current?.abort();
+    const controller = new AbortController();
+    kpiFetchAbortRef.current = controller;
+
+    kpiFetchedKeyRef.current = filterKey;
+    setActiveWarrantyKpiLoading(true);
+    try {
+      const { warrantyBucket: _bucket, ...params } = appliedFilters;
+      const res = await axios.get("/api/service-before-installation/active-warranty/kpi", {
+        params,
+        signal: controller.signal,
+        timeout: 12_000,
+      });
+      if (res.data?.success && res.data.breakdown) {
+        setActiveWarrantyBreakdown(res.data.breakdown);
+        activeWarrantyBreakdownRef.current = res.data.breakdown;
+      }
+    } catch (e) {
+      if (e?.code !== "ERR_CANCELED") console.error(e);
+    } finally {
+      if (!controller.signal.aborted) {
+        setActiveWarrantyKpiLoading(false);
+      }
+    }
+  }, [segment, appliedFilters, activeWarrantyKpiFilterKey]);
 
   const fetchOpenCompletionsKpis = useCallback(async () => {
     if (segment !== "open-completions") return;
@@ -2432,6 +2643,68 @@ export default function ServiceBeforeInstallationDetailClient({
       return;
     }
 
+    if (segment === "active-warranty") {
+      const activeBucket = String(appliedFilters.warrantyBucket || "active").trim();
+      const knownTotal =
+        listTotalRef.current ||
+        activeWarrantyBucketRecordCount(activeBucket, activeWarrantyBreakdownRef.current);
+
+      if (kpiFetchedKeyRef.current !== activeWarrantyKpiFilterKey) {
+        void fetchActiveWarrantyKpis();
+      }
+
+      try {
+        const { warrantyBucket: _bucket, ...listFilters } = appliedFilters;
+        const res = await axios.get(`/api/service-before-installation/active-warranty`, {
+          params: {
+            ...listFilters,
+            warrantyBucket: activeBucket,
+            limit: pageSize,
+            skip: page * pageSize,
+            includeFilterOptions: "0",
+            deferTotal: "0",
+            skipTotal: "0",
+          },
+          signal,
+          timeout: 20_000,
+        });
+        if (res.data?.success && requestId === rowsRequestIdRef.current) {
+          const data = res.data.data || [];
+          const pag = res.data.pagination || {};
+          const total =
+            knownTotal > 0
+              ? knownTotal
+              : Number(pag.total) || listTotalRef.current || 0;
+          if (total > 0) listTotalRef.current = total;
+          setRows(data);
+          setPagination({
+            total,
+            hasMore: total > 0 ? page * pageSize + data.length < total : Boolean(pag.hasMore),
+          });
+        }
+      } catch (e) {
+        if (e?.code === "ERR_CANCELED") return;
+        console.error(e);
+      } finally {
+        if (!signal.aborted && requestId === rowsRequestIdRef.current) {
+          setLoading(false);
+          setApplyingFilters(false);
+        }
+      }
+
+      if (signal.aborted || requestId !== rowsRequestIdRef.current) return;
+
+      const fromCards = activeWarrantyBucketRecordCount(
+        activeBucket,
+        activeWarrantyBreakdownRef.current,
+      );
+      if (fromCards > 0) {
+        applyListTotal(fromCards);
+        setCountLoading(false);
+      }
+      return;
+    }
+
     try {
       const res = await axios.get(`/api/service-before-installation/${segment}`, {
         params: {
@@ -2478,6 +2751,8 @@ export default function ServiceBeforeInstallationDetailClient({
     fetchOpenInstallationKpis,
     fetchOpenCompletionsCount,
     fetchOpenCompletionsKpis,
+    fetchActiveWarrantyKpis,
+    activeWarrantyKpiFilterKey,
     fetchFeedbackCollectedKpiCount,
     patchFeedbackCollected,
     enrichOpenInstallationServiceColumns,
@@ -2487,13 +2762,19 @@ export default function ServiceBeforeInstallationDetailClient({
   const fetchTableFilterOptions = useCallback(async () => {
     if (
       segment !== "total-registered" &&
+      segment !== "active-warranty" &&
       segment !== "open-installation" &&
       segment !== "overdue-delayed-installation"
     ) {
       return;
     }
     // Open Installation filters API uses small rep_list / third-party tables only.
-    const key = segment === "overdue-delayed-installation" ? "open-installation" : segment;
+    const key =
+      segment === "overdue-delayed-installation"
+        ? "open-installation"
+        : segment === "active-warranty"
+          ? "active-warranty"
+          : segment;
     if (tableFilterOptionsFetchKeyRef.current === key) return;
     tableFilterOptionsFetchKeyRef.current = key;
     try {
@@ -2534,11 +2815,17 @@ export default function ServiceBeforeInstallationDetailClient({
   }, [segment, openCompletionsKpiFilterKey, fetchOpenCompletionsKpis]);
 
   useEffect(() => {
+    if (segment !== "active-warranty") return;
+    void fetchActiveWarrantyKpis();
+  }, [segment, activeWarrantyKpiFilterKey, fetchActiveWarrantyKpis]);
+
+  useEffect(() => {
     if (segment === "open-installation" && !openInstallationBucketReady) return;
     if (segment === "open-completions" && !openCompletionsBucketReady) return;
+    if (segment === "active-warranty" && !warrantyBucketReady) return;
     fetchRows();
     return () => rowsFetchAbortRef.current?.abort();
-  }, [fetchRows, segment, openInstallationBucketReady, openCompletionsBucketReady]);
+  }, [fetchRows, segment, openInstallationBucketReady, openCompletionsBucketReady, warrantyBucketReady]);
 
   const totalPages = pagination.totalPending
     ? Math.max(1, page + (pagination.hasMore ? 2 : 1))
@@ -2654,6 +2941,37 @@ export default function ServiceBeforeInstallationDetailClient({
           />
         ) : null}
 
+        {segment === "active-warranty" ? (
+          <ServiceBeforeInstallationActiveWarrantyKpiStrip
+            warrantyBucket={appliedFilters.warrantyBucket || "active"}
+            totals={activeWarrantyBreakdown}
+            loading={activeWarrantyKpiLoading}
+            onCardSelect={(warrantyBucket) => {
+              const nextBucket = normalizeWarrantyBucket(warrantyBucket) || "active";
+              const current = String(appliedFilters.warrantyBucket || "active").trim();
+              if (nextBucket === current) return;
+              stickyBucketRef.current = persistWarrantyBucket(nextBucket);
+              setPage(0);
+              listTotalRef.current = 0;
+              setRows([]);
+              setPagination({ total: 0, hasMore: false });
+              setLoading(true);
+              setCountLoading(true);
+              const estTotal = activeWarrantyBucketRecordCount(
+                nextBucket,
+                activeWarrantyBreakdownRef.current,
+              );
+              if (estTotal > 0) {
+                applyListTotal(estTotal);
+                setPagination({ total: estTotal, hasMore: estTotal > pageSize });
+              }
+              const next = { ...appliedFilters, warrantyBucket: nextBucket };
+              setAppliedFilters(next);
+              setDraftFilters(next);
+            }}
+          />
+        ) : null}
+
         <ServiceBeforeInstallationFilters
           segment={segment}
           tableFilterOptions={mergedTableFilterOptions}
@@ -2681,6 +2999,15 @@ export default function ServiceBeforeInstallationDetailClient({
                       "total_registered",
                   }
                 : {}),
+              ...(segment === "active-warranty"
+                ? {
+                    warrantyBucket:
+                      stickyBucketRef.current ||
+                      appliedFilters.warrantyBucket ||
+                      next.warrantyBucket ||
+                      "active",
+                  }
+                : {}),
             });
           }}
           loading={applyingFilters}
@@ -2700,6 +3027,7 @@ export default function ServiceBeforeInstallationDetailClient({
             setCompletedKpiLoading(true);
             setFeedbackCollectedKpiLoading(true);
             setOpenCompletionsKpiLoading(segment === "open-completions");
+            setActiveWarrantyKpiLoading(segment === "active-warranty");
             if (segment === "open-installation") {
               const keptBucket = persistOpenInstallationBucket(
                 stickyBucketRef.current ||
@@ -2722,6 +3050,17 @@ export default function ServiceBeforeInstallationDetailClient({
                 ...draftFilters,
                 openCompletionsBucket: keptBucket,
               });
+            } else if (segment === "active-warranty") {
+              const keptBucket = persistWarrantyBucket(
+                stickyBucketRef.current ||
+                  appliedFilters.warrantyBucket ||
+                  draftFilters.warrantyBucket,
+              );
+              stickyBucketRef.current = keptBucket;
+              setAppliedFilters({
+                ...draftFilters,
+                warrantyBucket: keptBucket,
+              });
             } else {
               setAppliedFilters(draftFilters);
             }
@@ -2741,6 +3080,15 @@ export default function ServiceBeforeInstallationDetailClient({
             if (segment === "open-completions") {
               const keptBucket = persistOpenCompletionsBucket(
                 stickyBucketRef.current || appliedFilters.openCompletionsBucket,
+              );
+              stickyBucketRef.current = keptBucket;
+              const next = initialSbiFiltersForSegment(segment, keptBucket);
+              applyFilterState(setDraftFilters, setAppliedFilters, next);
+              return;
+            }
+            if (segment === "active-warranty") {
+              const keptBucket = persistWarrantyBucket(
+                stickyBucketRef.current || appliedFilters.warrantyBucket,
               );
               stickyBucketRef.current = keptBucket;
               const next = initialSbiFiltersForSegment(segment, keptBucket);

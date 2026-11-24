@@ -1,6 +1,6 @@
 import {
   sqlTrimUtf8EqColumns,
-  sqlUtf8HasText,
+  sqlUtf8TrimExpr,
 } from "@/lib/sqlUtf8Compare";
 
 export const WP_LIST_COLUMNS = `
@@ -84,6 +84,7 @@ export async function enrichTotalRegisteredRows(conn, rows) {
 
   for (const row of rows) {
     if (row.customer_id === undefined) row.customer_id = null;
+    if (row.order_id === undefined) row.order_id = null;
     if (row.order_sales_person === undefined) {
       row.order_sales_person = row.registered_by ?? null;
     }
@@ -200,52 +201,76 @@ async function enrichEngineersBySerial(conn, serials, rowsBySerial) {
 }
 
 async function enrichSalesByDispatchSerial(conn, serials, rowsBySerial) {
+  const trimmedSerials = [
+    ...new Set(serials.map((s) => String(s ?? "").trim()).filter(Boolean)),
+  ];
+  if (!trimmedSerials.length) return;
+
   const [salesRows] = await conn.execute(
-    `SELECT d.serial_no AS serial_number, no.created_by, no.id AS order_id
+    `SELECT
+       ${sqlUtf8TrimExpr("d.serial_no")} AS serial_key,
+       no.created_by,
+       no.order_id
      FROM dispatch d
      INNER JOIN neworder no ON ${sqlTrimUtf8EqColumns("no.quote_number", "d.quote_number")}
-     WHERE d.serial_no IN (${inClausePlaceholders(serials.length)})
-       AND ${sqlUtf8HasText("no.created_by")}
+     WHERE ${sqlUtf8TrimExpr("d.serial_no")} IN (${inClausePlaceholders(trimmedSerials.length)})
      ORDER BY no.id DESC`,
-    serials,
+    trimmedSerials,
   );
 
   const seen = new Set();
   for (const r of salesRows) {
-    const key = normKey(r.serial_number);
+    const key = normKey(r.serial_key);
     if (!key || seen.has(key)) continue;
     seen.add(key);
     const targets = rowsBySerial.get(key);
     if (!targets) continue;
     const name = String(r.created_by || "").trim();
-    if (!name) continue;
+    const orderId = String(r.order_id ?? "").trim();
+    if (!name && !orderId) continue;
     for (const row of targets) {
-      row.order_sales_person = name;
+      if (name) row.order_sales_person = name;
+      if (orderId) row.order_id = orderId;
     }
   }
 }
 
 async function enrichSalesByInvoice(conn, invoices, rows) {
+  const trimmedInvoices = [
+    ...new Set(invoices.map((i) => String(i ?? "").trim()).filter(Boolean)),
+  ];
+  if (!trimmedInvoices.length) return;
+
   const [salesRows] = await conn.execute(
-    `SELECT no.invoice_number, no.created_by, no.id AS order_id
+    `SELECT
+       ${sqlUtf8TrimExpr("no.invoice_number")} AS invoice_key,
+       no.created_by,
+       no.order_id
      FROM neworder no
-     WHERE no.invoice_number IN (${inClausePlaceholders(invoices.length)})
-       AND ${sqlUtf8HasText("no.created_by")}
+     WHERE ${sqlUtf8TrimExpr("no.invoice_number")} IN (${inClausePlaceholders(trimmedInvoices.length)})
      ORDER BY no.id DESC`,
-    invoices,
+    trimmedInvoices,
   );
 
   const byInvoice = new Map();
   for (const r of salesRows) {
-    const key = normKey(r.invoice_number);
+    const key = normKey(r.invoice_key);
     if (!key || byInvoice.has(key)) continue;
-    byInvoice.set(key, String(r.created_by || "").trim());
+    byInvoice.set(key, {
+      name: String(r.created_by || "").trim(),
+      order_id: String(r.order_id ?? "").trim(),
+    });
   }
 
   for (const row of rows) {
-    if (String(row.order_sales_person || "").trim()) continue;
-    const name = byInvoice.get(normKey(row.invoice_number));
-    if (name) row.order_sales_person = name;
+    const hit = byInvoice.get(normKey(row.invoice_number));
+    if (!hit) continue;
+    if (!String(row.order_sales_person || "").trim() && hit.name) {
+      row.order_sales_person = hit.name;
+    }
+    if (!String(row.order_id || "").trim() && hit.order_id) {
+      row.order_id = hit.order_id;
+    }
   }
 }
 

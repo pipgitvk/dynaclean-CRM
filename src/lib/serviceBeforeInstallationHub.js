@@ -127,8 +127,8 @@ export const SERVICE_BEFORE_INSTALLATION_SEGMENTS = [
   },
   {
     id: "active-warranty",
-    title: "Active Warranty",
-    subtitle: "Under warranty",
+    title: "Warranty Records",
+    subtitle: "Active, expiring in 30 days & expired warranty",
     countKey: "active_warranty",
     accent: "from-emerald-500 to-teal-600",
     surface:
@@ -136,18 +136,6 @@ export const SERVICE_BEFORE_INSTALLATION_SEGMENTS = [
     glow: "bg-emerald-400/25",
     iconSurface: "bg-gradient-to-br from-emerald-500 to-teal-600",
     chartColor: "#10b981",
-  },
-  {
-    id: "due-warranty-expiry",
-    title: "Due Warranty Expiry",
-    subtitle: "Expires in 30 days or already expired",
-    countKey: "due_warranty_expiry",
-    accent: "from-cyan-500 to-sky-600",
-    surface:
-      "bg-white/80 backdrop-blur-xl border-sky-200/40 shadow-[0_8px_30px_-8px_rgba(6,182,212,0.3)]",
-    glow: "bg-sky-400/25",
-    iconSurface: "bg-gradient-to-br from-cyan-500 to-sky-600",
-    chartColor: "#06b6d4",
   },
   {
     id: "active-amc",
@@ -284,6 +272,74 @@ export const OPEN_COMPLETIONS_COMPLAINT_KPI_CARDS = [
 
 export function getOpenCompletionsComplaintKpiCards() {
   return OPEN_COMPLETIONS_COMPLAINT_KPI_CARDS.map((c) => ({ ...c, href: null }));
+}
+
+/** Active Warranty detail — KPI strip (warranty_products). */
+export const ACTIVE_WARRANTY_DETAIL_KPI_CARDS = [
+  {
+    id: "aw-active",
+    field: "active_warranty",
+    title: "Active Warranty",
+    subtitle: "Currently under warranty",
+    countCaption: "Currently under warranty",
+    chartColor: "#10b981",
+    surface: "border-emerald-200/60 bg-emerald-50/30",
+    iconSurface: "bg-gradient-to-br from-emerald-500 to-teal-600",
+    glow: "bg-emerald-400/20",
+  },
+  {
+    id: "aw-expiring-30",
+    field: "expiring_30_days",
+    title: "Expiring in 30 Days",
+    subtitle: "Warranty ends within 30 days",
+    countCaption: "Warranty ends within 30 days",
+    chartColor: "#f59e0b",
+    surface: "border-amber-200/60 bg-amber-50/30",
+    iconSurface: "bg-gradient-to-br from-amber-500 to-orange-600",
+    glow: "bg-amber-400/20",
+  },
+  {
+    id: "aw-expired",
+    field: "expired_warranty",
+    title: "Expired Warranty",
+    subtitle: "Warranty period ended",
+    countCaption: "Warranty period ended",
+    chartColor: "#64748b",
+    surface: "border-slate-200/80 bg-slate-50/50",
+    iconSurface: "bg-gradient-to-br from-slate-500 to-slate-600",
+    glow: "bg-slate-400/20",
+  },
+];
+
+const ACTIVE_WARRANTY_CARD_ID_TO_BUCKET = {
+  "aw-active": "active",
+  "aw-expiring-30": "expiring_30",
+  "aw-expired": "expired",
+};
+
+const ACTIVE_WARRANTY_BUCKET_TO_CARD_ID = Object.fromEntries(
+  Object.entries(ACTIVE_WARRANTY_CARD_ID_TO_BUCKET).map(([id, bucket]) => [bucket, id]),
+);
+
+export function getActiveWarrantyDetailKpiCards() {
+  return ACTIVE_WARRANTY_DETAIL_KPI_CARDS.map((c) => ({ ...c, href: null }));
+}
+
+export function warrantyBucketFromKpiCardId(cardId) {
+  return ACTIVE_WARRANTY_CARD_ID_TO_BUCKET[String(cardId || "").trim()] || "active";
+}
+
+export function activeWarrantyKpiCardIdFromFilter(warrantyBucket) {
+  const v = String(warrantyBucket || "active").trim().toLowerCase();
+  return ACTIVE_WARRANTY_BUCKET_TO_CARD_ID[v] || "aw-active";
+}
+
+export function getActiveWarrantyKpiMeta(warrantyBucket) {
+  const cardId = activeWarrantyKpiCardIdFromFilter(warrantyBucket);
+  return (
+    ACTIVE_WARRANTY_DETAIL_KPI_CARDS.find((c) => c.id === cardId) ||
+    ACTIVE_WARRANTY_DETAIL_KPI_CARDS[0]
+  );
 }
 
 const OPEN_COMPLETIONS_CARD_ID_TO_BUCKET = {

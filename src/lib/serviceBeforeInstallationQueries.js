@@ -13,6 +13,7 @@ import {
 } from "@/lib/upcomingInstallationsQuery";
 import { buildNeworderOpenInstallationBucketWhereSql } from "@/lib/openInstallationBucketNeworderSql";
 import { buildOpenCompletionsBucketWhereSql } from "@/lib/openCompletionsBucketSql";
+import { activeWarrantyBucketBaseSql } from "@/lib/activeWarrantyBucketSql";
 import { ensureServiceReportStepsTable } from "@/lib/ensureServiceReportStepsTable";
 import {
   dispatchSerialEligibleForInstallation,
@@ -1625,14 +1626,29 @@ function parseTotalRegisteredAggregateRow(row) {
   };
 }
 
+export const WARRANTY_END_DATE_SQL = `DATE_ADD(DATE(wp.installation_date), INTERVAL CAST(wp.warranty_period AS UNSIGNED) MONTH)`;
+
 export const IN_WARRANTY_SQL = `(
   wp.installation_date IS NOT NULL
   AND wp.warranty_period IS NOT NULL
   AND TRIM(CAST(wp.warranty_period AS CHAR)) <> ''
-  AND DATE_ADD(DATE(wp.installation_date), INTERVAL CAST(wp.warranty_period AS UNSIGNED) MONTH) >= CURDATE()
+  AND ${WARRANTY_END_DATE_SQL} >= CURDATE()
 )`;
 
-const WARRANTY_END_DATE_SQL = `DATE_ADD(DATE(wp.installation_date), INTERVAL CAST(wp.warranty_period AS UNSIGNED) MONTH)`;
+export const EXPIRED_WARRANTY_SQL = `(
+  wp.installation_date IS NOT NULL
+  AND wp.warranty_period IS NOT NULL
+  AND TRIM(CAST(wp.warranty_period AS CHAR)) <> ''
+  AND ${WARRANTY_END_DATE_SQL} < CURDATE()
+)`;
+
+export const WARRANTY_EXPIRING_30_DAYS_SQL = `(
+  wp.installation_date IS NOT NULL
+  AND wp.warranty_period IS NOT NULL
+  AND TRIM(CAST(wp.warranty_period AS CHAR)) <> ''
+  AND ${WARRANTY_END_DATE_SQL} >= CURDATE()
+  AND ${WARRANTY_END_DATE_SQL} <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+)`;
 
 export const DUE_WARRANTY_EXPIRY_SQL = `(
   wp.installation_date IS NOT NULL
@@ -1843,6 +1859,26 @@ function serviceRecordFilterNeedsWpJoin(f) {
   return Boolean(f.search || f.model || f.serial || (f.state && !f.assignedTo));
 }
 
+export async function fetchActiveWarrantyKpiBreakdown(conn, filters = {}) {
+  const f = parseSbiFilters(filters);
+  const wpFilter = buildWpFilterSql(f);
+  const [rows] = await conn.execute(
+    `SELECT
+       SUM(CASE WHEN ${IN_WARRANTY_SQL} THEN 1 ELSE 0 END) AS active_warranty,
+       SUM(CASE WHEN ${WARRANTY_EXPIRING_30_DAYS_SQL} THEN 1 ELSE 0 END) AS expiring_30_days,
+       SUM(CASE WHEN ${EXPIRED_WARRANTY_SQL} THEN 1 ELSE 0 END) AS expired_warranty
+     FROM warranty_products wp
+     WHERE 1=1 ${wpFilter.sql}`,
+    wpFilter.params,
+  );
+  const row = rows?.[0] || {};
+  return {
+    active_warranty: Number(row.active_warranty || 0),
+    expiring_30_days: Number(row.expiring_30_days || 0),
+    expired_warranty: Number(row.expired_warranty || 0),
+  };
+}
+
 export async function fetchServiceBeforeInstallationHubCounts(filters = {}) {
   const f = parseSbiFilters(filters);
   const cacheKey = JSON.stringify(f);
@@ -2005,7 +2041,9 @@ export async function fetchServiceBeforeInstallationSegmentPage(segment, options
 
   let filterSql = "1=1";
   if (segment === "total-registered") filterSql = "1=1";
-  else if (segment === "active-warranty") filterSql = IN_WARRANTY_SQL;
+  else if (segment === "active-warranty") {
+    filterSql = activeWarrantyBucketBaseSql(parseSbiFilters(filters).warrantyBucket);
+  }
   else if (segment === "due-warranty-expiry") filterSql = DUE_WARRANTY_EXPIRY_SQL;
 
   const wpFilter = buildWpFilterSql(filters);
@@ -2038,6 +2076,9 @@ export async function fetchServiceBeforeInstallationSegmentPage(segment, options
     }
     rows = await fetchSimpleWarrantyProductPage(conn, where, baseParams, fetchLimit, safeSkip);
     const pageRows = deferTotal ? rows.slice(0, safeLimit) : rows;
+    if (segment === "active-warranty" && pageRows.length) {
+      await enrichTotalRegisteredRows(conn, pageRows);
+    }
     return { rows: pageRows, hasExtra: deferTotal && rows.length > safeLimit };
   };
 
@@ -2087,8 +2128,9 @@ export async function fetchServiceBeforeInstallationSegmentPage(segment, options
 
 export async function countWarrantyProductsSegment(conn, segment, filters = {}) {
   let filterSql = "1=1";
-  if (segment === "active-warranty") filterSql = IN_WARRANTY_SQL;
-  else if (segment === "due-warranty-expiry") filterSql = DUE_WARRANTY_EXPIRY_SQL;
+  if (segment === "active-warranty") {
+    filterSql = activeWarrantyBucketBaseSql(parseSbiFilters(filters).warrantyBucket);
+  } else if (segment === "due-warranty-expiry") filterSql = DUE_WARRANTY_EXPIRY_SQL;
   else if (segment !== "total-registered") return 0;
 
   const wpFilter = buildWpFilterSql(filters);
@@ -2177,6 +2219,20 @@ export async function fetchServiceBeforeInstallationWpFilterOptions(segment, _fi
        LIMIT ${limit}`,
     );
 
+    let repSalesRows = [];
+    if (segment === "active-warranty") {
+      const [repRows] = await conn.execute(
+        `SELECT username AS name
+         FROM rep_list
+         WHERE status = 1
+           AND UPPER(TRIM(COALESCE(userRole, ''))) LIKE '%SALES%'
+           AND TRIM(username) <> ''
+         ORDER BY username ASC
+         LIMIT ${limit}`,
+      );
+      repSalesRows = repRows || [];
+    }
+
     // Engineers: master tables (same as assignment dropdowns) — not service_records scan.
     const [internalRows] = await conn.execute(
       `SELECT username AS name
@@ -2203,7 +2259,7 @@ export async function fetchServiceBeforeInstallationWpFilterOptions(segment, _fi
     }
 
     return {
-      salesPersons: mapDistinctNameRows(salesRows),
+      salesPersons: mapDistinctNameRows([...(salesRows || []), ...(repSalesRows || [])]),
       serviceEngineers: mapDistinctNameRows(internalRows),
       thirdPartyEngineers: mapDistinctNameRows(thirdRows),
     };
