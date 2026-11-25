@@ -9,6 +9,7 @@ import {
 } from "@/lib/attendanceCanonicalUsername";
 import { lookupAttendanceEmployeeIds } from "@/lib/ensureAttendanceLogsEmployeeColumns";
 import { ensureAttendanceCheckoutGpsTriggersAllowAdmin } from "@/lib/ensureAttendanceCheckoutGpsTriggers";
+import { machinePunchIsEligibleAsCheckout } from "@/lib/machinePunchDailyInOut";
 import {
   AUTO_CHECKOUT_ATTENDANCE_ADDRESS,
   AUTO_CHECKOUT_WALL_TIME,
@@ -498,6 +499,7 @@ export function machineCheckoutFromDailyAggregates(row) {
   if (humanCount <= 1 || !isMeaningfulAttendancePunch(out)) return null;
   const inn = row?.machine_checkin ?? null;
   if (machinePunchesSameInstant(inn, out)) return null;
+  if (!machinePunchIsEligibleAsCheckout(out)) return null;
   return out;
 }
 

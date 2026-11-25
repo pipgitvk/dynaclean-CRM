@@ -11,6 +11,7 @@ import {
   loadRepListInfoByMachineEmpCode,
   repListInfoForEmpCode,
 } from "@/lib/attendanceMachineMerge";
+import { resolveMachineDailyCheckInOut } from "@/lib/machinePunchDailyInOut";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,7 @@ function parseYmd(s) {
   return /^\d{4}-\d{2}-\d{2}$/.test(t) ? t : null;
 }
 
-/** eTimeOffice daily row: earliest punch = in, latest = out (not AM/PM split). */
+/** Daily row: earliest = in; out only when latest punch is at/after 12:00 PM IST. */
 function formatPunchTime12h(dt) {
   if (dt == null) return "";
   const d = dt instanceof Date ? dt : new Date(dt);
@@ -162,9 +163,12 @@ export async function GET(request) {
       const allPunches = allRaw
         .map((dt) => formatPunchTime12h(dt))
         .filter((t) => t);
-      const checkIn = allPunches[0] || "";
-      const checkOut =
-        punchCount > 1 ? allPunches[allPunches.length - 1] || "" : "";
+      const { checkInDatetime, checkOutDatetime } =
+        resolveMachineDailyCheckInOut(allRaw);
+      const checkIn = checkInDatetime ? formatPunchTime12h(checkInDatetime) : "";
+      const checkOut = checkOutDatetime
+        ? formatPunchTime12h(checkOutDatetime)
+        : "";
       return attachRepListFields({
         emp_code: row.emp_code,
         employee_name: row.employee_name,
