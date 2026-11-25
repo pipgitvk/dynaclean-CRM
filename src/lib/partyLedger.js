@@ -3,6 +3,7 @@ import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { LEDGER_INVOICE_SQL } from "@/lib/ledgerInvoiceFilters";
 import { parseLinkedStatementIds } from "@/lib/statementLinkedPurchases";
+import { appendPartyPaymentLedgerEntries } from "@/lib/partyPaymentLedgerEntries";
 
 function parseTransIds(raw) {
   if (!raw) return [];
@@ -693,6 +694,13 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
     });
   }
 
+  await appendPartyPaymentLedgerEntries(conn, {
+    customerId: customerIdForCompany,
+    nameAliases:
+      nameAliases.length > 0 ? nameAliases : [decodedCompany],
+    derivedLedger,
+  });
+
   for (const inv of invoices) {
     const relevantTransIds = new Set([
       ...parseTransIds(inv.linked_trans_ids),
@@ -817,7 +825,9 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
       "Spare Purchase": 2,
       Spare: 3,
       Payment: 3,
+      "Party Pay Out": 3,
       Receipt: 4,
+      "Party Pay In": 4,
     };
     const aOrder =
       orderMap[a.vch_type] !== undefined ? orderMap[a.vch_type] : 99;

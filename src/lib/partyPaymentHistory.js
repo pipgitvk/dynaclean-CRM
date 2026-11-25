@@ -258,6 +258,47 @@ export function partyPaymentStatementOutOrderId(statementId) {
   return `STMT-${sid}`;
 }
 
+/** Manual Out from party-payments add/edit form (not order/statement auto). */
+export const PARTY_PAYMENT_MANUAL_OUT_ORDER_ID = "MANUAL-EDIT";
+
+/**
+ * Persist form "Out" into history so reconcile does not wipe edits on reload.
+ */
+export async function syncPartyPaymentOutTotalFromEdit(
+  conn,
+  partyPaymentId,
+  { targetAmountOut, entryDate = null, createdBy = null } = {},
+) {
+  await ensurePartyPaymentHistoryTable(conn);
+  const ppId = Number(partyPaymentId);
+  if (!ppId) return;
+
+  const target = Number(targetAmountOut) || 0;
+  const [sumRows] = await conn.execute(
+    `SELECT COALESCE(SUM(amount), 0) AS s FROM party_payment_history
+     WHERE party_payment_id = ? AND entry_type = 'out'
+       AND order_id <> ?`,
+    [ppId, PARTY_PAYMENT_MANUAL_OUT_ORDER_ID],
+  );
+  const linkedOut = Number(sumRows?.[0]?.s) || 0;
+  const manualAmt = Math.max(0, Number((target - linkedOut).toFixed(2)));
+
+  if (manualAmt > 0) {
+    await recordPartyPaymentOutEntry(conn, ppId, {
+      orderId: PARTY_PAYMENT_MANUAL_OUT_ORDER_ID,
+      amount: manualAmt,
+      entryDate,
+      createdBy,
+    });
+  } else {
+    await conn.execute(
+      `DELETE FROM party_payment_history
+       WHERE party_payment_id = ? AND entry_type = 'out' AND order_id = ?`,
+      [ppId, PARTY_PAYMENT_MANUAL_OUT_ORDER_ID],
+    );
+  }
+}
+
 export async function syncPartyPaymentInHistoryFromStatements(
   conn,
   partyPaymentId,
@@ -401,8 +442,13 @@ export async function getPartyPaymentHistory(conn, partyPaymentId) {
     [ppId],
   );
 
-  return (rows || []).map((r) => ({
+  return (rows || []).map(mapPartyPaymentHistoryRow);
+}
+
+function mapPartyPaymentHistoryRow(r) {
+  return {
     id: r.id,
+    party_payment_id: r.party_payment_id != null ? Number(r.party_payment_id) : null,
     customer_id: r.customer_id ? String(r.customer_id) : null,
     customer_name: r.customer_name ? String(r.customer_name) : null,
     company_name: r.company_name ? String(r.company_name) : null,
@@ -415,5 +461,78 @@ export async function getPartyPaymentHistory(conn, partyPaymentId) {
     entry_date: r.entry_date,
     created_by: r.created_by ? String(r.created_by) : null,
     created_at: r.created_at,
-  }));
+  };
+}
+
+function buildPartyPaymentMatchWhere(customerId, nameAliases, tablePrefix = "") {
+  const t = tablePrefix ? `${tablePrefix}.` : "";
+  const where = [];
+  const params = [];
+  const cid = customerId != null ? String(customerId).trim() : "";
+  if (cid && cid !== "0") {
+    where.push(`(${t}customer_id IS NOT NULL AND TRIM(${t}customer_id) = ?)`);
+    params.push(cid);
+  }
+  const keys = [
+    ...new Set(
+      (nameAliases || [])
+        .map((n) => String(n || "").trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  ];
+  if (keys.length) {
+    const nameParts = keys.map(() => `LOWER(TRIM(${t}name)) = ?`);
+    const companyParts = keys.map(() => `LOWER(TRIM(${t}company_name)) = ?`);
+    where.push(`(${nameParts.join(" OR ")})`);
+    where.push(`(${companyParts.join(" OR ")})`);
+    params.push(...keys, ...keys);
+  }
+  if (!where.length) return null;
+  return { sql: where.join(" OR "), params };
+}
+
+/** In/Out lines for admin parties page (no extra component file). */
+export async function listPartyPaymentHistoryForParty(
+  conn,
+  { customerId = null, nameAliases = [] } = {},
+) {
+  await ensurePartyPaymentsTable(conn);
+  await ensurePartyPaymentHistoryTable(conn);
+
+  const filter = buildPartyPaymentMatchWhere(customerId, nameAliases, "pp");
+  if (!filter) return [];
+
+  const [paymentRows] = await conn.execute(
+    `SELECT pp.id FROM party_payments pp WHERE ${filter.sql}`,
+    filter.params,
+  );
+
+  for (const row of paymentRows || []) {
+    try {
+      const [countRows] = await conn.execute(
+        `SELECT COUNT(*) AS c FROM party_payment_history WHERE party_payment_id = ?`,
+        [row.id],
+      );
+      if (Number(countRows?.[0]?.c) === 0) {
+        await backfillPartyPaymentHistory(conn, row.id);
+      } else {
+        await reconcilePartyPaymentTotalsFromHistory(conn, row.id);
+      }
+    } catch {
+      /* non-fatal */
+    }
+  }
+
+  const [rows] = await conn.execute(
+    `SELECT h.id, h.party_payment_id, h.customer_id, h.customer_name, h.company_name,
+            h.entry_type, h.amount, h.order_id, h.invoice_number, h.statement_id,
+            h.trans_id, h.entry_date, h.created_by, h.created_at
+     FROM party_payment_history h
+     INNER JOIN party_payments pp ON pp.id = h.party_payment_id
+     WHERE ${filter.sql}
+     ORDER BY COALESCE(h.entry_date, DATE(h.created_at)) DESC, h.id DESC`,
+    filter.params,
+  );
+
+  return (rows || []).map(mapPartyPaymentHistoryRow);
 }

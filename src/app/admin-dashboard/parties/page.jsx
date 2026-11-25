@@ -10,6 +10,8 @@ import {
   Bell,
   Loader2,
   Database,
+  ArrowDownLeft,
+  ArrowUpRight,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import LedgerTableClient from "@/app/admin-dashboard/ledger/[companyName]/LedgerTableClient";
@@ -92,6 +94,23 @@ function displayCustomerId(p) {
   return id && id !== "0" ? id : "";
 }
 
+function formatPartyPaymentInr(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "—";
+  return `₹${n.toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function formatPartyPaymentDate(val) {
+  if (!val) return "—";
+  const s = String(val).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "—";
+  const [y, m, d] = s.split("-");
+  return `${d}/${m}/${y}`;
+}
+
 function formatSidebarCustomerMeta(p) {
   const id = displayCustomerId(p);
   const clientName = String(p?.client_name || "").trim();
@@ -112,6 +131,8 @@ export default function PartiesPage() {
   const [ledgerError, setLedgerError] = useState(null);
   const [ledgerSyncLoading, setLedgerSyncLoading] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [paymentHistory, setPaymentHistory] = useState([]);
+  const [paymentHistoryLoading, setPaymentHistoryLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -200,6 +221,68 @@ export default function PartiesPage() {
       cancelled = true;
     };
   }, [selectedKey, selected?.name, selected?.customer_id]);
+
+  useEffect(() => {
+    if (!selected?.name) {
+      setPaymentHistory([]);
+      setPaymentHistoryLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setPaymentHistoryLoading(true);
+    setPaymentHistory([]);
+
+    (async () => {
+      try {
+        const params = new URLSearchParams({ name: selected.name });
+        if (selected.customer_id) {
+          params.set("customer_id", String(selected.customer_id));
+        }
+        const clientName = String(selected.client_name || "").trim();
+        if (clientName && clientName !== selected.name) {
+          params.append("alias", clientName);
+        }
+        if (Array.isArray(selected.searchableNames)) {
+          for (const alias of selected.searchableNames) {
+            const a = String(alias || "").trim();
+            if (a && a !== selected.name && a !== clientName) {
+              params.append("alias", a);
+            }
+          }
+        }
+        const res = await fetch(
+          `/api/party-payments/by-party/history?${params.toString()}`,
+          { credentials: "include" },
+        );
+        const data = await res.json();
+        if (cancelled) return;
+        if (!res.ok || !data.success) {
+          setPaymentHistory([]);
+          return;
+        }
+        setPaymentHistory(Array.isArray(data.history) ? data.history : []);
+      } catch {
+        if (!cancelled) setPaymentHistory([]);
+      } finally {
+        if (!cancelled) setPaymentHistoryLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedKey, selected?.name, selected?.customer_id, selected?.client_name]);
+
+  const paymentHistoryTotals = useMemo(() => {
+    const totalIn = paymentHistory
+      .filter((h) => h.entry_type === "in")
+      .reduce((s, h) => s + (Number(h.amount) || 0), 0);
+    const totalOut = paymentHistory
+      .filter((h) => h.entry_type === "out")
+      .reduce((s, h) => s + (Number(h.amount) || 0), 0);
+    return { totalIn, totalOut };
+  }, [paymentHistory]);
 
   const selectedLedgerNet = useMemo(() => {
     if (!selectedKey || ledgerLoading) return null;
@@ -491,8 +574,103 @@ export default function PartiesPage() {
             </div>
           </div>
 
-          {/* Ledger Table – same component used on ledger page */}
-          <div className="flex-1 bg-white rounded-lg border border-gray-200 shadow-sm overflow-auto">
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 shrink-0 max-h-[42vh] flex flex-col overflow-hidden">
+            <h3 className="text-sm font-semibold text-gray-800 mb-2">
+              Party Payments (In / Out)
+            </h3>
+            <div className="px-1 pb-3 flex flex-wrap gap-4 text-sm">
+              <span>
+                In (history):{" "}
+                <strong className="text-green-700">
+                  {formatPartyPaymentInr(paymentHistoryTotals.totalIn)}
+                </strong>
+              </span>
+              <span>
+                Out (history):{" "}
+                <strong className="text-orange-700">
+                  {formatPartyPaymentInr(paymentHistoryTotals.totalOut)}
+                </strong>
+              </span>
+            </div>
+            <div className="overflow-auto flex-1 min-h-0">
+              {paymentHistoryLoading ? (
+                <p className="text-center text-gray-500 py-6 text-sm">Loading…</p>
+              ) : paymentHistory.length === 0 ? (
+                <p className="text-center text-gray-500 py-6 text-sm">
+                  No payment In / Out entries for this party.
+                </p>
+              ) : (
+                <table className="min-w-full text-sm">
+                  <thead className="text-left text-xs font-semibold text-gray-600 uppercase bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-2">Type</th>
+                      <th className="px-3 py-2">Date</th>
+                      <th className="px-3 py-2">Customer</th>
+                      <th className="px-3 py-2">Order</th>
+                      <th className="px-3 py-2">Invoice</th>
+                      <th className="px-3 py-2">Created By</th>
+                      <th className="px-3 py-2 text-right">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {paymentHistory.map((h) => {
+                      const isIn = h.entry_type === "in";
+                      return (
+                        <tr key={h.id} className="hover:bg-gray-50/80">
+                          <td className="px-3 py-2">
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+                                isIn
+                                  ? "bg-green-50 text-green-800"
+                                  : "bg-orange-50 text-orange-800"
+                              }`}
+                            >
+                              {isIn ? (
+                                <ArrowDownLeft className="w-3.5 h-3.5" />
+                              ) : (
+                                <ArrowUpRight className="w-3.5 h-3.5" />
+                              )}
+                              {isIn ? "In" : "Out"}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap">
+                            {formatPartyPaymentDate(h.entry_date || h.created_at)}
+                          </td>
+                          <td className="px-3 py-2 text-xs">
+                            {h.customer_name || h.customer_id || "—"}
+                            {h.company_name ? (
+                              <span className="block text-gray-500">
+                                {h.company_name}
+                              </span>
+                            ) : null}
+                          </td>
+                          <td className="px-3 py-2 font-mono text-xs">
+                            {h.order_id || "—"}
+                          </td>
+                          <td className="px-3 py-2 text-xs">
+                            {h.invoice_number ||
+                              (h.trans_id ? `UTR: ${h.trans_id}` : "—")}
+                          </td>
+                          <td className="px-3 py-2 text-xs text-gray-600">
+                            {h.created_by || "—"}
+                          </td>
+                          <td
+                            className={`px-3 py-2 text-right font-medium ${
+                              isIn ? "text-green-700" : "text-orange-700"
+                            }`}
+                          >
+                            {formatPartyPaymentInr(h.amount)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+
+          <div className="flex-1 bg-white rounded-lg border border-gray-200 shadow-sm overflow-auto min-h-0">
             {ledgerLoading ? (
               <div className="p-10 flex items-center justify-center">
                 <Loader2

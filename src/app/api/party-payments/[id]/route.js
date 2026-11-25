@@ -9,7 +9,11 @@ import {
   syncPartyPaymentStatementLinks,
   unlinkAllStatementsForPartyPayment,
 } from "@/lib/partyPaymentStatementLink";
-import { syncPartyPaymentInHistoryFromStatements } from "@/lib/partyPaymentHistory";
+import {
+  reconcilePartyPaymentTotalsFromHistory,
+  syncPartyPaymentInHistoryFromStatements,
+  syncPartyPaymentOutTotalFromEdit,
+} from "@/lib/partyPaymentHistory";
 
 function parseLinkedIdsFromBody(body) {
   const raw = body?.linked_statement_ids;
@@ -114,6 +118,17 @@ export async function PUT(req, { params }) {
       } catch (histErr) {
         console.error("[party-payments] in history:", histErr);
       }
+    }
+
+    try {
+      await syncPartyPaymentOutTotalFromEdit(conn, id, {
+        targetAmountOut: amounts.amount_out,
+        entryDate: paymentDate,
+        createdBy: payload.username,
+      });
+      await reconcilePartyPaymentTotalsFromHistory(conn, id);
+    } catch (outErr) {
+      console.error("[party-payments] out history:", outErr);
     }
 
     if (!result.affectedRows) {

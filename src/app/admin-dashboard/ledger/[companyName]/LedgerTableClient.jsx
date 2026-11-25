@@ -13,6 +13,8 @@ const fmt = (n) =>
 function VchBadge({ type }) {
   const colorMap = {
     Payment:       "bg-orange-100 text-orange-700",
+    "Party Pay In": "bg-emerald-100 text-emerald-800",
+    "Party Pay Out": "bg-amber-100 text-amber-800",
     Spare:         "bg-cyan-100 text-cyan-700",
     "Spare Purchase": "bg-cyan-100 text-cyan-800",
     Receipt:       "bg-green-100 text-green-700",

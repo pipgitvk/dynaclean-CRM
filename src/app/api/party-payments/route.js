@@ -14,6 +14,7 @@ import {
 import {
   reconcilePartyPaymentTotalsFromHistory,
   syncPartyPaymentInHistoryFromStatements,
+  syncPartyPaymentOutTotalFromEdit,
 } from "@/lib/partyPaymentHistory";
 
 const SELECT_FIELDS = `
@@ -187,6 +188,17 @@ export async function POST(req) {
       } catch (histErr) {
         console.error("[party-payments] in history:", histErr);
       }
+    }
+
+    try {
+      await syncPartyPaymentOutTotalFromEdit(conn, newId, {
+        targetAmountOut: amounts.amount_out,
+        entryDate: paymentDate,
+        createdBy: payload.username,
+      });
+      await reconcilePartyPaymentTotalsFromHistory(conn, newId);
+    } catch (outErr) {
+      console.error("[party-payments] out history:", outErr);
     }
 
     return NextResponse.json({ success: true, id: newId });
