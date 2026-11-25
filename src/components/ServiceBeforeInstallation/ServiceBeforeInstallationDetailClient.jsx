@@ -25,6 +25,7 @@ import {
   X,
   History,
 } from "lucide-react";
+import { formatSbiNum } from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationKpiCard";
 import {
   displayComplaintDateForServiceRecord,
   displayRegDateForServiceRecord,
@@ -1038,18 +1039,103 @@ function exportRowsCsv(rows, segment) {
   URL.revokeObjectURL(url);
 }
 
-function DetailSegmentHeader({ meta, segment }) {
+function DetailSegmentHeader({ meta, segment, trailing = null }) {
   const Icon = SEGMENT_ICONS[segment] || Package;
   return (
-    <header className="mb-5 flex items-center gap-4 rounded-2xl border border-slate-200/80 bg-white px-4 py-5 shadow-[0_4px_20px_-10px_rgba(15,23,42,0.1)] sm:px-6 sm:py-6">
-      <div className="shrink-0 rounded-xl bg-gradient-to-br from-violet-600 to-purple-600 p-3 text-white shadow-md shadow-violet-500/20">
-        <Icon className="h-6 w-6" strokeWidth={2.1} aria-hidden />
+    <header className="mb-5 flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white px-4 py-5 shadow-[0_4px_20px_-10px_rgba(15,23,42,0.1)] sm:flex-row sm:items-stretch sm:gap-5 sm:px-6 sm:py-6">
+      <div className="flex min-w-0 flex-1 items-center gap-4">
+        <div className="shrink-0 rounded-xl bg-gradient-to-br from-violet-600 to-purple-600 p-3 text-white shadow-md shadow-violet-500/20">
+          <Icon className="h-6 w-6" strokeWidth={2.1} aria-hidden />
+        </div>
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{meta.title}</h1>
+          <p className="mt-0.5 text-sm text-slate-500 sm:text-base">{meta.subtitle}</p>
+        </div>
       </div>
-      <div className="min-w-0">
-        <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{meta.title}</h1>
-        <p className="mt-0.5 text-sm text-slate-500 sm:text-base">{meta.subtitle}</p>
-      </div>
+      {trailing ? (
+        <div className="flex shrink-0 items-center sm:ml-auto sm:pl-2">{trailing}</div>
+      ) : null}
     </header>
+  );
+}
+
+function ActiveWarrantyAllProductsSummaryCard({ totals, loading }) {
+  const active = Number(totals?.active_warranty) || 0;
+  const expired = Number(totals?.expired_warranty) || 0;
+  const total = active + expired;
+  const settled = totals?.active_warranty != null && totals?.expired_warranty != null;
+  const waiting = Boolean(loading) && !settled;
+  const activePct = total > 0 ? Math.round((active / total) * 1000) / 10 : 0;
+  const expiredPct = total > 0 ? Math.max(0, 100 - activePct) : 0;
+
+  return (
+    <section
+      aria-labelledby="aw-all-products-heading"
+      className="relative w-full overflow-hidden rounded-2xl border border-violet-200/75 bg-gradient-to-br from-violet-50/95 via-white to-fuchsia-50/50 px-4 py-3.5 shadow-[0_10px_32px_-14px_rgba(124,58,237,0.45)] ring-1 ring-inset ring-white/80 sm:w-[min(100%,18rem)]"
+    >
+      <div
+        className="pointer-events-none absolute -right-8 -top-10 h-24 w-24 rounded-full bg-violet-400/20 blur-2xl"
+        aria-hidden
+      />
+      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-violet-500/[0.06] to-transparent" aria-hidden />
+
+      <div className="relative flex items-start gap-3">
+        <div className="shrink-0 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 p-2.5 text-white shadow-lg shadow-violet-500/30">
+          <Package className="h-5 w-5" strokeWidth={2.15} aria-hidden />
+        </div>
+        <div className="min-w-0 flex-1 pt-0.5">
+          <p
+            id="aw-all-products-heading"
+            className="text-[10px] font-bold uppercase tracking-[0.14em] text-violet-700/90"
+          >
+            All products
+          </p>
+          {waiting ? (
+            <div className="mt-2.5 space-y-2" aria-hidden>
+              <div className="h-9 w-20 animate-pulse rounded-lg bg-violet-200/40" />
+              <div className="h-1.5 w-full animate-pulse rounded-full bg-slate-200/80" />
+            </div>
+          ) : (
+            <p className="mt-1 text-[1.75rem] font-extrabold leading-none tabular-nums tracking-tight text-slate-900 sm:text-3xl">
+              {formatSbiNum(total)}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {settled && !waiting ? (
+        <div className="relative mt-3.5 space-y-2">
+          <div
+            className="flex h-2 w-full overflow-hidden rounded-full bg-slate-200/70 shadow-inner"
+            role="img"
+            aria-label={`Active ${activePct} percent, expired ${expiredPct} percent`}
+          >
+            {active > 0 ? (
+              <div
+                className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-[width] duration-500 ease-out"
+                style={{ width: `${activePct}%` }}
+              />
+            ) : null}
+            {expired > 0 ? (
+              <div
+                className="h-full bg-gradient-to-r from-rose-500 to-red-500 transition-[width] duration-500 ease-out"
+                style={{ width: `${expiredPct}%` }}
+              />
+            ) : null}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/90 bg-emerald-50/95 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 shadow-sm">
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_2px_rgba(16,185,129,0.25)]" />
+              Active {formatSbiNum(active)}
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-200/90 bg-rose-50/95 px-2.5 py-1 text-[11px] font-semibold text-rose-800 shadow-sm">
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500 shadow-[0_0_0_2px_rgba(244,63,94,0.2)]" />
+              Expired {formatSbiNum(expired)}
+            </span>
+          </div>
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -3383,7 +3469,18 @@ export default function ServiceBeforeInstallationDetailClient({
           Back to Hub
         </Link>
 
-        <DetailSegmentHeader meta={headerMeta} segment={segment} />
+        <DetailSegmentHeader
+          meta={headerMeta}
+          segment={segment}
+          trailing={
+            segment === "active-warranty" ? (
+              <ActiveWarrantyAllProductsSummaryCard
+                totals={activeWarrantyBreakdown}
+                loading={activeWarrantyKpiLoading}
+              />
+            ) : null
+          }
+        />
 
         {segment === "open-completions" ? (
           <ServiceBeforeInstallationOpenCompletionsKpiSection
