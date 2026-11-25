@@ -187,10 +187,21 @@ export async function GET(req) {
     }
 
     const inWarrantySql = `(
-      wp.installation_date IS NOT NULL
-      AND wp.warranty_period IS NOT NULL
+      wp.warranty_period IS NOT NULL
       AND TRIM(CAST(wp.warranty_period AS CHAR)) <> ''
-      AND DATE_ADD(DATE(wp.installation_date), INTERVAL CAST(wp.warranty_period AS UNSIGNED) MONTH) >= CURDATE()
+      AND (
+        (wp.installation_date IS NOT NULL AND TRIM(CAST(wp.installation_date AS CHAR)) NOT IN ('', '0000-00-00'))
+        OR (wp.invoice_date IS NOT NULL AND TRIM(CAST(wp.invoice_date AS CHAR)) NOT IN ('', '0000-00-00'))
+      )
+      AND DATE_ADD(
+        DATE(
+          COALESCE(
+            NULLIF(TRIM(CAST(wp.installation_date AS CHAR)), ''),
+            NULLIF(TRIM(CAST(wp.invoice_date AS CHAR)), '')
+          )
+        ),
+        INTERVAL CAST(wp.warranty_period AS UNSIGNED) MONTH
+      ) >= CURDATE()
     )`;
 
     if (warrantyFilter === "in-warranty" || warrantyFilter === "in") {

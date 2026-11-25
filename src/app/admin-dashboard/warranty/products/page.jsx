@@ -4,6 +4,7 @@ import { CheckCircle, AlertTriangle, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast, Toaster } from "react-hot-toast";
 import { useWarrantyProductFollowup } from "@/components/warranty/WarrantyProductFollowupControls";
+import { warrantyStartDateFromProduct } from "@/lib/warrantyDefaults";
 
 // ─── AMC Tooltip Component ────────────────────────────────────────────────────
 function AMCTooltip({ amcDetails, children }) {
@@ -686,8 +687,8 @@ export default function WarrantyPage() {
                       </div>
                     </AMCTooltip>
                   </div>
-                  <div className={`text-[11px] text-right ${getWarrantyStatus(r.installation_date, r.warranty_period).color}`}>
-                    {getWarrantyStatus(r.installation_date, r.warranty_period).status}
+                  <div className={`text-[11px] text-right ${getWarrantyStatus(warrantyStartDateFromProduct(r), r.warranty_period).color}`}>
+                    {getWarrantyStatus(warrantyStartDateFromProduct(r), r.warranty_period).status}
                   </div>
                 </div>
 
@@ -823,8 +824,8 @@ export default function WarrantyPage() {
                         </div>
                       </td>
                       <td className="p-3 border-b border-gray-200">{r.serial_number}</td>
-                      <td className={`p-3 border-b border-gray-200 ${getWarrantyStatus(r.installation_date, r.warranty_period).color}`}>
-                        {getWarrantyStatus(r.installation_date, r.warranty_period).status}
+                      <td className={`p-3 border-b border-gray-200 ${getWarrantyStatus(warrantyStartDateFromProduct(r), r.warranty_period).color}`}>
+                        {getWarrantyStatus(warrantyStartDateFromProduct(r), r.warranty_period).status}
                       </td>
                       <td className="p-3 border-b border-gray-200">{r.state || "—"}</td>
                       <td className="p-3 border-b border-gray-200 text-center">

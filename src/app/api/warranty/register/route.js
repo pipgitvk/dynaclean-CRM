@@ -102,12 +102,16 @@ export async function POST(req) {
     }
 
     const conn = await getDbConnection();
+    const invoiceDateVal = f.invoice_date
+      ? String(f.invoice_date).trim().slice(0, 10)
+      : null;
+
     const sql = `INSERT INTO warranty_products
       (product_name, specification, model, serial_number, gstin, warranty_period,
        customer_name, email, contact, customer_address, state, invoice_number,
-       invoice_date, invoice_file, report_file, quantity, contact_person,
+       invoice_date, installation_date, invoice_file, report_file, quantity, contact_person,
        created_by, created_at, updated_by, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
     const now = new Date();
     const values = [
@@ -123,7 +127,8 @@ export async function POST(req) {
       f.customer_address,
       f.state || "",
       f.invoice_number,
-      f.invoice_date,
+      invoiceDateVal,
+      invoiceDateVal,
       invoiceFilename,
       reportNames.join(","),
       f.quantity,

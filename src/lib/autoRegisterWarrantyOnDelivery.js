@@ -93,9 +93,9 @@ export async function autoRegisterWarrantyProductsOnDelivery(conn, orderId) {
   const insertSql = `INSERT INTO warranty_products
     (product_name, specification, model, serial_number, gstin, warranty_period,
      customer_name, email, contact, customer_address, state, invoice_number,
-     invoice_date, invoice_file, report_file, quantity, contact_person,
+     invoice_date, installation_date, invoice_file, report_file, quantity, contact_person,
      created_by, created_at, updated_by, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
   for (const rawRow of rows || []) {
     const row = {
@@ -123,6 +123,7 @@ export async function autoRegisterWarrantyProductsOnDelivery(conn, orderId) {
       normalized.customer_address,
       normalized.state || "",
       normalized.invoice_number,
+      normalized.invoice_date,
       normalized.invoice_date,
       null,
       null,

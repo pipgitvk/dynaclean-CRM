@@ -32,9 +32,7 @@ export function normalizeAutoWarrantyProductRow(row, orderId) {
 
   const invoiceDate = row.invoice_date
     ? String(row.invoice_date).slice(0, 10)
-    : row.delivered_on
-      ? String(row.delivered_on).slice(0, 10)
-      : null;
+    : null;
 
   return {
     product_name: productName,
