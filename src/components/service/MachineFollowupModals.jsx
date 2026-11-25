@@ -84,6 +84,14 @@ export function FollowUpModal({ fu, onClose, onSaved, allowEditIdentity = false 
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (
+      form.followed_at &&
+      form.next_followup_date &&
+      form.next_followup_date < form.followed_at
+    ) {
+      toast.error("Next follow-up date cannot be before followed date");
+      return;
+    }
     setSubmitting(true);
     const fd = new FormData();
     if (form.machine_id) fd.append("machine_id", form.machine_id);
@@ -233,7 +241,20 @@ export function FollowUpModal({ fu, onClose, onSaved, allowEditIdentity = false 
               min={minDT}
               max={maxDT}
               required
-              onChange={set("followed_at")}
+              onChange={(e) => {
+                const followed_at = e.target.value;
+                setForm((p) => {
+                  let next_followup_date = p.next_followup_date;
+                  if (
+                    next_followup_date &&
+                    followed_at &&
+                    next_followup_date < followed_at
+                  ) {
+                    next_followup_date = followed_at;
+                  }
+                  return { ...p, followed_at, next_followup_date };
+                });
+              }}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -288,8 +309,16 @@ export function FollowUpModal({ fu, onClose, onSaved, allowEditIdentity = false 
             <input
               type="datetime-local"
               value={form.next_followup_date}
+              min={form.followed_at || undefined}
               required
-              onChange={set("next_followup_date")}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (form.followed_at && v && v < form.followed_at) {
+                  toast.error("Next follow-up date cannot be before followed date");
+                  return;
+                }
+                setForm((p) => ({ ...p, next_followup_date: v }));
+              }}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>

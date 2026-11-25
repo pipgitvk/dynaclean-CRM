@@ -258,6 +258,25 @@ export async function POST(req) {
       return NextResponse.json({ success: false, error: "Next follow-up date is mandatory" }, { status: 400 });
     }
 
+    const nextFollowupMatch = String(nextFollowupDate).match(
+      /(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/,
+    );
+    const nextFollowupParsed = nextFollowupMatch
+      ? new Date(
+          Number(nextFollowupMatch[1]),
+          Number(nextFollowupMatch[2]) - 1,
+          Number(nextFollowupMatch[3]),
+          Number(nextFollowupMatch[4]),
+          Number(nextFollowupMatch[5]),
+        )
+      : null;
+    if (nextFollowupParsed && followedDate && nextFollowupParsed < followedDate) {
+      return NextResponse.json(
+        { success: false, error: "Next follow-up date cannot be before followed date" },
+        { status: 400 },
+      );
+    }
+
     let imageUrl = null;
     if (imageFile && imageFile.name) {
       const buffer = Buffer.from(await imageFile.arrayBuffer());
