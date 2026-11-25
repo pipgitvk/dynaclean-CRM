@@ -93,7 +93,8 @@ export const SERVICE_BEFORE_INSTALLATION_SEGMENTS = [
     title: "Open Installation",
     detailTitle: "Installation Management Dashboard",
     subtitle: "Open installations — delivery, completion & Google feedback",
-    countKey: "open_installation",
+    countCaption: "No. of products delivered (installation pending)",
+    countKey: "delivered_installation_pending",
     accent: "from-amber-500 to-orange-600",
     surface:
       "bg-white/80 backdrop-blur-xl border-amber-200/40 shadow-[0_8px_30px_-8px_rgba(245,158,11,0.35)]",
@@ -539,7 +540,10 @@ export function getServiceBeforeInstallationCards(dashboardBase) {
   const base = `/${dashboardBase}`;
   return SERVICE_BEFORE_INSTALLATION_SEGMENTS.map((c) => ({
     ...c,
-    href: `${base}/service-before-installation/${c.id}`,
+    href:
+      c.id === "open-installation"
+        ? `${base}/service-before-installation/open-installation?openInstallationBucket=delivered_pending`
+        : `${base}/service-before-installation/${c.id}`,
   }));
 }
 

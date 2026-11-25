@@ -1972,11 +1972,12 @@ export async function fetchServiceBeforeInstallationHubCounts(filters = {}) {
      WHERE 1=1 ${amcFilter.sql}`;
 
   const t0 = Date.now();
-  const [wpResult, srResult, amcResult, upcomingTotals] = await Promise.all([
+  const [wpResult, srResult, amcResult, upcomingTotals, openInstallationBreakdown] = await Promise.all([
     pool.execute(wpSql, wpFilter.params),
     pool.execute(srSql, srFilter.params),
     pool.execute(amcSql, amcFilter.params),
     countUpcomingInstallationHubTotals(pool, f),
+    fetchOpenInstallationCardsBreakdown(f),
   ]);
 
   const wpRow = wpResult[0]?.[0];
@@ -1986,6 +1987,9 @@ export async function fetchServiceBeforeInstallationHubCounts(filters = {}) {
   const data = {
     total_registered: Number(wpRow?.total_registered || 0),
     open_installation: upcomingTotals.open_installation,
+    delivered_installation_pending: Number(
+      openInstallationBreakdown?.delivered_installation_pending || 0,
+    ),
     open_completions: Number(srRow?.open_completions || 0),
     overdue_delayed_installation: upcomingTotals.overdue_delayed_installation,
     active_warranty: Number(wpRow?.active_warranty || 0),
