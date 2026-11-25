@@ -495,16 +495,17 @@ function getApprovalRemarkText(order) {
   return String(raw).trim();
 }
 
-function ApprovalRemarkHover({ remark }) {
-  const text = String(remark || "").trim();
-  if (!text) return null;
+function ApprovalRemarkCell({ order }) {
+  const text = getApprovalRemarkText(order);
+  if (!text) {
+    return <span className="text-gray-400">—</span>;
+  }
   return (
     <span
-      className="inline-flex items-center justify-center text-amber-600 cursor-help shrink-0"
+      className="text-left text-xs font-medium text-amber-800 bg-amber-50 border border-amber-200/80 rounded px-2 py-1 max-w-[220px] block truncate"
       title={text}
-      aria-label={`Approval remark: ${text}`}
     >
-      <AlertCircle size={14} />
+      {text}
     </span>
   );
 }
@@ -1442,6 +1443,8 @@ export default function OrderTable({
         return order.order_id?.toString().toLowerCase() || "";
       case "created_by":
         return order.created_by?.toString().toLowerCase() || "";
+      case "approval_remark":
+        return getApprovalRemarkText(order).toLowerCase();
       case "created_at":
         return order.created_at ? new Date(order.created_at).getTime() : 0;
       case "punch_date":
@@ -1601,6 +1604,7 @@ export default function OrderTable({
         { header: "Products", key: "products", width: 35 },
         { header: "Spares", key: "spares", width: 35 },
         { header: "Created By", key: "created_by", width: 15 },
+        { header: "Remark", key: "approval_remark", width: 28 },
         { header: "Lead Campaign", key: "lead_campaign", width: 18 },
         { header: "Order Date / PO Date", key: "created_at", width: 20 },
         { header: "Punch Date", key: "punch_date", width: 22 },
@@ -1642,6 +1646,7 @@ export default function OrderTable({
           state: order.state || "",
           ...splitOrderItemsByType(order, catalogByCode, spareCatalogByCode),
           created_by: order.created_by || "",
+          approval_remark: getApprovalRemarkText(order),
           lead_campaign: formatLeadCampaignLabel(order.lead_campaign),
           created_at: order.created_at ? dayjs(order.created_at).format("DD-MM-YYYY") : "",
           punch_date: order.punch_date
@@ -2901,6 +2906,21 @@ export default function OrderTable({
                   )}
                 </div>
               </th>
+              <th
+                className="px-3 py-3 font-semibold text-left cursor-pointer hover:bg-gray-700 transition-colors"
+                onClick={() => handleSort("approval_remark")}
+              >
+                <div className="flex items-center gap-1">
+                  Remark
+                  {sortColumn === "approval_remark" && (
+                    sortDirection === "asc" ? (
+                      <ArrowUp size={14} />
+                    ) : (
+                      <ArrowDown size={14} />
+                    )
+                  )}
+                </div>
+              </th>
               <th 
                 className="px-3 py-3 font-semibold text-left cursor-pointer hover:bg-gray-700 transition-colors"
                 onClick={() => handleSort("created_at")}
@@ -3056,6 +3076,9 @@ export default function OrderTable({
                     <td className="px-3 py-3 font-medium text-gray-800">
                       {r.created_by}
                     </td>
+                    <td className="px-3 py-3 text-left align-top">
+                      <ApprovalRemarkCell order={r} />
+                    </td>
                     <td className="px-3 py-3 text-left">
                       {r.created_at ? dayjs(r.created_at).format("DD-MM-YYYY") : "—"}
                     </td>
@@ -3175,13 +3198,13 @@ export default function OrderTable({
               })
             ) : showListLoadingEmpty ? (
               <tr>
-                <td colSpan={16} className="px-6 py-8 text-center text-gray-600">
+                <td colSpan={17} className="px-6 py-8 text-center text-gray-600">
                   Loading…
                 </td>
               </tr>
             ) : showNoOrdersEmpty ? (
               <tr>
-                <td colSpan={16} className="px-6 py-4 text-center text-gray-500">
+                <td colSpan={17} className="px-6 py-4 text-center text-gray-500">
                   No orders found.
                 </td>
               </tr>
@@ -3281,6 +3304,16 @@ export default function OrderTable({
                 </div>
                 <div>
                   <strong>Created By:</strong> {r.created_by || "-"}
+                </div>
+                <div className="whitespace-normal break-words">
+                  <strong>Remark:</strong>{" "}
+                  {getApprovalRemarkText(r) ? (
+                    <span className="text-amber-800 bg-amber-50 border border-amber-200/80 rounded px-2 py-0.5 text-sm font-medium">
+                      {getApprovalRemarkText(r)}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
                 </div>
                 <div>
                   <strong>Lead Campaign:</strong>{" "}
@@ -4519,13 +4552,9 @@ function ApprovalActions({ r, userRole }) {
   if (normalizeApprovalStatus(r.approval_status) === "approved") {
     return (
       <div className="flex flex-col items-center gap-1">
-        <div
-          className="flex items-center gap-1 text-green-600 font-semibold px-2 py-1 bg-green-50 rounded-lg border border-green-100"
-          title={savedRemark || undefined}
-        >
+        <div className="flex items-center gap-1 text-green-600 font-semibold px-2 py-1 bg-green-50 rounded-lg border border-green-100">
           <CheckCircle size={14} />
           <span>Approved</span>
-          <ApprovalRemarkHover remark={savedRemark} />
         </div>
         {isSuperAdmin && revertAllowed && (
           <button
@@ -4543,13 +4572,9 @@ function ApprovalActions({ r, userRole }) {
   if (normalizeApprovalStatus(r.approval_status) === "rejected") {
     return (
       <div className="flex flex-col items-center gap-1">
-        <div
-          className="flex items-center gap-1 text-red-600 font-semibold px-2 py-1 bg-red-50 rounded-lg border border-red-100"
-          title={savedRemark || undefined}
-        >
+        <div className="flex items-center gap-1 text-red-600 font-semibold px-2 py-1 bg-red-50 rounded-lg border border-red-100">
           <XCircle size={14} />
           <span>Rejected</span>
-          <ApprovalRemarkHover remark={savedRemark} />
         </div>
         {isSuperAdmin && revertAllowed && (
           <button
