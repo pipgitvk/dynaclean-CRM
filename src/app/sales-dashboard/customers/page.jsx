@@ -7,7 +7,10 @@ import {
   mysqlBoundsForIstDateRange,
   mysqlUpperBoundIstDayEnd,
 } from "@/lib/timezone";
-import { appendVeryGoodFollowupTodayFilter } from "@/lib/veryGoodFollowupTodaySql";
+import {
+  appendCustomerOwnedByUserFilter,
+  appendVeryGoodFollowupTodayFilter,
+} from "@/lib/veryGoodFollowupTodaySql";
 import { getTodayYmdIST } from "@/lib/prospectCommitmentRules";
 import {
   appendLatestFollowedDateIstFilter,
@@ -140,8 +143,14 @@ export default async function CustomersPage({ searchParams }) {
     appendVeryGoodFollowupTodayFilter({
       conditions: customerConditions,
       params: customerParams,
-      restrictToFollowedBy: isSalesCumBackoffice ? null : username,
     });
+    if (!isSalesCumBackoffice) {
+      appendCustomerOwnedByUserFilter({
+        conditions: customerConditions,
+        params: customerParams,
+        username,
+      });
+    }
   }
 
   // TL reporting: latest TL follow-up with next date on or before today (IST)

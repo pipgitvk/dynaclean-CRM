@@ -10,6 +10,20 @@ export function getVeryGoodFollowupTodayBounds() {
  * Customers with status "Very Good" who had a follow-up today (IST).
  * When restrictToFollowedBy is set, only follow-ups logged by that user count.
  */
+/** Sales rep owns customer via lead source, SR field, or assignee. */
+export function appendCustomerOwnedByUserFilter({
+  conditions,
+  params,
+  username,
+  customerAlias = "c",
+}) {
+  if (!username) return;
+  conditions.push(
+    `(${customerAlias}.lead_source = ? OR ${customerAlias}.sales_representative = ? OR ${customerAlias}.assigned_to = ?)`,
+  );
+  params.push(username, username, username);
+}
+
 export function appendVeryGoodFollowupTodayFilter({
   conditions,
   params,
@@ -53,8 +67,10 @@ export async function countVeryGoodFollowupsToday(conn, username, isSalesCumBack
   const queryParams = [bounds.start, bounds.end];
 
   if (!isSalesCumBackoffice) {
-    query += " AND cf.followed_by = ?";
-    queryParams.push(username);
+    query += ` AND (
+      c.lead_source = ? OR c.sales_representative = ? OR c.assigned_to = ?
+    )`;
+    queryParams.push(username, username, username);
   }
 
   const [rows] = await conn.execute(query, queryParams);
