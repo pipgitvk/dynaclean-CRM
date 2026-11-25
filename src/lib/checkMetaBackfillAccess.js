@@ -33,6 +33,17 @@ export async function checkMetaBackfillAccess() {
     return { allowed: true, payload, forbidden: null };
   }
 
+  if (roleKey === "DIGITAL MARKETER") {
+    const hasMetaForms = await userHasModuleKey(
+      payload.username,
+      effectiveRole,
+      "meta-credentials-add",
+    );
+    if (hasMetaForms) {
+      return { allowed: true, payload, forbidden: null };
+    }
+  }
+
   const hasMetaBackfill = await userHasModuleKey(
     payload.username,
     effectiveRole,

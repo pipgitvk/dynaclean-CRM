@@ -19,6 +19,14 @@ function ProductInterestBadge({ value, className = '' }) {
   );
 }
 
+function maskPhoneLastFiveDigits(phone) {
+  const raw = String(phone || '').trim();
+  if (!raw || raw === 'N/A') return raw || 'N/A';
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) return 'N/A';
+  return `xxxx${digits.slice(-5)}`;
+}
+
 function getAssignedEmployeeName(lead) {
   const name = String(lead?.employee_name || lead?.employeeName || '').trim();
   if (name) return name;
@@ -29,6 +37,7 @@ export default function MetaFormLeadsTable({
   formIds,
   productInterestByFormId = {},
   appearance = 'default',
+  hideAssignedTo = false,
 }) {
   const isHub = appearance === 'hub';
   const accentText = isHub ? 'text-violet-600' : 'text-blue-600';
@@ -47,6 +56,10 @@ export default function MetaFormLeadsTable({
   const [currentPage, setCurrentPage] = useState(0);
 
   useEffect(() => {
+    if (hideAssignedTo) {
+      setAssigneeOptions([]);
+      return;
+    }
     if (!formIds?.length) {
       setAssigneeOptions([]);
       return;
@@ -78,7 +91,7 @@ export default function MetaFormLeadsTable({
     return () => {
       cancelled = true;
     };
-  }, [formIds, startDate, endDate, importFilter]);
+  }, [formIds, startDate, endDate, importFilter, hideAssignedTo]);
 
   useEffect(() => {
     if (formIds && formIds.length > 0) {
@@ -102,7 +115,7 @@ export default function MetaFormLeadsTable({
       if (endDate) {
         params.endDate = endDate;
       }
-      if (assignedToFilter) {
+      if (!hideAssignedTo && assignedToFilter) {
         params.assignedTo = assignedToFilter;
       }
       const response = await axios.get('/api/meta-leads', { params });
@@ -141,7 +154,8 @@ export default function MetaFormLeadsTable({
   const getLeadPhone = (lead) => {
     const fieldData = lead.fieldData || [];
     const phone = fieldData.find(f => f.name === 'phone_number')?.values?.[0] || '';
-    return phone || 'N/A';
+    const value = phone || 'N/A';
+    return hideAssignedTo ? maskPhoneLastFiveDigits(value) : value;
   };
 
   const getLeadEmail = (lead) => {
@@ -233,13 +247,17 @@ export default function MetaFormLeadsTable({
 
   return (
     <div className={isHub ? '' : 'mt-6 border-t pt-6'}>
-      <div className="flex items-center gap-2 mb-4">
-        <User className={`w-5 h-5 ${accentText}`} />
-        <h3 className={`text-lg font-semibold ${isHub ? 'text-slate-900' : 'text-gray-900'}`}>Form Leads</h3>
-      </div>
-      <p className={`text-sm mb-4 ${isHub ? 'text-slate-600' : 'text-gray-600'}`}>
-        View all leads received from each form and their assigned employees.
-      </p>
+      {!isHub ? (
+        <>
+          <div className="mb-4 flex items-center gap-2">
+            <User className={`h-5 w-5 ${accentText}`} />
+            <h3 className="text-lg font-semibold text-gray-900">Form Leads</h3>
+          </div>
+          <p className="mb-4 text-sm text-gray-600">
+            View all leads received from each form and their assigned employees.
+          </p>
+        </>
+      ) : null}
 
       {/* Filters Section */}
       <div className={`rounded-lg p-4 mb-4 ${isHub ? 'bg-violet-50/40 border border-violet-100' : 'bg-gray-50'}`}>
@@ -247,32 +265,38 @@ export default function MetaFormLeadsTable({
           <Filter className="w-4 h-4 text-gray-600" />
           <span className="font-medium text-gray-900">Filters</span>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          <div className="flex flex-col min-w-0">
-            <label className="text-xs font-medium text-gray-600 mb-1">Employee</label>
-            <select
-              value={assignedToFilter}
-              onChange={(e) => {
-                setAssignedToFilter(e.target.value);
-                setCurrentPage(0);
-              }}
-              className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${focusRing}`}
-            >
-              <option value="">All employees</option>
-              {assigneeOptions.map((row) => {
-                const value = String(row.assignedTo || '').trim();
-                const label = String(row.employeeName || value).trim();
-                const count = Number(row.leadCount) || 0;
-                if (!value) return null;
-                return (
-                  <option key={value} value={value}>
-                    {label} — {count.toLocaleString('en-IN')} lead
-                    {count === 1 ? '' : 's'}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
+        <div
+          className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${
+            hideAssignedTo ? 'lg:grid-cols-4' : 'lg:grid-cols-5'
+          }`}
+        >
+          {hideAssignedTo ? null : (
+            <div className="flex min-w-0 flex-col">
+              <label className="mb-1 text-xs font-medium text-gray-600">Employee</label>
+              <select
+                value={assignedToFilter}
+                onChange={(e) => {
+                  setAssignedToFilter(e.target.value);
+                  setCurrentPage(0);
+                }}
+                className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 ${focusRing}`}
+              >
+                <option value="">All employees</option>
+                {assigneeOptions.map((row) => {
+                  const value = String(row.assignedTo || '').trim();
+                  const label = String(row.employeeName || value).trim();
+                  const count = Number(row.leadCount) || 0;
+                  if (!value) return null;
+                  return (
+                    <option key={value} value={value}>
+                      {label} — {count.toLocaleString('en-IN')} lead
+                      {count === 1 ? '' : 's'}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          )}
           <div className="flex flex-col min-w-0">
             <label className="text-xs font-medium text-gray-600 mb-1">Import Status</label>
             <select
@@ -318,7 +342,7 @@ export default function MetaFormLeadsTable({
             Clear Filters
           </button>
         </div>
-        {assigneeOptions.length > 0 ? (
+        {!hideAssignedTo && assigneeOptions.length > 0 ? (
           <div className="mt-3 border-t border-violet-100/80 pt-3">
             <p className="mb-2 text-xs font-semibold text-slate-600">
               Leads by employee
@@ -454,10 +478,12 @@ export default function MetaFormLeadsTable({
                               <span className="font-medium text-gray-500">Email: </span>
                               {getLeadEmail(lead)}
                             </p>
-                            <p>
-                              <span className="font-medium text-gray-500">Assigned: </span>
-                              {getAssignedEmployeeName(lead)}
-                            </p>
+                            {hideAssignedTo ? null : (
+                              <p>
+                                <span className="font-medium text-gray-500">Assigned: </span>
+                                {getAssignedEmployeeName(lead)}
+                              </p>
+                            )}
                             <p>
                               <span className="font-medium text-gray-500">Created: </span>
                               {formatLeadCreatedAt(lead)}
@@ -480,7 +506,9 @@ export default function MetaFormLeadsTable({
                             <th className="p-2 border">Phone</th>
                             <th className="p-2 border">Email</th>
                             <th className="p-2 border min-w-[200px]">Product</th>
-                            <th className="p-2 border">Assigned To</th>
+                            {hideAssignedTo ? null : (
+                              <th className="border p-2">Assigned To</th>
+                            )}
                             <th className="p-2 border">Status</th>
                             <th className="p-2 border">Created At</th>
                           </tr>
@@ -500,9 +528,11 @@ export default function MetaFormLeadsTable({
                               <td className="p-2 border align-top min-w-[200px] max-w-md">
                                 <ProductInterestBadge value={getLeadProductInterest(lead)} />
                               </td>
-                              <td className="p-2 border font-semibold">
-                                {getAssignedEmployeeName(lead)}
-                              </td>
+                              {hideAssignedTo ? null : (
+                                <td className="border p-2 font-semibold">
+                                  {getAssignedEmployeeName(lead)}
+                                </td>
+                              )}
                               <td className="p-2 border">{renderLeadStatus(lead)}</td>
                               <td className="p-2 border text-xs whitespace-nowrap">
                                 {formatLeadCreatedAt(lead)}

@@ -90,6 +90,7 @@ export const MODULE_TREE = [
       { key: "denied-leads", label: "Denied Leads" },
       { key: "ads-management", label: "Ads Management" },
       { key: "meta-backfill", label: "Meta Backfill" },
+      { key: "meta-credentials-add", label: "Meta Leads Forms" },
     ],
   },
   {
@@ -315,6 +316,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
       { kind: "leaf", key: "denied-leads", label: "Denied Leads" },
       { kind: "leaf", key: "ads-management", label: "Ads Management" },
       { kind: "leaf", key: "meta-backfill", label: "Meta Backfill" },
+      { kind: "leaf", key: "meta-credentials-add", label: "Meta Leads Forms" },
     ],
   },
   {

@@ -7,6 +7,7 @@ export function getDashboardPrefixFromPathname(pathname) {
     .filter(Boolean)[0];
   if (first === "sales-dashboard") return "/sales-dashboard";
   if (first === "director-dashboard") return "/director-dashboard";
+  if (first === "digital-marketing-dashboard") return "/digital-marketing-dashboard";
   return "/admin-dashboard";
 }
 

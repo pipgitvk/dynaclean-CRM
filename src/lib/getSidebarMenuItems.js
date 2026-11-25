@@ -439,8 +439,8 @@ const allMenuItems = [
         icon: "FileText",
       },
       {
-        path: "/digital-marketing-dashboard/meta-credentials/add",
-        name: "Meta Credentials",
+        path: "/digital-marketing-dashboard/meta-credentials",
+        name: "Meta Leads Forms",
         moduleKey: "meta-credentials-add",
         roles: ["DIGITAL MARKETER"],
         icon: "ShieldCheck",
