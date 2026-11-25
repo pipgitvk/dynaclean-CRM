@@ -1972,13 +1972,15 @@ export async function fetchServiceBeforeInstallationHubCounts(filters = {}) {
      WHERE 1=1 ${amcFilter.sql}`;
 
   const t0 = Date.now();
-  const [wpResult, srResult, amcResult, upcomingTotals, openInstallationBreakdown] = await Promise.all([
-    pool.execute(wpSql, wpFilter.params),
-    pool.execute(srSql, srFilter.params),
-    pool.execute(amcSql, amcFilter.params),
-    countUpcomingInstallationHubTotals(pool, f),
-    fetchOpenInstallationCardsBreakdown(f),
-  ]);
+  const [wpResult, srResult, amcResult, upcomingTotals, openInstallationBreakdown, overdueDelayedCount] =
+    await Promise.all([
+      pool.execute(wpSql, wpFilter.params),
+      pool.execute(srSql, srFilter.params),
+      pool.execute(amcSql, amcFilter.params),
+      countUpcomingInstallationHubTotals(pool, f),
+      fetchOpenInstallationCardsBreakdown(f),
+      countOpenInstallationSegment("overdue-delayed-installation", f),
+    ]);
 
   const wpRow = wpResult[0]?.[0];
   const srRow = srResult[0]?.[0];
@@ -1991,7 +1993,7 @@ export async function fetchServiceBeforeInstallationHubCounts(filters = {}) {
       openInstallationBreakdown?.delivered_installation_pending || 0,
     ),
     open_completions: Number(srRow?.open_completions || 0),
-    overdue_delayed_installation: upcomingTotals.overdue_delayed_installation,
+    overdue_delayed_installation: Number(overdueDelayedCount || 0),
     active_warranty: Number(wpRow?.active_warranty || 0),
     due_warranty_expiry: Number(wpRow?.due_warranty_expiry || 0),
     active_amc: Number(amcRow?.active_amc || 0),
