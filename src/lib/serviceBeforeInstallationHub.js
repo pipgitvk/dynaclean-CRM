@@ -91,7 +91,7 @@ export const SERVICE_BEFORE_INSTALLATION_SEGMENTS = [
   {
     id: "open-installation",
     title: "Open Installation",
-    detailTitle: "Google Feedback Collected",
+    detailTitle: "Installation Management Dashboard",
     subtitle: "Open installations — delivery, completion & Google feedback",
     countKey: "open_installation",
     accent: "from-amber-500 to-orange-600",
@@ -104,6 +104,7 @@ export const SERVICE_BEFORE_INSTALLATION_SEGMENTS = [
   {
     id: "open-completions",
     title: "Open Complaints",
+    detailTitle: "Service Complaints Management Dashboard",
     subtitle: "Pending complaints only",
     countKey: "open_completions",
     accent: "from-sky-500 to-blue-600",
