@@ -487,8 +487,8 @@ const allMenuItems = [
       icon: "ShieldCheck",
       children: [
         {
-          path: "/admin-dashboard/warranty",
-          name: "Register Product",
+          path: "/admin-dashboard/warranty?manual=1",
+          name: "Manual warranty (exceptions)",
           roles: ["SUPERADMIN"],
           icon: "ShieldCheck",
         },

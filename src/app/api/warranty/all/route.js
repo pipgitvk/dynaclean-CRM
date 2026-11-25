@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { getDbConnection } from "@/lib/db";
+import { sqlTrimUtf8EqColumns } from "@/lib/sqlUtf8Compare";
 
 const WARRANTY_SEARCH_FIELDS = [
   "wp.product_name",
@@ -237,7 +238,15 @@ export async function GET(req) {
 
     // Get paginated data (state comes directly from warranty_products)
     const [rows] = await pool.execute(
-      `SELECT *
+      `SELECT wp.*,
+         (
+           SELECT sr.service_id
+           FROM service_records sr
+           WHERE ${sqlTrimUtf8EqColumns("sr.serial_number", "wp.serial_number")}
+             AND UPPER(TRIM(COALESCE(sr.service_type, ''))) = 'INSTALLATION'
+           ORDER BY sr.service_id DESC
+           LIMIT 1
+         ) AS installation_service_id
        FROM warranty_products wp
        ${whereClause}
        ORDER BY wp.id DESC

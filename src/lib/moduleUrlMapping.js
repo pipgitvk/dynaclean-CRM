@@ -67,7 +67,7 @@ export const MODULE_KEY_TO_URL = {
 
   "service-before-installation": "/admin-dashboard/service-before-installation",
   // Service & After-Sales
-  "warranty-console": "/admin-dashboard/warranty",
+  "warranty-console": "/admin-dashboard/warranty/products",
   "registered-products": "/admin-dashboard/warranty/products",
   "service-followups": "/admin-dashboard/service-followups",
   "service-support-report": "/admin-dashboard/service-support-report",

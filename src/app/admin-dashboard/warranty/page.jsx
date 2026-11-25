@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import Link from "next/link";
 import WarrantyRegistrationFormCard from "./WarrantyRegistrationFormCard";
 import WarrantyDispatchItemLabel from "@/components/warranty/WarrantyDispatchItemLabel";
+import { STANDARD_WARRANTY_PERIOD_MONTHS } from "@/lib/warrantyDefaults";
 
 const STATES = [
   "Andhra Pradesh (28)",
@@ -73,12 +75,14 @@ function dispatchToForm(d) {
     customer_address: d.customer_address || "",
     invoice_number: d.invoice_number || "",
     invoice_date: d.invoice_date ? String(d.invoice_date).slice(0, 10) : "",
+    warranty_period: String(STANDARD_WARRANTY_PERIOD_MONTHS),
   };
 }
 
 export default function WarrantyForm() {
+  const router = useRouter();
   const [mode, setMode] = useState("manual");
-  const [showModeModal, setShowModeModal] = useState(true);
+  const [showModeModal, setShowModeModal] = useState(false);
   const [orderId, setOrderId] = useState("");
   const [orderDispatches, setOrderDispatches] = useState([]);
   const [orderError, setOrderError] = useState("");
@@ -90,12 +94,22 @@ export default function WarrantyForm() {
     const params = new URLSearchParams(window.location.search);
     const oid = String(params.get("order_id") || "").trim();
     const modeParam = String(params.get("mode") || "").trim().toLowerCase();
+    const manual = params.get("manual") === "1";
+
     if (oid && modeParam === "order") {
       setOrderId(oid);
       setMode("order");
+      setShowModeModal(true);
+      return;
     }
-    setShowModeModal(true);
-  }, []);
+
+    if (manual) {
+      setShowModeModal(true);
+      return;
+    }
+
+    router.replace("/admin-dashboard/warranty/products");
+  }, [router]);
 
   const fetchByOrderId = useCallback(async (silent = false) => {
     const trimmed = orderId.trim();
@@ -257,7 +271,9 @@ export default function WarrantyForm() {
             </button>
             <h3 className="mb-2 text-lg font-semibold">Warranty Registration</h3>
             <p className="mb-4 text-sm text-gray-600">
-              Choose how you want to register the warranty.
+              Products appear in Registered Products automatically when delivery
+              is marked on the order. Use this page only for exceptions or older
+              orders that were not auto-registered.
             </p>
             <div className="mb-4 space-y-2">
               <label className="flex items-center gap-2 text-sm">

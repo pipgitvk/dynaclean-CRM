@@ -1633,19 +1633,24 @@ function registrationExport(row) {
 function OpenInstallationRegistrationCell({ row, dashboardBase }) {
   const registered = Number(row.warranty_registered) === 1;
   const orderId = String(row.order_id || "").trim();
-  const warrantyRegisterHref =
+  const productsHref =
     orderId &&
-    `/${dashboardBase}/warranty?mode=order&order_id=${encodeURIComponent(orderId)}`;
+    `/${dashboardBase}/warranty/products?search=${encodeURIComponent(orderId)}`;
   return (
     <div className="min-w-[8rem] space-y-1.5">
       {registered ? <RegistrationDateByCell row={row} /> : null}
       <OpenInstallationRegistrationBadge row={row} dashboardBase={dashboardBase} />
-      {!registered && warrantyRegisterHref ? (
+      {!registered ? (
+        <span className="block text-[10px] leading-snug text-slate-500">
+          Auto-registers when delivery is marked
+        </span>
+      ) : null}
+      {registered && productsHref ? (
         <Link
-          href={warrantyRegisterHref}
+          href={productsHref}
           className="inline-flex rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-[11px] font-semibold text-violet-800 hover:bg-violet-100"
         >
-          Register now
+          Registered Products
         </Link>
       ) : null}
     </div>

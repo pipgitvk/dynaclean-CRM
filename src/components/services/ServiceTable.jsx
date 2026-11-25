@@ -156,6 +156,13 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
   // Assign modal state
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [assignServiceId, setAssignServiceId] = useState(null);
+  const [assignRecord, setAssignRecord] = useState(null);
+  const [assignSiteForm, setAssignSiteForm] = useState({
+    installation_address: "",
+    site_person: "",
+    site_email: "",
+    site_contact: "",
+  });
   const [assignEngineer, setAssignEngineer] = useState("NOT ASSIGNED");
   const [assignThirdPartyId, setAssignThirdPartyId] = useState("");
   const [engineers, setEngineers] = useState([]);
@@ -811,15 +818,27 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
     }
   };
 
-  const assignServiceRecord = async (serviceId, assignedTo, thirdPartyEngineerId) => {
+  const assignServiceRecord = async (
+    serviceId,
+    assignedTo,
+    thirdPartyEngineerId,
+    installationSite = null,
+  ) => {
+    const body = {
+      service_id: serviceId,
+      assigned_to: assignedTo,
+      third_party_engineer_id: thirdPartyEngineerId || null,
+    };
+    if (installationSite) {
+      body.installation_address = installationSite.installation_address;
+      body.site_person = installationSite.site_person;
+      body.site_email = installationSite.site_email;
+      body.site_contact = installationSite.site_contact;
+    }
     const res = await fetch("/api/service-status/assign", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        service_id: serviceId,
-        assigned_to: assignedTo,
-        third_party_engineer_id: thirdPartyEngineerId || null,
-      }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
       const d = await res.json().catch(() => ({}));
@@ -1126,6 +1145,17 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
 
   const openAssignModal = async (record) => {
     setAssignServiceId(record.service_id);
+    setAssignRecord(record);
+    setAssignSiteForm({
+      installation_address:
+        record.installed_address_from_wp ||
+        record.installed_address ||
+        "",
+      site_person: record.site_person || record.contact_person_from_wp || "",
+      site_email:
+        record.site_email_from_wp || record.site_email || record.email || "",
+      site_contact: record.site_contact || record.contact || "",
+    });
     setAssignEngineer(record.assigned_to || "NOT ASSIGNED");
     setAssignThirdPartyId(thirdPartyIdFromRecord(record));
     setAssignError("");
@@ -1144,13 +1174,33 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
   const closeAssignModal = () => {
     if (isAssignSubmitting) return;
     setIsAssignModalOpen(false);
+    setAssignRecord(null);
     setAssignError("");
   };
 
   const handleAssignSubmit = async () => {
+    const isInstallation =
+      String(assignRecord?.service_type || "").toUpperCase() === "INSTALLATION";
     if (!assignServiceId || !assignEngineer) {
       setAssignError("Please select an engineer.");
       return;
+    }
+    if (isInstallation) {
+      if (String(assignEngineer).trim().toUpperCase() === "NOT ASSIGNED") {
+        setAssignError("Please select a user to assign.");
+        return;
+      }
+      const { installation_address, site_person, site_email, site_contact } =
+        assignSiteForm;
+      if (
+        !installation_address?.trim() ||
+        !site_person?.trim() ||
+        !site_email?.trim() ||
+        !site_contact?.trim()
+      ) {
+        setAssignError("Please fill all installation site fields.");
+        return;
+      }
     }
     setIsAssignSubmitting(true);
     setAssignError("");
@@ -1159,8 +1209,10 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
         assignServiceId,
         assignEngineer,
         assignThirdPartyId,
+        isInstallation ? assignSiteForm : null,
       );
       setIsAssignModalOpen(false);
+      setAssignRecord(null);
     } catch (err) {
       setAssignError(err.message || "Something went wrong.");
     } finally {
@@ -2279,6 +2331,76 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
               Assign Service (ID: {assignServiceId})
             </h3>
             <div className="space-y-4">
+              {String(assignRecord?.service_type || "").toUpperCase() ===
+                "INSTALLATION" && (
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Installation Address
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                      placeholder="Enter complete address"
+                      value={assignSiteForm.installation_address}
+                      onChange={(e) =>
+                        setAssignSiteForm((p) => ({
+                          ...p,
+                          installation_address: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Site Person Name
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                      value={assignSiteForm.site_person}
+                      onChange={(e) =>
+                        setAssignSiteForm((p) => ({
+                          ...p,
+                          site_person: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Site Person Email
+                    </label>
+                    <input
+                      type="email"
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                      value={assignSiteForm.site_email}
+                      onChange={(e) =>
+                        setAssignSiteForm((p) => ({
+                          ...p,
+                          site_email: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Site Person Contact
+                    </label>
+                    <input
+                      type="tel"
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                      value={assignSiteForm.site_contact}
+                      onChange={(e) =>
+                        setAssignSiteForm((p) => ({
+                          ...p,
+                          site_contact: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Assign To (Internal)

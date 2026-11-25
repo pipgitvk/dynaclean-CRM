@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import toast from "react-hot-toast";
 import Link from "next/link";
+import { STANDARD_WARRANTY_PERIOD_MONTHS } from "@/lib/warrantyDefaults";
 
 export default function WarrantyForm() {
   const [form, setForm] = useState({});
@@ -193,6 +194,7 @@ export default function WarrantyForm() {
       customer_address: d.customer_address || "",
       invoice_number: d.invoice_number || "",
       invoice_date: d.invoice_date ? String(d.invoice_date).slice(0, 10) : "",
+      warranty_period: String(STANDARD_WARRANTY_PERIOD_MONTHS),
     }));
     setMode("order");
     setShowModeModal(false);

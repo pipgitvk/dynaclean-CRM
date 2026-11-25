@@ -548,13 +548,18 @@ export default function WarrantyPage() {
                     <ProductFollowupIcons product={r} className="mb-1" />
                     <div className="font-semibold text-sm">{r.product_name}</div>
                     <div className="text-[11px] text-gray-600">{r.model} · {r.serial_number}</div>
+                    {r.installation_service_id ? (
+                      <div className="text-blue-700 font-mono text-[11px]">
+                        Service ID: {r.installation_service_id}
+                      </div>
+                    ) : null}
                   </div>
                   <div className={`text-[11px] text-right ${getWarrantyStatus(r.installation_date, r.warranty_period).color}`}>
                     {getWarrantyStatus(r.installation_date, r.warranty_period).status}
                   </div>
                 </div>
                 <div className="pt-2 flex flex-wrap gap-1">
-                  {!r.installed_address && (
+                  {!r.installation_service_id && !r.installed_address && (
                     <button onClick={() => setModal({ type: "install", serial: r.serial_number })}
                       className="bg-green-500 hover:bg-green-600 text-white text-[11px] py-1 px-2 rounded-md">
                       Install
@@ -602,7 +607,14 @@ export default function WarrantyPage() {
                       <td className="p-3 border-b border-gray-200">
                         <ProductFollowupIcons product={r} />
                         <div className="font-semibold">{r.product_name}</div>
-                        {r.model && <div className="text-xs text-gray-600">Model: {r.model}</div>}
+                        {r.model && (
+                          <div className="text-xs text-gray-600">Model: {r.model}</div>
+                        )}
+                        {r.installation_service_id ? (
+                          <div className="text-xs text-blue-700 font-mono mt-0.5">
+                            Service ID: {r.installation_service_id}
+                          </div>
+                        ) : null}
                       </td>
                       <td className="p-3 border-b border-gray-200 relative group max-w-[200px]">
                         <div className="line-clamp-2 text-xs whitespace-pre-wrap group-hover:line-clamp-none group-hover:absolute group-hover:bg-white group-hover:border group-hover:border-gray-300 group-hover:shadow-lg group-hover:z-20 group-hover:p-3 group-hover:rounded group-hover:max-w-md group-hover:left-0 group-hover:top-0">
@@ -674,7 +686,7 @@ export default function WarrantyPage() {
                         ) : <div className="text-gray-400">---</div>}
                       </td>
                       <td className="p-3 border-b border-gray-200 space-y-1">
-                        {!r.installed_address && (
+                        {!r.installation_service_id && !r.installed_address && (
                           <button onClick={() => setModal({ type: "install", serial: r.serial_number })}
                             className="block w-full text-center bg-green-500 hover:bg-green-600 text-white text-xs py-1 px-2 rounded-md mb-1">
                             Install

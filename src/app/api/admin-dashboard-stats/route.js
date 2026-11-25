@@ -228,7 +228,7 @@ export async function GET(req) {
       FROM neworder
       WHERE installation_status = 0
         AND delivery_date IS NOT NULL
-        AND dispatch_status = 1
+        AND COALESCE(delivery_status, 0) IN (1, 2)
         AND DATE(delivery_date) BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 10 DAY)
     `);
 
@@ -239,7 +239,7 @@ export async function GET(req) {
       FROM neworder
       WHERE installation_status = 0
         AND delivery_date IS NOT NULL
-        AND dispatch_status = 1
+        AND COALESCE(delivery_status, 0) IN (1, 2)
         AND DATE(delivery_date) < CURDATE()
     `);
 

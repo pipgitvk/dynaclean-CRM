@@ -22,6 +22,8 @@ import {
   persistOrderDeliveryBatch,
 } from "@/lib/orderDeliveryBatches";
 import { attachDispatchShipmentWavesToOrders } from "@/lib/orderDeliverySlots";
+import { autoRegisterWarrantyProductsOnDelivery } from "@/lib/autoRegisterWarrantyOnDelivery";
+import { autoCreateInstallationRequestsOnDelivery } from "@/lib/autoCreateInstallationOnDelivery";
 
 export async function POST(request) {
   try {
@@ -193,9 +195,25 @@ export async function POST(request) {
       ],
     );
 
+    let warrantyAutoRegistered = 0;
+    let installationAutoCreated = 0;
+    try {
+      const reg = await autoRegisterWarrantyProductsOnDelivery(conn, order_id);
+      warrantyAutoRegistered = Number(reg?.inserted ?? 0);
+      const inst = await autoCreateInstallationRequestsOnDelivery(
+        conn,
+        order_id,
+      );
+      installationAutoCreated = Number(inst?.inserted ?? 0);
+    } catch (regErr) {
+      console.error("Auto warranty/install on delivery:", regErr);
+    }
+
     return NextResponse.json({
       success: true,
       message: "Delivery status updated successfully",
+      warrantyAutoRegistered,
+      installationAutoCreated,
     });
   } catch (error) {
     console.error("Error updating delivery status:", error);

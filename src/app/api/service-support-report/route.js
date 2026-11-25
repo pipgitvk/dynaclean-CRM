@@ -67,7 +67,7 @@ function buildInstallBaseConditions(empPlaceholders) {
     `(no.is_returned = 0 OR no.is_returned = 2 OR no.is_returned IS NULL)`,
     `(no.is_cancelled = 0 OR no.is_cancelled IS NULL)`,
     `no.delivery_date IS NOT NULL`,
-    `no.dispatch_status = 1`,
+    `COALESCE(no.delivery_status, 0) IN (1, 2)`,
     `no.created_by IN (${empPlaceholders})`,
     `EXISTS (
       SELECT 1 FROM dispatch d
