@@ -30,6 +30,24 @@ import {
 import { isServiceRecordAssigned } from "@/lib/serviceRecordAssignment";
 import MachineRegistrationModal from "@/components/warranty/MachineRegistrationModal";
 
+/** Installation assign: hide site fields when all four are already on warranty. */
+function installationSiteDetailsSubmitted(record) {
+  if (!record) return false;
+  const installation_address = String(
+    record.installed_address_from_wp || record.installed_address || "",
+  ).trim();
+  const site_person = String(
+    record.site_person || record.contact_person_from_wp || "",
+  ).trim();
+  const site_email = String(
+    record.site_email_from_wp || record.site_email || record.email || "",
+  ).trim();
+  const site_contact = String(record.site_contact || record.contact || "").trim();
+  return Boolean(
+    installation_address && site_person && site_email && site_contact,
+  );
+}
+
 function ServiceRecordCompanyCell({ record }) {
   const company = String(record.customer_name || "").trim() || "N/A";
   const sitePerson = String(
@@ -1190,13 +1208,15 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
         setAssignError("Please select a user to assign.");
         return;
       }
+      const siteAlreadySaved = installationSiteDetailsSubmitted(assignRecord);
       const { installation_address, site_person, site_email, site_contact } =
         assignSiteForm;
       if (
-        !installation_address?.trim() ||
-        !site_person?.trim() ||
-        !site_email?.trim() ||
-        !site_contact?.trim()
+        !siteAlreadySaved &&
+        (!installation_address?.trim() ||
+          !site_person?.trim() ||
+          !site_email?.trim() ||
+          !site_contact?.trim())
       ) {
         setAssignError("Please fill all installation site fields.");
         return;
@@ -2332,7 +2352,15 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
             </h3>
             <div className="space-y-4">
               {String(assignRecord?.service_type || "").toUpperCase() ===
-                "INSTALLATION" && (
+                "INSTALLATION" &&
+                installationSiteDetailsSubmitted(assignRecord) && (
+                  <p className="rounded-md border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+                    Installation site details are already saved — assign engineer below.
+                  </p>
+                )}
+              {String(assignRecord?.service_type || "").toUpperCase() ===
+                "INSTALLATION" &&
+                !installationSiteDetailsSubmitted(assignRecord) && (
                 <>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1">
