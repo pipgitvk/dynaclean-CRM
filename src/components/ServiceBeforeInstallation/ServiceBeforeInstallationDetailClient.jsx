@@ -22,7 +22,13 @@ import {
   Shield,
   ShieldCheck,
   Wrench,
+  X,
+  History,
 } from "lucide-react";
+import {
+  displayComplaintDateForServiceRecord,
+  displayRegDateForServiceRecord,
+} from "@/lib/serviceRecordComplaintDisplay";
 import {
   getActiveAmcKpiMeta,
   getActiveWarrantyKpiMeta,
@@ -73,6 +79,7 @@ import {
 import OpenInstallationStatusColumn from "@/components/installation/OpenInstallationStatusColumn";
 import OpenInstallationReportButton from "@/components/installation/OpenInstallationReportButton";
 import OpenInstallationServicesModal from "@/components/installation/OpenInstallationServicesModal";
+import PaymentPendingOrderDetailsModal from "@/components/reports/PaymentPendingOrderDetailsModal";
 import { parseOpenInstallationDispatchItems } from "@/lib/openInstallationDispatchItems";
 import { listOpenInstallationSerialNumbers } from "@/lib/openInstallationServiceLineItems";
 import {
@@ -353,25 +360,58 @@ function SiteContactDetailBlock({ row }) {
   );
 }
 
-function InvoiceDetailBlock({ row }) {
-  const hasAny = row.invoice_number || row.invoice_date || row.invoice_file;
+function InvoiceDetailBlock({ row, userRole = "" }) {
+  const [orderModalId, setOrderModalId] = useState(null);
+  const orderId = String(row.order_id || "").trim();
+  const hasAny =
+    row.invoice_number || row.invoice_date || row.invoice_file || orderId;
   if (!hasAny) return <span className="text-slate-400">—</span>;
   const invoiceFile = row.invoice_file ? String(row.invoice_file).trim() : "";
   return (
-    <div className="min-w-[9rem] max-w-[14rem] space-y-0.5 text-xs">
-      <DetailField label="#" value={row.invoice_number} />
-      <DetailField label="Date" value={formatDate(row.invoice_date)} />
-      {invoiceFile ? (
-        <a
-          href={`/uploads/${invoiceFile}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-block font-semibold text-violet-700 underline hover:text-violet-900"
-        >
-          View File
-        </a>
-      ) : null}
-    </div>
+    <>
+      <div className="min-w-[9rem] max-w-[14rem] space-y-0.5 text-xs">
+        <DetailField label="#" value={row.invoice_number} />
+        <DetailField label="Date" value={formatDate(row.invoice_date)} />
+        {orderId ? (
+          <OrderIdOpenButton
+            orderId={orderId}
+            onOpen={() => setOrderModalId(orderId)}
+          />
+        ) : null}
+        {invoiceFile ? (
+          <a
+            href={`/uploads/${invoiceFile}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block font-semibold text-violet-700 underline hover:text-violet-900"
+          >
+            View File
+          </a>
+        ) : null}
+      </div>
+      <PaymentPendingOrderDetailsModal
+        open={Boolean(orderModalId)}
+        orderId={orderModalId}
+        userRole={userRole}
+        onClose={() => setOrderModalId(null)}
+      />
+    </>
+  );
+}
+
+function OrderIdOpenButton({ orderId, onOpen }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="inline-flex items-center gap-1 rounded-md border border-violet-200 bg-violet-50 px-2 py-0.5 text-left font-semibold text-violet-800 hover:bg-violet-100 hover:underline"
+      title="View order details"
+    >
+      <Eye className="h-3 w-3 shrink-0" aria-hidden />
+      <span>
+        <span className="font-medium text-slate-500">Order</span> {orderId}
+      </span>
+    </button>
   );
 }
 
@@ -929,6 +969,7 @@ function exportRowsCsv(rows, segment) {
       ];
     }
     if (segment === "total-registered") {
+      const orderId = String(row.order_id || "").trim();
       const modelText = [row.product_name, row.model].filter(Boolean).join(" ");
       const sales = salesPersonLabel(row);
       const engineer = isServiceRecordAssigned(row.service_engineer)
@@ -959,7 +1000,13 @@ function exportRowsCsv(rows, segment) {
         row.state,
         `Installation: ${formatDate(row.installation_date)} | Warranty end: ${formatDate(row.warranty_end_date)}`,
         row.installed_address,
-        [row.invoice_number, formatDate(row.invoice_date)].filter(Boolean).join(" "),
+        [
+          row.invoice_number,
+          formatDate(row.invoice_date),
+          orderId ? `Order: ${orderId}` : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
         [
           sales ? `Sales: ${sales}` : "",
           engineer ? `Service engineer: ${engineer}` : "",
@@ -1017,7 +1064,167 @@ function registeredProductHistoryPayload(row) {
   };
 }
 
-function RegisteredProductActionCell({ row, onMachineHistory, onWarrantyAction }) {
+function RegisteredProductServiceHistoryModal({
+  open,
+  serialNumber,
+  dashboardBase,
+  onClose,
+}) {
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!open || !serialNumber) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError("");
+      setRecords([]);
+      try {
+        const res = await fetch(
+          `/api/service-records?serial_number=${encodeURIComponent(serialNumber)}`,
+        );
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || "Failed to load service history");
+        if (!cancelled) {
+          setRecords(Array.isArray(data.records) ? data.records : []);
+        }
+      } catch (e) {
+        if (!cancelled) setError(e?.message || "Failed to load service history");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, serialNumber]);
+
+  if (!open) return null;
+
+  const fullPageHref = serialNumber
+    ? `/${dashboardBase}/warranty/service-records/${encodeURIComponent(serialNumber)}`
+    : null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="flex max-h-[90vh] w-full max-w-5xl flex-col rounded-xl bg-white shadow-xl">
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b px-5 py-4">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <History className="h-5 w-5 text-violet-600" aria-hidden />
+              Service History
+            </h3>
+            <p className="text-sm text-slate-500 mt-0.5">
+              Serial: <span className="font-semibold text-slate-800">{serialNumber}</span>
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-auto p-4">
+          {loading ? (
+            <div className="flex items-center justify-center gap-2 py-12 text-sm text-slate-600">
+              <Loader2 className="h-5 w-5 animate-spin text-violet-600" />
+              Loading service records…
+            </div>
+          ) : error ? (
+            <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
+          ) : records.length === 0 ? (
+            <p className="py-12 text-center text-sm text-slate-500">
+              No service records for this serial.
+            </p>
+          ) : (
+            <table className="min-w-full text-sm border border-slate-200 rounded-lg overflow-hidden">
+              <thead className="bg-slate-100 text-left text-xs font-semibold uppercase text-slate-600">
+                <tr>
+                  <th className="px-3 py-2">Service ID</th>
+                  <th className="px-3 py-2">Type</th>
+                  <th className="px-3 py-2">Reg. Date</th>
+                  <th className="px-3 py-2">Complaint Date</th>
+                  <th className="px-3 py-2">Summary</th>
+                  <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2">Completed</th>
+                  <th className="px-3 py-2 text-right">Report</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {records.map((row) => (
+                  <tr key={row.service_id} className="hover:bg-violet-50/40">
+                    <td className="px-3 py-2 font-mono text-xs font-semibold text-violet-800">
+                      {row.service_id}
+                    </td>
+                    <td className="px-3 py-2 text-slate-700">{row.service_type || "—"}</td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {displayRegDateForServiceRecord(row) || "—"}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {displayComplaintDateForServiceRecord(row) || "—"}
+                    </td>
+                    <td className="px-3 py-2 max-w-[200px] truncate" title={row.complaint_summary}>
+                      {row.complaint_summary || "—"}
+                    </td>
+                    <td className="px-3 py-2 text-xs font-medium">{row.status || "—"}</td>
+                    <td className="px-3 py-2 whitespace-nowrap text-xs">
+                      {row.completed_date || "—"}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <Link
+                        href={`/${dashboardBase}/warranty/completion-report/${row.service_id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs font-semibold text-violet-700 hover:underline"
+                      >
+                        View
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div className="flex shrink-0 items-center justify-between gap-2 border-t px-5 py-3">
+          {fullPageHref ? (
+            <Link
+              href={fullPageHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm font-semibold text-violet-700 hover:underline"
+            >
+              Open full service records page
+            </Link>
+          ) : (
+            <span />
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-300"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RegisteredProductActionCell({
+  row,
+  onMachineHistory,
+  onWarrantyAction,
+  onServiceHistory,
+}) {
   const serial = String(row.serial_number || "").trim();
   if (!serial) return <span className="text-slate-300">—</span>;
 
@@ -1060,10 +1267,17 @@ function RegisteredProductActionCell({ row, onMachineHistory, onWarrantyAction }
       </button>
       <button
         type="button"
+        className={`${btn} bg-slate-700 hover:bg-slate-800`}
+        onClick={() => onServiceHistory?.(serial)}
+      >
+        Service History
+      </button>
+      <button
+        type="button"
         className={`${btn} bg-indigo-700 hover:bg-indigo-800`}
         onClick={() => runAction("history")}
       >
-        History
+        Follow-up History
       </button>
     </div>
   );
@@ -1075,8 +1289,10 @@ function WarrantyProductRows({
   page,
   pageSize,
   segment,
+  userRole = "",
   onMachineHistory,
   onWarrantyAction,
+  onServiceHistory,
 }) {
   const detailLayout = segment === "total-registered";
 
@@ -1217,7 +1433,7 @@ function WarrantyProductRows({
           </span>
         </td>
         <td className="px-4 py-3.5 align-top">
-          <InvoiceDetailBlock row={row} />
+          <InvoiceDetailBlock row={row} userRole={userRole} />
         </td>
         <td className="px-4 py-3.5 align-top">
           <SalesServiceTeamBlock row={row} />
@@ -1227,6 +1443,7 @@ function WarrantyProductRows({
             row={row}
             onMachineHistory={onMachineHistory}
             onWarrantyAction={onWarrantyAction}
+            onServiceHistory={onServiceHistory}
           />
         </td>
       </tr>
@@ -1883,6 +2100,7 @@ function TableBody({
   onMachineFollowUp,
   onMachineHistory,
   onWarrantyAction,
+  onServiceHistory,
   ProductFollowupIcons,
 }) {
   if (segment === "open-installation" || segment === "overdue-delayed-installation") {
@@ -1925,8 +2143,10 @@ function TableBody({
       page={page}
       pageSize={pageSize}
       segment={segment}
+      userRole={userRole}
       onMachineHistory={segment === "total-registered" ? onMachineHistory : undefined}
       onWarrantyAction={segment === "total-registered" ? onWarrantyAction : undefined}
+      onServiceHistory={segment === "total-registered" ? onServiceHistory : undefined}
     />
   );
 }
@@ -1956,6 +2176,7 @@ export default function ServiceBeforeInstallationDetailClient({
   const { ProductFollowupIcons, followupModals, openMachineFollowUp, openMachineHistory } =
     useWarrantyProductFollowup();
   const [warrantyRowModal, setWarrantyRowModal] = useState(null);
+  const [serviceHistorySerial, setServiceHistorySerial] = useState(null);
 
   const handleWarrantyRowAction = useCallback((type, serial) => {
     setWarrantyRowModal({
@@ -3531,6 +3752,11 @@ export default function ServiceBeforeInstallationDetailClient({
                     onWarrantyAction={
                       segment === "total-registered" ? handleWarrantyRowAction : undefined
                     }
+                    onServiceHistory={
+                      segment === "total-registered"
+                        ? (serial) => setServiceHistorySerial(String(serial || "").trim())
+                        : undefined
+                    }
                     ProductFollowupIcons={
                       segment === "open-installation" ||
                       segment === "overdue-delayed-installation" ||
@@ -3621,6 +3847,12 @@ export default function ServiceBeforeInstallationDetailClient({
         </div>
       </div>
       {followupModals}
+      <RegisteredProductServiceHistoryModal
+        open={Boolean(serviceHistorySerial)}
+        serialNumber={serviceHistorySerial}
+        dashboardBase={dashboardBase}
+        onClose={() => setServiceHistorySerial(null)}
+      />
       {segment === "total-registered" ? <Toaster position="top-right" /> : null}
       {warrantyRowModal?.type === "install" && warrantyRowModal.serial ? (
         <WarrantyInstallRequestModal
