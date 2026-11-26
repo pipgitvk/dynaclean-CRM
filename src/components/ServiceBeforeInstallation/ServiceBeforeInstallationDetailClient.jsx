@@ -88,6 +88,7 @@ import {
   openInstallationViewMoreBtnClassCompact,
 } from "@/components/installation/openInstallationViewMoreBtnClass";
 import { useWarrantyProductFollowup } from "@/components/warranty/WarrantyProductFollowupControls";
+import { formatFollowedAtDisplay } from "@/lib/enrichSbiLastFollowup";
 import {
   WarrantyComplaintModal,
   WarrantyProductEditModal,
@@ -317,6 +318,22 @@ function applyFilterState(setDraft, setApplied, next) {
 function formatDate(raw) {
   if (!raw) return "—";
   return formatCrmDatetimeForISTDisplay(raw) || formatCrmDateOnly(String(raw).slice(0, 10)) || "—";
+}
+
+function LastFollowupTableCell({ value, className = "px-4 py-3.5" }) {
+  const formatted = formatFollowedAtDisplay(value);
+  return (
+    <td className={`min-w-[10.5rem] whitespace-nowrap text-sm ${className}`}>
+      {formatted ? (
+        <>
+          <span className="text-slate-500">Last Followed:</span>{" "}
+          <span className="font-medium tabular-nums text-slate-800">{formatted}</span>
+        </>
+      ) : (
+        "—"
+      )}
+    </td>
+  );
 }
 
 function DetailField({ label, value, multiline = false }) {
@@ -1477,6 +1494,7 @@ function WarrantyProductRows({
           <td className="max-w-[220px] px-4 py-3.5 xl:max-w-none">
             <span className="line-clamp-2 text-slate-700">{row.installed_address || "—"}</span>
           </td>
+          <LastFollowupTableCell value={row.last_followup_at} />
           <td className="whitespace-nowrap px-4 py-3.5 text-right">
             <div className="inline-flex items-center gap-1">
               {serialHref ? (
@@ -1525,6 +1543,7 @@ function WarrantyProductRows({
         <td className="px-4 py-3.5 align-top">
           <SalesServiceTeamBlock row={row} />
         </td>
+        <LastFollowupTableCell value={row.last_followup_at} className="px-4 py-3.5 align-top" />
         <td className="px-4 py-3.5 text-right align-top">
           <RegisteredProductActionCell
             row={row}
@@ -2038,6 +2057,7 @@ function OpenInstallationRows({
             />
           )}
         </td>
+        <LastFollowupTableCell value={row.last_followup_at} className="px-4 py-3.5 align-top" />
         <td className="px-4 py-3.5 align-top">
           <OpenInstallationActionCell
             row={row}
@@ -2064,6 +2084,7 @@ function AmcRows({ rows, page, pageSize }) {
         <td className="px-4 py-3.5">{row.status || "—"}</td>
         <td className="px-4 py-3.5">{formatDate(row.amc_start_datetime)}</td>
         <td className="px-4 py-3.5">{formatDate(row.amc_end_datetime)}</td>
+        <LastFollowupTableCell value={row.last_followup_at} />
       </tr>
     );
   });
@@ -2106,6 +2127,7 @@ function TableHead({ segment }) {
         <th className={th}>Regst. / Registration</th>
         <th className={th}>Google Feedback</th>
         <th className={th}>Status</th>
+        <th className={th}>Last Followed</th>
         <th className={th}>Action</th>
       </tr>
     );
@@ -2123,6 +2145,7 @@ function TableHead({ segment }) {
         <th className={th}>Status</th>
         <th className={th}>AMC Start</th>
         <th className={th}>AMC End</th>
+        <th className={th}>Last Followed</th>
       </tr>
     );
   }
@@ -2139,6 +2162,7 @@ function TableHead({ segment }) {
         <th className={th}>Installation</th>
         <th className={th}>Warranty End</th>
         <th className={th}>Installed Address</th>
+        <th className={th}>Last Followed</th>
         <th className={`${th} text-right`}>Actions</th>
       </tr>
     );
@@ -2156,6 +2180,7 @@ function TableHead({ segment }) {
         <th className={th}>Installed Address</th>
         <th className={th}>Invoice</th>
         <th className={th}>Sales / Service</th>
+        <th className={th}>Last Followed</th>
         <th className={`${th} text-right min-w-[7rem]`}>Action</th>
       </tr>
     );
@@ -2170,6 +2195,7 @@ function TableHead({ segment }) {
       <th className={th}>Installation</th>
       <th className={th}>Warranty End</th>
       <th className={th}>Installed Address</th>
+      <th className={th}>Last Followed</th>
       <th className={`${th} text-right`}>Actions</th>
     </tr>
   );
@@ -2239,13 +2265,13 @@ function TableBody({
 }
 
 function colSpanForSegment(segment) {
-  if (segment === "total-registered") return 11;
-  if (segment === "active-warranty") return 11;
-  if (isWarrantyProductSegment(segment)) return 9;
-  if (segment === "open-completions") return 13;
-  if (segment === "open-installation" || segment === "overdue-delayed-installation") return 13;
-  if (segment === "active-amc" || segment === "due-amc-expiring") return 7;
-  return 9;
+  if (segment === "total-registered") return 12;
+  if (segment === "active-warranty") return 12;
+  if (isWarrantyProductSegment(segment)) return 10;
+  if (segment === "open-completions") return 14;
+  if (segment === "open-installation" || segment === "overdue-delayed-installation") return 14;
+  if (segment === "active-amc" || segment === "due-amc-expiring") return 8;
+  return 10;
 }
 
 export default function ServiceBeforeInstallationDetailClient({

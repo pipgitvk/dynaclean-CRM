@@ -8,6 +8,7 @@ import {
   sqlUtf8TrimExpr,
 } from "@/lib/sqlUtf8Compare";
 import { enrichOpenInstallationRowsWithServices } from "@/lib/openInstallationServiceEnrich";
+import { enrichRowsWithLastMachineFollowup } from "@/lib/enrichSbiLastFollowup";
 import {
   sqlOrderGoogleFeedbackCollected,
   sqlOrderGoogleFeedbackNotCollected,
@@ -273,6 +274,11 @@ export async function fetchOpenInstallationGoogleFeedbackPage(
   let enriched = await enrichDispatchLite(conn, rows);
   if (!skipServiceEnrich) {
     enriched = await enrichOpenInstallationRowsWithServices(conn, enriched);
+  }
+  try {
+    await enrichRowsWithLastMachineFollowup(conn, enriched);
+  } catch (err) {
+    console.warn("[sbi google-feedback] last followup enrich skipped:", err?.message || err);
   }
 
   return {

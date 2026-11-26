@@ -63,6 +63,7 @@ import {
 } from "@/lib/serviceBeforeInstallationWpExpressions";
 import { enrichOpenInstallationRowsWithServices } from "@/lib/openInstallationServiceEnrich";
 import { mergeOpenInstallationParallelEnrichment } from "@/lib/openInstallationListEnrich";
+import { enrichRowsWithLastMachineFollowup } from "@/lib/enrichSbiLastFollowup";
 
 function upcomingOverdueDelayedExtraSql() {
   return ` AND u.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)`;
@@ -1208,6 +1209,14 @@ async function fetchOpenInstallationNeworderPage(
     }
   }
 
+  if (enriched.length && !deferServiceEnrich) {
+    try {
+      await enrichRowsWithLastMachineFollowup(conn, enriched);
+    } catch (err) {
+      console.warn("[sbi open-installation] last followup enrich skipped:", err?.message || err);
+    }
+  }
+
   let total;
   if (!skipTotal) {
     const [[countRow]] = await conn.execute(
@@ -1563,7 +1572,13 @@ export async function enrichOpenInstallationListServices(rows) {
   const conn = await getDbConnection();
   const withDispatch = await enrichOpenInstallationRowsWithDispatch(conn, rows);
   const withServices = await enrichOpenInstallationRowsWithServices(conn, withDispatch);
-  return mergeOpenInstallationParallelEnrichment(withDispatch, withServices);
+  const merged = mergeOpenInstallationParallelEnrichment(withDispatch, withServices);
+  try {
+    await enrichRowsWithLastMachineFollowup(conn, merged);
+  } catch (err) {
+    console.warn("[sbi open-installation enrich] last followup skipped:", err?.message || err);
+  }
+  return merged;
 }
 
 async function fetchUpcomingInstallationsPage(
@@ -1851,6 +1866,12 @@ async function fetchOpenCompletionsComplaintsPage(conn, filters, limit, skip, { 
     [...baseParams, limit, skip],
   );
 
+  try {
+    await enrichRowsWithLastMachineFollowup(conn, rows);
+  } catch (err) {
+    console.warn("[sbi open-completions] last followup enrich skipped:", err?.message || err);
+  }
+
   return {
     total,
     data: rows,
@@ -2127,6 +2148,12 @@ export async function fetchServiceBeforeInstallationSegmentPage(segment, options
       [...baseParams, safeLimit, safeSkip],
     );
 
+    try {
+      await enrichRowsWithLastMachineFollowup(conn, rows);
+    } catch (err) {
+      console.warn("[sbi amc] last followup enrich skipped:", err?.message || err);
+    }
+
     return {
       total: Number(countRow?.cnt || 0),
       data: rows,
@@ -2172,6 +2199,12 @@ export async function fetchServiceBeforeInstallationSegmentPage(segment, options
     const pageRows = deferTotal ? rows.slice(0, safeLimit) : rows;
     if (segment === "active-warranty" && pageRows.length) {
       await enrichTotalRegisteredRows(conn, pageRows);
+    } else if (pageRows.length) {
+      try {
+        await enrichRowsWithLastMachineFollowup(conn, pageRows);
+      } catch (err) {
+        console.warn("[sbi warranty list] last followup enrich skipped:", err?.message || err);
+      }
     }
     return { rows: pageRows, hasExtra: deferTotal && rows.length > safeLimit };
   };

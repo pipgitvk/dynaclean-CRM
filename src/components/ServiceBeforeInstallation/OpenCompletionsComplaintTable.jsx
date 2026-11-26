@@ -12,6 +12,7 @@ import {
   toFollowupTarget,
 } from "@/components/service/MachineFollowupModals";
 import { displayComplaintDateForServiceRecord } from "@/lib/serviceRecordComplaintDisplay";
+import { formatFollowedAtDisplay } from "@/lib/enrichSbiLastFollowup";
 
 const TH =
   "px-3 py-3.5 text-left text-xs font-bold uppercase tracking-wide text-slate-500 bg-slate-50/95";
@@ -196,6 +197,7 @@ export function OpenCompletionsComplaintTableHead() {
       <th className={TH}>Completed Date</th>
       <th className={TH}>Complaint Summary</th>
       <th className={TH}>Step Video</th>
+      <th className={TH}>Last Followed</th>
       <th className={`${TH} min-w-[19rem]`}>Actions</th>
     </tr>
   );
@@ -282,6 +284,18 @@ export function OpenCompletionsComplaintRows({
             </td>
             <td className="px-3 py-3.5 align-top">
               <OpenCompletionsStepVideos row={row} />
+            </td>
+            <td className="min-w-[10.5rem] whitespace-nowrap px-3 py-3.5 text-sm">
+              {(() => {
+                const at = formatFollowedAtDisplay(row.last_followup_at);
+                if (!at) return "—";
+                return (
+                  <>
+                    <span className="text-slate-500">Last Followed:</span>{" "}
+                    <span className="font-medium tabular-nums text-slate-800">{at}</span>
+                  </>
+                );
+              })()}
             </td>
             <td className="px-3 py-3.5 align-top">
               <OpenCompletionsActionsCell

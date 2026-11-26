@@ -2,6 +2,7 @@ import {
   sqlTrimUtf8EqColumns,
   sqlUtf8TrimExpr,
 } from "@/lib/sqlUtf8Compare";
+import { enrichRowsWithLastMachineFollowup } from "@/lib/enrichSbiLastFollowup";
 
 export const WP_LIST_COLUMNS = `
        wp.id,
@@ -94,6 +95,7 @@ export async function enrichTotalRegisteredRows(conn, rows) {
 
   try {
     await enrichTotalRegisteredRowsInner(conn, rows);
+    await enrichRowsWithLastMachineFollowup(conn, rows);
   } catch (err) {
     console.warn("[sbi enrich] skipped:", err?.message || err);
   }
