@@ -77,7 +77,7 @@ const OPEN_INSTALLATION_KPI_CACHE = new Map();
 const OPEN_INSTALLATION_KPI_INFLIGHT = new Map();
 const OPEN_INSTALLATION_KPI_TTL_MS = 90_000;
 /** Bump when count semantics change so stale under-counts (e.g. forced products) are dropped. */
-const OPEN_INSTALLATION_KPI_CACHE_VER = "v15-dispatched-only";
+const OPEN_INSTALLATION_KPI_CACHE_VER = "v16-overdue-card";
 
 const DELIVERED_ON_SQL = `(
   no.delivered_on IS NOT NULL
@@ -471,6 +471,9 @@ function openInstallationBreakdownAggregateSql(inner, listFilter, extraSql) {
   return `SELECT
     SUM(CASE WHEN COALESCE(u.order_installation_status, 0) = 0 THEN 1 ELSE 0 END) AS total,
     SUM(CASE WHEN ${U_DELIVERED_INSTALLATION_PENDING_SQL} THEN 1 ELSE 0 END) AS delivered_installation_pending,
+    SUM(CASE WHEN COALESCE(u.order_installation_status, 0) = 0
+      AND u.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)
+      THEN 1 ELSE 0 END) AS overdue_delayed_installation,
     SUM(CASE WHEN ${U_DELIVERY_PENDING_AFTER_DISPATCH_SQL} THEN 1 ELSE 0 END) AS delivery_pending_after_dispatch,
     SUM(CASE WHEN ${U_INSTALLATION_PLANNED_SQL} THEN 1 ELSE 0 END) AS installation_planned,
     SUM(CASE WHEN ${U_INSTALLATION_COMPLETED_SQL} THEN 1 ELSE 0 END) AS completed_installation,
@@ -482,6 +485,7 @@ function parseOpenInstallationBreakdownRow(row) {
   return {
     total: Number(row?.total || 0),
     delivered_installation_pending: Number(row?.delivered_installation_pending || 0),
+    overdue_delayed_installation: Number(row?.overdue_delayed_installation || 0),
     delivery_pending_after_dispatch: Number(row?.delivery_pending_after_dispatch || 0),
     installation_planned: Number(row?.installation_planned || 0),
     completed_installation: Number(row?.completed_installation || 0),
@@ -568,6 +572,14 @@ async function fetchOpenInstallationBreakdownLite(
            THEN 1 ELSE 0
          END
        ) AS delivered_installation_pending,
+       SUM(
+         CASE
+           WHEN COALESCE(no.installation_status, 0) = 0
+            AND no.delivery_date IS NOT NULL
+            AND no.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)
+           THEN 1 ELSE 0
+         END
+       ) AS overdue_delayed_installation,
        SUM(CASE WHEN ${NO_DELIVERY_PENDING_AFTER_DISPATCH_SQL} THEN 1 ELSE 0 END) AS delivery_pending_after_dispatch,
        0 AS installation_planned,
        SUM(CASE WHEN COALESCE(no.installation_status, 0) = 1 THEN 1 ELSE 0 END) AS completed_installation,
@@ -915,6 +927,10 @@ function buildOpenInstallationNeworderWhereSql(
     sql += ` AND ${NO_DELIVERY_PENDING_AFTER_DISPATCH_SQL}`;
   } else if (bucket === "delivered_pending") {
     sql += ` AND COALESCE(no.installation_status, 0) = 0 AND ${DELIVERED_ON_SQL} AND ${NO_TEMP_DISPATCH_SERIAL_SQL}`;
+  } else if (bucket === "overdue_delayed") {
+    sql += ` AND COALESCE(no.installation_status, 0) = 0
+      AND no.delivery_date IS NOT NULL
+      AND no.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)`;
   } else if (bucket === "installation_planned") {
     // Quote keys from PLANNED INSTALLATION service_records (see buildOpenInstallationNeworderWhereWithQuotePrefilters).
   } else if (bucket === "completed") {
@@ -1236,6 +1252,7 @@ export async function fetchOpenInstallationBucketList(
   { deferServiceEnrich = true } = {},
 ) {
   const conn = await getDbConnection();
+  const parsed = parseSbiFilters(withDefaultOpenInstallationItemType(filters));
   const page = await fetchOpenInstallationNeworderPage(
     conn,
     withDefaultOpenInstallationItemType(filters),
@@ -1243,6 +1260,7 @@ export async function fetchOpenInstallationBucketList(
     Math.max(Number(skip) || 0, 0),
     {
       skipTotal: true,
+      overdueDelayedOnly: parsed.openInstallationBucket === "overdue_delayed",
       deferServiceEnrich,
       deferDispatchEnrich: deferServiceEnrich,
     },
@@ -1338,6 +1356,14 @@ const OPEN_INSTALLATION_KPI_CARD_SPEC = {
     field: "delivered_installation_pending",
     openInstallationBucket: "delivered_pending",
   },
+  "overdue-delayed": {
+    field: "overdue_delayed_installation",
+    openInstallationBucket: "overdue_delayed",
+  },
+  overdue_delayed: {
+    field: "overdue_delayed_installation",
+    openInstallationBucket: "overdue_delayed",
+  },
   "delivery-pending": {
     field: "delivery_pending_after_dispatch",
     openInstallationBucket: "delivery_pending",
@@ -1385,6 +1411,15 @@ export async function countOpenInstallationKpiBucket(filters, bucket) {
     return { field: spec.field, count };
   }
 
+  if (spec.field === "overdue_delayed_installation") {
+    const conn = await getDbConnection();
+    const count = await countOpenInstallationNeworder(conn, {
+      ...kpiFilters,
+      openInstallationBucket: "overdue_delayed",
+    });
+    return { field: spec.field, count };
+  }
+
   const data = await loadOpenInstallationLiteBreakdown(kpiFilters);
   return { field: spec.field, count: Number(data[spec.field] || 0) };
 }
@@ -1393,7 +1428,9 @@ export async function countOpenInstallationKpiBucket(filters, bucket) {
 export async function countOpenInstallationSegment(segment, filters = {}) {
   const conn = await getDbConnection();
   if (segment === "open-installation" || segment === "overdue-delayed-installation") {
-    const overdueDelayedOnly = segment === "overdue-delayed-installation";
+    const overdueDelayedOnly =
+      segment === "overdue-delayed-installation" ||
+      parseSbiFilters(filters).openInstallationBucket === "overdue_delayed";
     if (openInstallationNeedsFullListShape(filters)) {
       return countUpcomingInstallations(conn, filters, { overdueDelayedOnly });
     }

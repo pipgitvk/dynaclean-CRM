@@ -11,6 +11,7 @@ import ServiceBeforeInstallationKpiCard from "@/components/ServiceBeforeInstalla
 const COUNT_BY_CARD_ID = {
   "open-installation-delivered-pending": (totals) =>
     totals.delivered_installation_pending,
+  "open-installation-overdue-delayed": (totals) => totals.overdue_delayed_installation,
   "open-installation-delivery-pending": (totals) => totals.delivery_pending_after_dispatch,
   "open-installation-planned": (totals) => totals.installation_planned,
   "open-installation-completed": (totals) => totals.completed_installation,
@@ -36,7 +37,7 @@ export default function ServiceBeforeInstallationOpenInstallationKpiStrip({
   const activeCardId = openInstallationKpiCardIdFromFilter(openInstallationBucket);
 
   return (
-    <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 lg:gap-4">
+    <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 lg:gap-4">
       {cards.map((card) => {
         const pick = COUNT_BY_CARD_ID[card.id];
         const value = pick ? pick(totals) : null;

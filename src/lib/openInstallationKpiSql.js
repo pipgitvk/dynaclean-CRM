@@ -111,6 +111,7 @@ export const NO_DELIVERY_PENDING_AFTER_DISPATCH_SQL = `(
 export function openInstallationBucketRecordCount(bucket, breakdown = {}) {
   const b = String(bucket || "").trim().toLowerCase();
   if (b === "delivered_pending") return Number(breakdown.delivered_installation_pending ?? 0);
+  if (b === "overdue_delayed") return Number(breakdown.overdue_delayed_installation ?? 0);
   if (b === "delivery_pending") return Number(breakdown.delivery_pending_after_dispatch ?? 0);
   if (b === "completed") return Number(breakdown.completed_installation ?? 0);
   if (b === "installation_planned") return Number(breakdown.installation_planned ?? 0);

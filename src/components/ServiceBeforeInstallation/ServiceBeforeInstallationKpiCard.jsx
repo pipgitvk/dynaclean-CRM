@@ -26,6 +26,7 @@ export const SBI_CARD_ICONS = {
   "registered-installation-pending": Clock,
   "registered-installation-completed": CheckCircle2,
   "open-installation-delivered-pending": PackageCheck,
+  "open-installation-overdue-delayed": AlertTriangle,
   "open-installation-delivery-pending": Truck,
   "open-installation-completed": CheckCircle2,
   "open-installation-feedback-collected": MessageCircle,
@@ -57,6 +58,7 @@ export const SBI_SPARK_SEED = {
   "registered-installation-pending": 6,
   "registered-installation-completed": 9,
   "open-installation-delivered-pending": 4,
+  "open-installation-overdue-delayed": 11,
   "open-installation-delivery-pending": 8,
   "open-installation-completed": 12,
   "open-installation-feedback-collected": 15,
@@ -78,6 +80,7 @@ export const SBI_SPARK_SEED = {
 
 const COMPACT_TITLES = {
   "overdue-delayed-installation": "Overdue (Delayed)",
+  "open-installation-overdue-delayed": "Overdue (Delayed)",
 };
 
 export function formatSbiNum(n) {
@@ -228,7 +231,10 @@ export default function ServiceBeforeInstallationKpiCard({
   const displayTotal = hasNumber ? numericTotal : 0;
   const title =
     variant === "compact" && COMPACT_TITLES[card.id] ? COMPACT_TITLES[card.id] : card.title;
-  const invertTrend = card.id === "overdue-delayed-installation" || card.id === "due-warranty-expiry";
+  const invertTrend =
+    card.id === "overdue-delayed-installation" ||
+    card.id === "open-installation-overdue-delayed" ||
+    card.id === "due-warranty-expiry";
   const isHub = variant === "hub";
 
   const compactHover =

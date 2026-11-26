@@ -2837,6 +2837,7 @@ export default function ServiceBeforeInstallationDetailClient({
             const next = {
               ...prev,
               delivered_installation_pending: b.delivered_installation_pending,
+              overdue_delayed_installation: b.overdue_delayed_installation,
               delivery_pending_after_dispatch: b.delivery_pending_after_dispatch,
               completed_installation: b.completed_installation,
               total: b.total ?? prev.total,

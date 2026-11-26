@@ -23,7 +23,7 @@ export const EMPTY_SBI_FILTERS = {
   registeredBy: "",
   /** total-registered KPI: "" | "pending" | "completed" */
   registeredInstallation: "",
-  /** open-installation KPI: "" | "delivered_pending" | "delivery_pending" | "installation_planned" | "completed" | "feedback_collected" */
+  /** open-installation KPI: "" | "delivered_pending" | "overdue_delayed" | "delivery_pending" | "installation_planned" | "completed" | "feedback_collected" */
   openInstallationBucket: "",
   /** open-completions KPI card bucket */
   openCompletionsBucket: "",
@@ -233,6 +233,7 @@ export function normalizeOpenInstallationBucket(raw) {
     .toLowerCase();
   if (
     v === "delivered_pending" ||
+    v === "overdue_delayed" ||
     v === "delivery_pending" ||
     v === "installation_planned" ||
     v === "completed" ||

@@ -215,6 +215,8 @@ export function buildUpcomingInstallationListFilterSql(
   if (!omitOpenInstallationBucket) {
     if (f.openInstallationBucket === "delivered_pending") {
       sql += ` AND ${U_DELIVERED_INSTALLATION_PENDING_SQL}`;
+    } else if (f.openInstallationBucket === "overdue_delayed") {
+      sql += ` AND u.delivery_date < DATE_SUB(CURDATE(), INTERVAL 2 DAY)`;
     } else if (f.openInstallationBucket === "delivery_pending") {
       sql += ` AND ${U_DELIVERY_PENDING_AFTER_DISPATCH_SQL}`;
     } else if (f.openInstallationBucket === "installation_planned") {

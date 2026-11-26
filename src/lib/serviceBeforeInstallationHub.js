@@ -18,6 +18,19 @@ export const OPEN_INSTALLATION_DETAIL_KPI_STRIP = [
     chartColor: "#f59e0b",
   },
   {
+    id: "open-installation-overdue-delayed",
+    title: "Overdue Delayed Installation",
+    subtitle: "Pending from more than 2 days",
+    countCaption: "No. of overdue delayed installations",
+    countKey: "overdue_delayed_installation",
+    accent: "from-rose-500 to-red-600",
+    surface:
+      "bg-white/80 backdrop-blur-xl border-rose-200/40 shadow-[0_8px_30px_-8px_rgba(244,63,94,0.35)]",
+    glow: "bg-rose-400/25",
+    iconSurface: "bg-gradient-to-br from-rose-500 to-red-600",
+    chartColor: "#e11d48",
+  },
+  {
     id: "open-installation-delivery-pending",
     title: "On the Way Machine",
     subtitle: "Dispatched, delivery still pending",
@@ -470,6 +483,7 @@ export function openCompletionsTableCountApi(openCompletionsBucket) {
 
 export function openInstallationBucketFromKpiCardId(cardId) {
   if (cardId === "open-installation-delivered-pending") return "delivered_pending";
+  if (cardId === "open-installation-overdue-delayed") return "overdue_delayed";
   if (cardId === "open-installation-delivery-pending") return "delivery_pending";
   if (cardId === "open-installation-planned") return "installation_planned";
   if (cardId === "open-installation-completed") return "completed";
@@ -481,6 +495,7 @@ export function openInstallationBucketFromKpiCardId(cardId) {
 export function openInstallationKpiCardIdFromFilter(openInstallationBucket) {
   const v = String(openInstallationBucket || "").trim().toLowerCase();
   if (v === "delivered_pending") return "open-installation-delivered-pending";
+  if (v === "overdue_delayed") return "open-installation-overdue-delayed";
   if (v === "delivery_pending") return "open-installation-delivery-pending";
   if (v === "installation_planned") return "open-installation-planned";
   if (v === "completed") return "open-installation-completed";
@@ -492,6 +507,7 @@ export function openInstallationKpiCardIdFromFilter(openInstallationBucket) {
 /** Path slug for per-card table APIs: /open-installation/list/{slug} */
 export const OPEN_INSTALLATION_TABLE_API_SLUGS = [
   "delivered-pending",
+  "overdue-delayed",
   "delivery-pending",
   "planned",
   "completed",
@@ -500,6 +516,7 @@ export const OPEN_INSTALLATION_TABLE_API_SLUGS = [
 
 export function openInstallationApiSlugFromBucket(openInstallationBucket) {
   const v = String(openInstallationBucket || "").trim().toLowerCase();
+  if (v === "overdue_delayed") return "overdue-delayed";
   if (v === "delivery_pending") return "delivery-pending";
   if (v === "installation_planned") return "planned";
   if (v === "completed") return "completed";
@@ -512,6 +529,7 @@ export function openInstallationBucketFromApiSlug(slug) {
     .trim()
     .toLowerCase()
     .replace(/_/g, "-");
+  if (v === "overdue-delayed") return "overdue_delayed";
   if (v === "delivery-pending") return "delivery_pending";
   if (v === "planned" || v === "installation-planned") return "installation_planned";
   if (v === "completed") return "completed";

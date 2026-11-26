@@ -20,6 +20,11 @@ export function buildNeworderOpenInstallationBucketWhereSql(openInstallationBuck
   if (b === "delivered_pending") {
     return `AND COALESCE(no.installation_status, 0) = 0 AND (${NO_ACTUALLY_DELIVERED_SQL}) AND ${NO_TEMP_DISPATCH_SERIAL_SQL}`;
   }
+  if (b === "overdue_delayed") {
+    return `AND COALESCE(no.installation_status, 0) = 0
+      AND no.delivery_date IS NOT NULL
+      AND no.delivery_date < DATE_SUB(CURDATE(), INTERVAL 2 DAY)`;
+  }
   if (b === "installation_planned") {
     // Quote list resolved from PLANNED INSTALLATION service_records (see quote prefilter).
     return "";
