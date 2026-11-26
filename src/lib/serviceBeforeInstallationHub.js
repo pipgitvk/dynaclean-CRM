@@ -557,7 +557,9 @@ export function openInstallationTableCountApi(openInstallationBucket) {
 
 export function getServiceBeforeInstallationCards(dashboardBase) {
   const base = `/${dashboardBase}`;
-  return SERVICE_BEFORE_INSTALLATION_SEGMENTS.map((c) => ({
+  return SERVICE_BEFORE_INSTALLATION_SEGMENTS.filter(
+    (c) => c.id !== "overdue-delayed-installation",
+  ).map((c) => ({
     ...c,
     subtitle: c.hubSubtitle || c.subtitle,
     href:
