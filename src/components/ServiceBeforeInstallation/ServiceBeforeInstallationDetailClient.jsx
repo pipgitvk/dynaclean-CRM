@@ -94,6 +94,7 @@ import {
   WarrantyInstallRequestModal,
 } from "@/components/warranty/WarrantyProductServiceModals";
 import GoogleFeedbackProofCell from "@/components/services/GoogleFeedbackProofCell";
+import { isSuperAdminRole } from "@/lib/serviceBeforeInstallationRoles";
 
 const DEFAULT_PAGE_SIZE = 10;
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
@@ -2259,6 +2260,7 @@ export default function ServiceBeforeInstallationDetailClient({
   const meta = getSegmentMeta(segment);
   const hubHref = `/${dashboardBase}/service-before-installation`;
   const warrantyHref = `/${dashboardBase}/warranty`;
+  const canExportCsv = isSuperAdminRole(userRole);
   const { ProductFollowupIcons, followupModals, openMachineFollowUp, openMachineHistory } =
     useWarrantyProductFollowup();
   const [warrantyRowModal, setWarrantyRowModal] = useState(null);
@@ -3797,15 +3799,17 @@ export default function ServiceBeforeInstallationDetailClient({
               ) : null}
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                disabled={loading || rows.length === 0}
-                onClick={() => exportRowsCsv(rows, segment)}
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-              >
-                <Download className="h-4 w-4" aria-hidden />
-                Export
-              </button>
+              {canExportCsv ? (
+                <button
+                  type="button"
+                  disabled={loading || rows.length === 0}
+                  onClick={() => exportRowsCsv(rows, segment)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  <Download className="h-4 w-4" aria-hidden />
+                  Export
+                </button>
+              ) : null}
               {showAddRegistered ? (
                 <Link
                   href={warrantyHref}
