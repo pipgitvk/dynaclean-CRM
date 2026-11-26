@@ -1,6 +1,6 @@
 "use client";
 
-import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+import { formatCrmDateOnly, CRM_DATE_SLASH_FORMAT } from "@/lib/crmDateFormat";
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -238,7 +238,7 @@ export default function CustomerSpecialPriceTable({
                   <td className="p-3">{row.set_by_name || row.set_by}</td>
                   <td className="p-3 text-sm text-gray-500">
                     {row.set_date
-                      ? formatCrmDateOnly(row.set_date)
+                      ? formatCrmDateOnly(row.set_date, "—", CRM_DATE_SLASH_FORMAT)
                       : "—"}
                   </td>
                   <td className="p-3 text-center">

@@ -10,6 +10,7 @@ import {
   isDealerPricePending,
   resolveDealerPriceFromProductStock,
 } from "@/lib/specialPriceDefaults";
+import { formatCrmDatetimeSlashDisplay } from "@/lib/timezone";
 
 export const dynamic = "force-dynamic";
 
@@ -117,13 +118,13 @@ export default async function ProductSpecialPrice({ params }) {
           {data.status === "approved" && data.approved_by && data.approved_date && (
             <span className="text-xs text-gray-600 ml-6">
               Approved by {data.approved_by} on{" "}
-              {new Date(data.approved_date).toLocaleString()}
+              {formatCrmDatetimeSlashDisplay(data.approved_date)}
             </span>
           )}
           {data.status === "rejected" && data.approved_by && data.approved_date && (
             <span className="text-xs text-gray-600 ml-6">
               Rejected by {data.approved_by} on{" "}
-              {new Date(data.approved_date).toLocaleString()}
+              {formatCrmDatetimeSlashDisplay(data.approved_date)}
             </span>
           )}
           {(data.status === "approved" || data.status === "rejected") &&

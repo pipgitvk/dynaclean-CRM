@@ -15,6 +15,7 @@ import {
   displayPriceTypeLabel,
 } from "@/lib/specialPriceDefaults";
 import { bulkApproveSpecialPrices, bulkRejectSpecialPrices } from "./_actions";
+import { formatCrmDatetimeSlashDisplay } from "@/lib/timezone";
 
 function rowKey(row) {
   return `${row.item_type}-${row.id}`;
@@ -56,7 +57,7 @@ function getSpecialPriceRowMeta(row) {
     isApproved && row.approved_by
       ? `Approved by ${row.approved_by}${
           row.approved_date
-            ? ` on ${new Date(row.approved_date).toLocaleString()}`
+            ? ` on ${formatCrmDatetimeSlashDisplay(row.approved_date)}`
             : ""
         }`
       : null;
@@ -64,7 +65,7 @@ function getSpecialPriceRowMeta(row) {
     isRejected && row.approved_by
       ? `Rejected by ${row.approved_by}${
           row.approved_date
-            ? ` on ${new Date(row.approved_date).toLocaleString()}`
+            ? ` on ${formatCrmDatetimeSlashDisplay(row.approved_date)}`
             : ""
         }`
       : null;
@@ -452,7 +453,7 @@ export default function AdminSpecialPricingTable({
                 <p className="text-[11px] text-gray-500">
                   Set:{" "}
                   {row.set_date
-                    ? new Date(row.set_date).toLocaleString()
+                    ? formatCrmDatetimeSlashDisplay(row.set_date)
                     : "—"}
                 </p>
 
@@ -658,7 +659,7 @@ export default function AdminSpecialPricingTable({
                     <td className="p-3 text-sm">{row.set_by}</td>
                     <td className="p-3 text-xs text-gray-600">
                       {row.set_date
-                        ? new Date(row.set_date).toLocaleString()
+                        ? formatCrmDatetimeSlashDisplay(row.set_date)
                         : "-"}
                     </td>
                     <td className="p-3 space-y-2 min-w-[160px] lg:sticky lg:right-0 lg:bg-white lg:shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.1)]">

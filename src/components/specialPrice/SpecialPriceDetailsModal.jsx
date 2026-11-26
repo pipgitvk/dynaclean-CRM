@@ -5,6 +5,7 @@ import {
   resolveSpecialPriceTerm,
   displayPriceTypeLabel,
 } from "@/lib/specialPriceDefaults";
+import { formatCrmDatetimeSlashDisplay } from "@/lib/timezone";
 
 export default function SpecialPriceDetailsModal({
   details,
@@ -56,12 +57,10 @@ export default function SpecialPriceDetailsModal({
     approvalNote,
   } = details;
 
-  const formattedSetDate = setDate
-    ? new Date(setDate).toLocaleString()
-    : "-";
+  const formattedSetDate = setDate ? formatCrmDatetimeSlashDisplay(setDate) : "-";
 
   const formattedApprovedDate = approvedDate
-    ? new Date(approvedDate).toLocaleString()
+    ? formatCrmDatetimeSlashDisplay(approvedDate)
     : "-";
 
   const statusLower = (status || "").toLowerCase();

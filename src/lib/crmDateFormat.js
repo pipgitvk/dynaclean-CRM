@@ -14,8 +14,14 @@ function crmFilterToday() {
 /** Standard CRM calendar date display (India). */
 export const CRM_DATE_FORMAT = "DD-MM-YYYY";
 
+/** Calendar date with slashes (e.g. 20/11/2026) — locale-independent. */
+export const CRM_DATE_SLASH_FORMAT = "DD/MM/YYYY";
+
 /** Datetime with 12-hour clock. */
 export const CRM_DATETIME_FORMAT = "DD-MM-YYYY hh:mm A";
+
+/** Datetime with slashes + 12-hour clock (special pricing, etc.). */
+export const CRM_DATETIME_SLASH_FORMAT = "DD/MM/YYYY, hh:mm A";
 
 /** Datetime with 24-hour clock. */
 export const CRM_DATETIME_24_FORMAT = "DD-MM-YYYY HH:mm";
@@ -26,14 +32,14 @@ const EMPTY = "—";
  * Date-only display. Uses the YYYY-MM-DD calendar prefix when present so
  * date fields are not shifted by timezone.
  */
-export function formatCrmDateOnly(value, empty = EMPTY) {
+export function formatCrmDateOnly(value, empty = EMPTY, dateFormat = CRM_DATE_FORMAT) {
   if (value == null || value === "") return empty;
   const s = String(value).trim();
   if (!s) return empty;
   const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
   if (m) {
     const d = dayjs(m[1]);
-    return d.isValid() ? d.format(CRM_DATE_FORMAT) : empty;
+    return d.isValid() ? d.format(dateFormat) : empty;
   }
   // Already DD-MM-YYYY (or D-M-YYYY). Do not let dayjs read this as MM-DD-YYYY.
   const dmy = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
@@ -46,13 +52,13 @@ export function formatCrmDateOnly(value, empty = EMPTY) {
       d.isValid() &&
       d.format("YYYY-MM-DD") === `${year}-${month}-${day}`
     ) {
-      return d.format(CRM_DATE_FORMAT);
+      return d.format(dateFormat);
     }
     return empty;
   }
   const d = dayjs(value);
   if (!d.isValid()) return empty;
-  return d.format(CRM_DATE_FORMAT);
+  return d.format(dateFormat);
 }
 
 /** @deprecated Use {@link formatCrmDateOnly}. */

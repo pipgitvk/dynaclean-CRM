@@ -6,12 +6,15 @@ import utc from 'dayjs/plugin/utc';
 import {
   CRM_DATETIME_FORMAT,
   CRM_DATETIME_24_FORMAT,
+  CRM_DATETIME_SLASH_FORMAT,
 } from '@/lib/crmDateFormat';
 
 export {
   CRM_DATE_FORMAT,
+  CRM_DATE_SLASH_FORMAT,
   CRM_DATETIME_FORMAT,
   CRM_DATETIME_24_FORMAT,
+  CRM_DATETIME_SLASH_FORMAT,
   formatCrmDateOnly,
 } from '@/lib/crmDateFormat';
 
@@ -60,6 +63,15 @@ export function formatCrmDatetimeForISTDisplay(value, format = CRM_DATETIME_FORM
   const d = parseCrmDatetimeToDayjs(value);
   if (!d || !d.isValid()) return '';
   return d.utcOffset(IST_OFFSET_MINUTES).format(format);
+}
+
+/** Fixed DD/MM/YYYY display — not browser locale (avoids US MM/DD/YYYY). */
+export function formatCrmDatetimeSlashDisplay(
+  value,
+  format = CRM_DATETIME_SLASH_FORMAT,
+) {
+  const s = formatCrmDatetimeForISTDisplay(value, format);
+  return s || "—";
 }
 
 /** Format an instant already parsed with {@link parseCrmDatetimeToDayjs} (e.g. from TL pick helpers) for IST display. */
