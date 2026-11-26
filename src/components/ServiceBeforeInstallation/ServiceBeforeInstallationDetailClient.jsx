@@ -3322,7 +3322,10 @@ export default function ServiceBeforeInstallationDetailClient({
       if (e?.code === "ERR_CANCELED") return;
       console.error(e);
     } finally {
-      if (!signal.aborted) setLoading(false);
+      if (!signal.aborted && requestId === rowsRequestIdRef.current) {
+        setLoading(false);
+        setApplyingFilters(false);
+      }
     }
   }, [
     segment,
@@ -3364,10 +3367,15 @@ export default function ServiceBeforeInstallationDetailClient({
     if (tableFilterOptionsFetchKeyRef.current === key) return;
     tableFilterOptionsFetchKeyRef.current = key;
     try {
-      const res = await axios.get("/api/service-before-installation/filters", {
-        params: { segment },
-        timeout: 12_000,
-      });
+      const res = await axios.get(
+        segment === "total-registered"
+          ? "/api/service-before-installation/total-registered/filters"
+          : "/api/service-before-installation/filters",
+        {
+          params: segment === "total-registered" ? undefined : { segment },
+          timeout: 12_000,
+        },
+      );
       if (res.data?.success && res.data.filterOptions) {
         setTableFilterOptions(res.data.filterOptions);
       }

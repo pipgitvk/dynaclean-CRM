@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ListFilter, Loader2, RotateCcw, Search } from "lucide-react";
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import { EMPTY_SBI_FILTERS } from "@/lib/serviceBeforeInstallationFilters";
+import { INDIAN_STATES } from "@/lib/indianStates";
 
 const filterSelectClass =
   "rounded-xl border-slate-200 py-2.5 text-slate-800 focus:border-violet-300 focus:ring-violet-500/20";
@@ -246,6 +247,101 @@ function ServiceStatusFilterSelect({
   );
 }
 
+const STATE_SUGGESTIONS = [
+  ...INDIAN_STATES,
+  "Chandigarh",
+  "Puducherry",
+  "Andaman and Nicobar Islands",
+  "Dadra and Nagar Haveli and Daman and Diu",
+  "Lakshadweep",
+].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+
+function StateSuggestFilter({ value, onChange, className = "xl:col-span-3" }) {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const boxRef = useRef(null);
+
+  const suggestions = useMemo(() => {
+    const q = String(value || "").trim().toLowerCase();
+    if (!q) return [];
+    return STATE_SUGGESTIONS.filter((name) => name.toLowerCase().includes(q)).slice(0, 8);
+  }, [value]);
+
+  useEffect(() => {
+    setActive(0);
+  }, [value]);
+
+  useEffect(() => {
+    const onDoc = (e) => {
+      if (!boxRef.current?.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+
+  const pick = (name) => {
+    onChange(name);
+    setOpen(false);
+  };
+
+  const showList = open && suggestions.length > 0;
+
+  return (
+    <label className={`relative block min-w-0 sm:col-span-1 ${className}`}>
+      <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+        State
+      </span>
+      <div ref={boxRef} className="relative">
+        <input
+          type="search"
+          value={value}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={(e) => {
+            if (!showList) return;
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              setActive((i) => (i + 1) % suggestions.length);
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              setActive((i) => (i - 1 + suggestions.length) % suggestions.length);
+            } else if (e.key === "Enter" && suggestions[active]) {
+              e.preventDefault();
+              pick(suggestions[active]);
+            } else if (e.key === "Escape") {
+              setOpen(false);
+            }
+          }}
+          placeholder="Customer state…"
+          autoComplete="off"
+          className="w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+        />
+        {showList ? (
+          <ul className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+            {suggestions.map((name, idx) => (
+              <li key={name}>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => pick(name)}
+                  className={`w-full px-3 py-2 text-left text-sm ${
+                    idx === active ? "bg-violet-50 font-medium text-violet-800" : "text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  {name}
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+    </label>
+  );
+}
+
 function FilterInput({ label, placeholder, value, onChange, className = "xl:col-span-3" }) {
   return (
     <label className={`block min-w-0 sm:col-span-1 ${className}`}>
@@ -480,13 +576,21 @@ export default function ServiceBeforeInstallationFilters({
               onChange={setField("model")}
               className={row2Field}
             />
-            <FilterInput
-              label="State"
-              placeholder="Customer state…"
-              value={draft.state}
-              onChange={setField("state")}
-              className={row2Field}
-            />
+            {segment === "total-registered" ? (
+              <StateSuggestFilter
+                value={draft.state}
+                onChange={setField("state")}
+                className={row2Field}
+              />
+            ) : (
+              <FilterInput
+                label="State"
+                placeholder="Customer state…"
+                value={draft.state}
+                onChange={setField("state")}
+                className={row2Field}
+              />
+            )}
             <FilterInput
               label="Serial"
               placeholder="Serial number…"

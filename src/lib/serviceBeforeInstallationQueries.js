@@ -2205,12 +2205,13 @@ function wpSegmentBaseFilterSql(segment) {
 
 const WP_FILTER_OPTIONS_CACHE = new Map();
 const OPEN_FILTER_OPTIONS_CACHE = new Map();
+const TOTAL_REGISTERED_FILTER_OPTIONS_CACHE = new Map();
 const FILTER_OPTIONS_INFLIGHT = new Map();
 /** Name lists change rarely — long TTL + segment-only key keeps dropdown opens cheap. */
 const FILTER_OPTIONS_TTL_MS = 10 * 60 * 1000;
 const FILTER_OPTIONS_NAME_LIMIT = 250;
 
-function mapDistinctNameRows(rows) {
+function mapDistinctNameRows(rows, limit = FILTER_OPTIONS_NAME_LIMIT) {
   const out = [];
   const seen = new Set();
   for (const r of rows || []) {
@@ -2222,7 +2223,7 @@ function mapDistinctNameRows(rows) {
     out.push(name);
   }
   out.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
-  return out.slice(0, FILTER_OPTIONS_NAME_LIMIT);
+  return out.slice(0, limit);
 }
 
 function getCachedFilterOptions(cache, cacheKey) {
@@ -2250,6 +2251,65 @@ async function withFilterOptionsInflight(cacheKey, cache, loader) {
 
   FILTER_OPTIONS_INFLIGHT.set(cacheKey, promise);
   return promise;
+}
+
+/**
+ * Total Registered dropdowns only.
+ * Names come from small master tables (rep_list / third_party_service_engineers),
+ * not a DISTINCT scan of warranty_products.
+ *
+ * GET /api/service-before-installation/total-registered/filters
+ */
+export async function fetchTotalRegisteredFilterOptions() {
+  const cacheKey = "total-registered";
+  return withFilterOptionsInflight(cacheKey, TOTAL_REGISTERED_FILTER_OPTIONS_CACHE, async () => {
+    const conn = await getDbConnection();
+    const limit = 1000;
+
+    const [salesRows] = await conn.execute(
+      `SELECT username AS name
+       FROM rep_list
+       WHERE status = 1
+         AND TRIM(username) <> ''
+       ORDER BY username ASC
+       LIMIT ${limit}`,
+    );
+
+    const [internalRows] = await conn.execute(
+      `SELECT username AS name
+       FROM rep_list
+       WHERE status = 1
+         AND TRIM(userRole) = 'SERVICE ENGINEER'
+         AND TRIM(username) <> ''
+       ORDER BY username ASC
+       LIMIT ${limit}`,
+    );
+
+    let thirdRows = [];
+    try {
+      const [rows] = await conn.execute(
+        `SELECT name
+         FROM third_party_service_engineers
+         WHERE status = 'active'
+           AND name IS NOT NULL
+           AND TRIM(name) <> ''
+         ORDER BY name ASC
+         LIMIT ${limit}`,
+      );
+      thirdRows = rows || [];
+    } catch {
+      thirdRows = [];
+    }
+
+    return {
+      salesPersons: mapDistinctNameRows(
+        [{ name: "Automatic" }, ...(salesRows || [])],
+        limit,
+      ),
+      serviceEngineers: mapDistinctNameRows(internalRows, limit),
+      thirdPartyEngineers: mapDistinctNameRows(thirdRows, limit),
+    };
+  });
 }
 
 /**
@@ -2383,7 +2443,10 @@ async function fetchOpenInstallationFilterOptions(conn) {
 
 /** Distinct sales / engineer names for open-installation list filters. */
 export async function fetchServiceBeforeInstallationSegmentFilterOptions(segment, filters = {}) {
-  if (segment === "total-registered" || segment === "active-warranty" || segment === "due-warranty-expiry") {
+  if (segment === "total-registered") {
+    return fetchTotalRegisteredFilterOptions();
+  }
+  if (segment === "active-warranty" || segment === "due-warranty-expiry") {
     return fetchServiceBeforeInstallationWpFilterOptions(segment, filters);
   }
   if (segment !== "open-installation" && segment !== "overdue-delayed-installation") {
