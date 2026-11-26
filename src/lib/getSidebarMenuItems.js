@@ -58,6 +58,21 @@ function transformMenuItemPaths(item, roleKey) {
     return { ...item, path: "/sales-dashboard/lead-distribution" };
   }
 
+  if (item.moduleKey === "service-before-installation") {
+    const sbiPath =
+      dashboardPrefix === "/sales-dashboard" || roleUpper === "SALES CUM BACKOFFICE"
+        ? "/sales-dashboard/service-before-installation"
+        : "/user-dashboard/service-before-installation";
+    const next = { ...item, path: sbiPath };
+    if (item.children?.length) {
+      return {
+        ...next,
+        children: item.children.map((child) => transformMenuItemPaths(child, roleKey)),
+      };
+    }
+    return next;
+  }
+
   if (dashboardPrefix === "/sales-dashboard" && item.moduleKey) {
     const salesDashboardModulePaths = {
       "prospects-view": "/sales-dashboard/prospects",
@@ -66,6 +81,7 @@ function transformMenuItemPaths(item, roleKey) {
       "bulk-reassign": "/sales-dashboard/leads-manage/bulk-reassign",
       "ads-management": "/sales-dashboard/meta-credentials",
       "meta-backfill": "/sales-dashboard/ads-management",
+      "service-before-installation": "/sales-dashboard/service-before-installation",
     };
     if (salesDashboardModulePaths[item.moduleKey]) {
       return { ...item, path: salesDashboardModulePaths[item.moduleKey] };
@@ -575,6 +591,13 @@ const allMenuItems = [
         icon: "FileText",
       },
     ],
+  },
+  {
+    path: "/user-dashboard/service-before-installation",
+    name: "All Service After Sales",
+    moduleKey: "service-before-installation",
+    roles: ["SUPERADMIN", "SALES CUM BACKOFFICE", "SERVICE SUPPORT", "ADMIN", "DIRECTOR"],
+    icon: "Wrench",
   },
   {
     name: "Service & After-Sales",

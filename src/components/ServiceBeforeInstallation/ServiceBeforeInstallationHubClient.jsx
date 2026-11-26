@@ -196,9 +196,9 @@ export default function ServiceBeforeInstallationHubClient({
         <header className="mb-6 overflow-hidden rounded-3xl border border-slate-200/70 bg-white/95 shadow-[0_4px_24px_-6px_rgba(124,58,237,0.12)] backdrop-blur-sm md:grid md:grid-cols-2 md:items-center">
           <div className="flex min-w-0 flex-col justify-center px-4 py-4 sm:px-6 sm:py-5">
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl md:text-[2rem]">
-              Service Before{" "}
+              All Service{" "}
               <span className="bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
-                Installation
+                After Sales
               </span>
             </h1>
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-500 sm:text-base">

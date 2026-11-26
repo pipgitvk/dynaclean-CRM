@@ -372,6 +372,7 @@ export const ROLE_DEFAULT_MODULE_KEYS = {
     "installation-videos",
     "return-products",
     "third-party-engineers",
+    "service-before-installation",
   ],
   "SALES CUM BACKOFFICE": [
     "dashboard-home",
@@ -413,6 +414,7 @@ export const ROLE_DEFAULT_MODULE_KEYS = {
     "return-products",
     "third-party-engineers",
     "amc-cmc",
+    "service-before-installation",
   ],
   DIRECTOR: [
     "dashboard-home",
