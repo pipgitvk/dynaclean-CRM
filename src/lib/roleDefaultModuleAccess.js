@@ -1,5 +1,14 @@
 import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 
+/** Global Module Access: ticked by default on every role preset (except empty / SUPERADMIN). */
+export const DEFAULT_SERVICE_BEFORE_INSTALLATION_MODULE_KEY = "service-before-installation";
+
+export function withDefaultServiceAfterSalesModule(keys) {
+  if (!Array.isArray(keys) || keys.length === 0) return keys;
+  if (keys.includes(DEFAULT_SERVICE_BEFORE_INSTALLATION_MODULE_KEY)) return keys;
+  return [...keys, DEFAULT_SERVICE_BEFORE_INSTALLATION_MODULE_KEY];
+}
+
 /**
  * Default module_access keys per role — used when rep_list.module_access is NULL
  * (legacy users never configured via Quick Edit / Global Module Access).
@@ -349,6 +358,7 @@ export const ROLE_DEFAULT_MODULE_KEYS = {
     "spare-parts",
     "installation-videos",
     "return-products",
+    "service-before-installation",
   ],
   "SERVICE SUPPORT": [
     "dashboard-home",
@@ -515,11 +525,11 @@ export const ROLE_DEFAULT_MODULE_KEYS = {
     "hiring-process",
     "final-profile-approval",
     "hr-daily-report",
+    "service-before-installation",
   ],
 };
 
-/** Role presets for users whose module_access column is still NULL. */
-export function getRoleDefaultModuleKeys(role) {
+function resolveRoleDefaultModuleKeys(role) {
   const key = normalizeRoleKey(role);
   if (!key) return [];
 
@@ -577,6 +587,11 @@ export function getRoleDefaultModuleKeys(role) {
     return [...(ROLE_DEFAULT_MODULE_KEYS["BACK OFFICE"] ?? [])];
   }
   return [];
+}
+
+/** Role presets for users whose module_access column is still NULL. */
+export function getRoleDefaultModuleKeys(role) {
+  return withDefaultServiceAfterSalesModule(resolveRoleDefaultModuleKeys(role));
 }
 
 /** Roles that bypass legacy leak cap (intentionally broad access). */

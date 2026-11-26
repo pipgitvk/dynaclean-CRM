@@ -10,7 +10,10 @@ import {
   stripCustomRoleDefaultModules,
 } from "@/lib/employeeRoles";
 import { syncRoleDashboardOverridesFile } from "@/lib/syncRoleDashboardOverrides";
-import { getRoleDefaultModuleKeys } from "@/lib/roleDefaultModuleAccess";
+import {
+  getRoleDefaultModuleKeys,
+  withDefaultServiceAfterSalesModule,
+} from "@/lib/roleDefaultModuleAccess";
 import {
   ALL_MODULE_KEYS,
   parseStoredModuleAccess,
@@ -136,7 +139,7 @@ export async function getRoleDefaultModulesForBulkUi(db, roleName) {
   if (raw !== null && raw !== undefined && String(raw).trim() !== "") {
     const parsed = parseStoredModuleAccess(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
-      return filterKnownModuleKeys(parsed);
+      return withDefaultServiceAfterSalesModule(filterKnownModuleKeys(parsed));
     }
   }
   const dash = String(rows[0]?.dashboard_path || "").trim();
@@ -144,11 +147,13 @@ export async function getRoleDefaultModulesForBulkUi(db, roleName) {
     const fromDashboard = filterKnownModuleKeys(
       getDefaultModuleKeysForDashboardPath(dash, { forNewCustomRole: isCustomRole }),
     );
-    if (fromDashboard.length > 0) return fromDashboard;
+    if (fromDashboard.length > 0) {
+      return withDefaultServiceAfterSalesModule(fromDashboard);
+    }
   }
   let keys = filterKnownModuleKeys(getRoleDefaultModuleKeys(key));
   if (isCustomRole) keys = stripCustomRoleDefaultModules(keys);
-  return keys;
+  return withDefaultServiceAfterSalesModule(keys);
 }
 
 export async function saveRoleDefaultModulesForBulkUi(db, roleName, moduleKeys) {
