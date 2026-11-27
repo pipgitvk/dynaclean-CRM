@@ -320,18 +320,30 @@ function formatDate(raw) {
   return formatCrmDatetimeForISTDisplay(raw) || formatCrmDateOnly(String(raw).slice(0, 10)) || "—";
 }
 
-function LastFollowupTableCell({ value, className = "px-4 py-3.5" }) {
+function LastFollowupTableCell({ value, notes, className = "px-4 py-3.5" }) {
   const formatted = formatFollowedAtDisplay(value);
+  const remark = notes != null && String(notes).trim() !== "" ? String(notes).trim() : "";
+  if (!formatted && !remark) {
+    return <td className={`min-w-[10.5rem] text-sm text-slate-400 ${className}`}>—</td>;
+  }
   return (
-    <td className={`min-w-[10.5rem] whitespace-nowrap text-sm ${className}`}>
+    <td className={`min-w-[10.5rem] max-w-[14rem] text-sm align-top ${className}`}>
       {formatted ? (
-        <>
+        <div className="whitespace-nowrap">
           <span className="text-slate-500">Last Followed:</span>{" "}
           <span className="font-medium tabular-nums text-slate-800">{formatted}</span>
-        </>
+        </div>
       ) : (
-        "—"
+        <span className="text-slate-400">—</span>
       )}
+      {remark ? (
+        <div
+          className="mt-1 line-clamp-3 whitespace-pre-wrap break-words text-xs text-slate-500"
+          title={remark}
+        >
+          {remark}
+        </div>
+      ) : null}
     </td>
   );
 }
@@ -1494,7 +1506,7 @@ function WarrantyProductRows({
           <td className="max-w-[220px] px-4 py-3.5 xl:max-w-none">
             <span className="line-clamp-2 text-slate-700">{row.installed_address || "—"}</span>
           </td>
-          <LastFollowupTableCell value={row.last_followup_at} />
+          <LastFollowupTableCell value={row.last_followup_at} notes={row.last_followup_notes} />
           <td className="whitespace-nowrap px-4 py-3.5 text-right">
             <div className="inline-flex items-center gap-1">
               {serialHref ? (
@@ -1543,7 +1555,11 @@ function WarrantyProductRows({
         <td className="px-4 py-3.5 align-top">
           <SalesServiceTeamBlock row={row} />
         </td>
-        <LastFollowupTableCell value={row.last_followup_at} className="px-4 py-3.5 align-top" />
+        <LastFollowupTableCell
+          value={row.last_followup_at}
+          notes={row.last_followup_notes}
+          className="px-4 py-3.5 align-top"
+        />
         <td className="px-4 py-3.5 text-right align-top">
           <RegisteredProductActionCell
             row={row}
@@ -2057,7 +2073,11 @@ function OpenInstallationRows({
             />
           )}
         </td>
-        <LastFollowupTableCell value={row.last_followup_at} className="px-4 py-3.5 align-top" />
+        <LastFollowupTableCell
+          value={row.last_followup_at}
+          notes={row.last_followup_notes}
+          className="px-4 py-3.5 align-top"
+        />
         <td className="px-4 py-3.5 align-top">
           <OpenInstallationActionCell
             row={row}
@@ -2084,7 +2104,7 @@ function AmcRows({ rows, page, pageSize }) {
         <td className="px-4 py-3.5">{row.status || "—"}</td>
         <td className="px-4 py-3.5">{formatDate(row.amc_start_datetime)}</td>
         <td className="px-4 py-3.5">{formatDate(row.amc_end_datetime)}</td>
-        <LastFollowupTableCell value={row.last_followup_at} />
+        <LastFollowupTableCell value={row.last_followup_at} notes={row.last_followup_notes} />
       </tr>
     );
   });

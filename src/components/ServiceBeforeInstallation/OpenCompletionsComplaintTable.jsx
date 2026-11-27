@@ -285,14 +285,29 @@ export function OpenCompletionsComplaintRows({
             <td className="px-3 py-3.5 align-top">
               <OpenCompletionsStepVideos row={row} />
             </td>
-            <td className="min-w-[10.5rem] whitespace-nowrap px-3 py-3.5 text-sm">
+            <td className="min-w-[10.5rem] max-w-[14rem] px-3 py-3.5 text-sm align-top">
               {(() => {
                 const at = formatFollowedAtDisplay(row.last_followup_at);
-                if (!at) return "—";
+                const remark = String(row.last_followup_notes ?? "").trim();
+                if (!at && !remark) return <span className="text-slate-400">—</span>;
                 return (
                   <>
-                    <span className="text-slate-500">Last Followed:</span>{" "}
-                    <span className="font-medium tabular-nums text-slate-800">{at}</span>
+                    {at ? (
+                      <div className="whitespace-nowrap">
+                        <span className="text-slate-500">Last Followed:</span>{" "}
+                        <span className="font-medium tabular-nums text-slate-800">{at}</span>
+                      </div>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                    {remark ? (
+                      <div
+                        className="mt-1 line-clamp-3 whitespace-pre-wrap break-words text-xs text-slate-500"
+                        title={remark}
+                      >
+                        {remark}
+                      </div>
+                    ) : null}
                   </>
                 );
               })()}
