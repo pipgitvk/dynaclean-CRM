@@ -73,16 +73,16 @@ function OpenCompletionsAssignCell({ row }) {
   return (
     <div className="min-w-[8.5rem] max-w-[12rem] space-y-1 text-xs">
       <div>
-        <span className="font-semibold text-slate-500">Assign by</span>
-        <span className="ml-1 text-slate-800">{assignedBy || "—"}</span>
+        <span className="font-bold text-violet-700">Assign by</span>
+        <span className="ml-1 font-bold text-violet-700">{assignedBy || "—"}</span>
       </div>
       <div>
         <span className="font-semibold text-slate-500">Assign to</span>
         <span className="ml-1 text-slate-800">{assignedTo || "—"}</span>
       </div>
       <div>
-        <span className="font-semibold text-slate-500">Completed by</span>
-        <span className="ml-1 text-slate-800">{completedBy || "—"}</span>
+        <span className="font-bold text-emerald-600">Completed by</span>
+        <span className="ml-1 font-bold text-emerald-600">{completedBy || "—"}</span>
       </div>
     </div>
   );
