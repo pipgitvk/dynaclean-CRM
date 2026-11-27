@@ -11,6 +11,7 @@ public/*
 !public/images/
 public/images/*
 !public/images/service-before-installation-technician.png
+!public/images/service-before-installation-technician1.jpeg
 .env
 
 uploads/

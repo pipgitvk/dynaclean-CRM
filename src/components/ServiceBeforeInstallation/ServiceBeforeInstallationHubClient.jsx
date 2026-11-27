@@ -9,7 +9,7 @@ import { SBI_HUB_PERIOD_OPTIONS, SBI_RANGE_SELECT } from "@/lib/serviceBeforeIns
 import { getServiceBeforeInstallationCards } from "@/lib/serviceBeforeInstallationHub";
 import ServiceBeforeInstallationKpiCard from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationKpiCard";
 
-const TECHNICIAN_SRC = "/images/service-before-installation-technician.png";
+const TECHNICIAN_SRC = "/images/service-before-installation-technician1.jpeg";
 
 function pctChange(current, previous) {
   if (previous === undefined || previous === null) return null;
