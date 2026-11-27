@@ -7,6 +7,7 @@ import {
   sumOrderPaymentAmounts,
 } from "@/lib/orderPaymentHistory";
 import { hasOrderInvoiceReport } from "@/lib/orderDocumentEditRules";
+import { getAdminOrderTotalAmount } from "@/lib/adminOrderAmounts";
 
 /** Paise/rounding drift (e.g. ₹0.40 on ₹802.40) — treat as fully settled in reports. */
 export const PAYMENT_REMAINING_TOLERANCE_INR = 1;
@@ -35,17 +36,10 @@ export function computeOrderPaymentRemaining(total, paid, deduction = 0) {
   return { remaining, rawRemaining, displayPaid };
 }
 
-/** Matches order list UI: quotation grand total, then invoice totalamt. */
+/** Matches order list UI: with GST unless quotation hides GST breakdown. */
 export function getOrderTotalForPayment(order) {
-  const quotationTotal = Number(order?.quotation_grand_total) || 0;
-  if (quotationTotal > 0) return quotationTotal;
-
-  const total = Number(order?.totalamt) || 0;
-  if (total > 0) return total;
-
-  const base = Number(order?.baseAmount) || 0;
-  const tax = Number(order?.taxamt) || 0;
-  return Math.max(total, base + tax);
+  if (!order) return 0;
+  return getAdminOrderTotalAmount(order);
 }
 
 /** Order list payment badge: uses invoice link paid or neworder payment_amount. */

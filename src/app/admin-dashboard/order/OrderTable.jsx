@@ -33,6 +33,10 @@ import {
 } from "@/lib/orderPaymentHistory";
 import { EMPTY_ORDER_STATS } from "@/lib/adminOrderListStatCards";
 import { EMPTY_PRODUCT_SPARE_TOTALS } from "@/lib/adminOrderProductSpareTotals";
+import {
+  getAdminOrderPaymentColumnAmount,
+  getAdminOrderTotalAmount,
+} from "@/lib/adminOrderAmounts";
 import { OrderPaymentHistoryTrigger } from "@/components/orders/OrderPaymentHistoryModal";
 import {
   deriveOrderPaymentStatus,
@@ -597,20 +601,9 @@ function getOrderPaidAmountUiClasses(order) {
   };
 }
 
-/** Calculate total amount - use quotation grand_total as primary source */
+/** Total Amount column: with GST unless quotation hides GST breakdown. */
 function getTotalAmount(order) {
-  // First priority: quotation grand_total (from quotations_records)
-  const quotationTotal = Number(order.quotation_grand_total) || 0;
-  if (quotationTotal > 0) return quotationTotal;
-  
-  // Second priority: order totalamt
-  const total = Number(order.totalamt) || 0;
-  if (total > 0) return total;
-  
-  // Fallback: use baseAmount + taxamt if both are 0
-  const base = Number(order.baseAmount) || 0;
-  const tax = Number(order.taxamt) || 0;
-  return Math.max(total, base + tax);
+  return getAdminOrderTotalAmount(order);
 }
 
 /** Calculate balance amount (total - paid) */
@@ -630,14 +623,9 @@ function orderTaxableTotal(order) {
   return amountWithoutGst(order);
 }
 
-/** Get taxable amount for Payment column - use quotation subtotal as primary (₹40,000) */
+/** Taxable / payment reference amount (quotation subtotal or line taxable sum). */
 function getPaymentColumnAmount(order) {
-  // First priority: quotation subtotal (taxable amount without GST)
-  const quotationSubtotal = Number(order.quotation_subtotal) || 0;
-  if (quotationSubtotal > 0) return quotationSubtotal;
-  
-  // Second priority: use orderTaxableTotal (from quotation items sum)
-  return orderTaxableTotal(order);
+  return getAdminOrderPaymentColumnAmount(order);
 }
 
 /** Same rules as table filter: `created_at` within optional From/To (order date). */

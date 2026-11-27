@@ -4,15 +4,21 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import QuotationItemsTable from "./quotation-table";
 import TaxAndSummary from "./TaxAndSummary";
 import { useRouter, useSearchParams } from "next/navigation";
-import Image from "next/image";
 import toast from "react-hot-toast";
 import { set } from "date-fns";
 import DocumentLetterheadHeader from "@/components/invoice/DocumentLetterheadHeader";
-import { LetterheadBankLine, LetterheadSignatoryLine } from "@/components/invoice/InvoiceLetterheadSection";
 import {
   documentFromCompanyForSubmit,
   getDefaultDocumentFromCompany,
 } from "@/lib/documentFromCompany";
+import {
+  quotationLineTotalAmount,
+  quotationSummaryTotals,
+} from "@/lib/ensureQuotationHideGstColumn";
+import {
+  QuotationBankDetailsBlock,
+  QuotationSignatoryBlock,
+} from "@/components/Quotation/QuotationBankSignatoryFooter";
 
 // Remove local generation - will fetch from API
 
@@ -225,6 +231,7 @@ export default function QuotationForm() {
   const [showStateSuggestions, setShowStateSuggestions] = useState(false);
 
   const [isAutoRoundOff, setIsAutoRoundOff] = useState(true);
+  const [hideGstBreakdown, setHideGstBreakdown] = useState(false);
 
   const taxSummary = useMemo(() => {
     let subtotal = 0;
@@ -237,14 +244,12 @@ export default function QuotationForm() {
       totalTax += gstAmt;
     });
 
-    // Split tax into cgst/sgst or igst based on interstate flag
     const isInterstate = (() => {
       const gstinValue = form.gstin_no?.trim();
       if (gstinValue) {
         const code = gstinValue.slice(0, 2);
         return code !== SUPPLIER_STATE_CODE;
       }
-      // No GSTIN → check manually selected state
       const stateCode = parseCodeFromDisplay(form.state_name)
         || Object.entries(stateCodeToName).find(
             ([, name]) => name.toLowerCase() === form.state_name?.trim().toLowerCase()
@@ -253,21 +258,14 @@ export default function QuotationForm() {
       return stateCode !== SUPPLIER_STATE_CODE;
     })();
 
-    const cgst = isInterstate ? 0 : totalTax / 2;
-    const sgst = isInterstate ? 0 : totalTax / 2;
-    const igst = isInterstate ? totalTax : 0;
-
-    const totalBeforeRound = subtotal + totalTax;
-    let finalRoundOff = parseFloat(roundOff) || 0;
-
-    if (isAutoRoundOff) {
-      finalRoundOff = Math.round(totalBeforeRound) - totalBeforeRound;
-    }
-
-    const grandTotal = totalBeforeRound + finalRoundOff;
-
-    return { subtotal, cgst, sgst, igst, totalTax, grandTotal, finalRoundOff };
-  }, [items, roundOff, isAutoRoundOff, form.gstin_no, form.state_name]);
+    return quotationSummaryTotals(hideGstBreakdown, {
+      subtotal,
+      totalTax,
+      roundOff,
+      isAutoRoundOff,
+      isInterstate,
+    });
+  }, [items, roundOff, isAutoRoundOff, form.gstin_no, form.state_name, hideGstBreakdown]);
 
   useEffect(() => {
     if (isAutoRoundOff) {
@@ -501,9 +499,8 @@ Thanks for doing business with us!`,
         const total = taxable + gstAmount;
         return {
           ...item,
-          // Add the calculated taxable and total values to each item
           taxable_amount: taxable,
-          total_amount: total,
+          total_amount: quotationLineTotalAmount(hideGstBreakdown, taxable, total),
           IGSTamt: gstAmount,
         };
       });
@@ -538,6 +535,7 @@ Thanks for doing business with us!`,
         sgstRate: effectiveSgstRate,
         igstRate: effectiveIgstRate,
         terms: editableTerms,
+        hideGstBreakdown,
         ...documentFromCompanyForSubmit(documentFromCompany, letterheadRef),
       };
 
@@ -870,7 +868,15 @@ Thanks for doing business with us!`,
             </select>
           </div>
         </div>
-        <QuotationItemsTable items={items} setItems={setItems} customerId={form.customer_id || customerIdFromUrl} cgstRate={cgstRate} sgstRate={sgstRate} igstRate={igstRate} />
+        <QuotationItemsTable
+          items={items}
+          setItems={setItems}
+          customerId={form.customer_id || customerIdFromUrl}
+          cgstRate={cgstRate}
+          sgstRate={sgstRate}
+          igstRate={igstRate}
+          hideTaxColumns={hideGstBreakdown}
+        />
         <TaxAndSummary
           items={items}
           subtotal={taxSummary.subtotal}
@@ -879,6 +885,8 @@ Thanks for doing business with us!`,
           isAutoRoundOff={isAutoRoundOff}
           setIsAutoRoundOff={setIsAutoRoundOff}
           grandTotal={taxSummary.grandTotal}
+          hideGstBreakdown={hideGstBreakdown}
+          onHideGstBreakdownChange={setHideGstBreakdown}
           interstate={(() => {
             const gstinValue = form.gstin_no?.trim();
             if (gstinValue) {
@@ -886,7 +894,6 @@ Thanks for doing business with us!`,
               const buyerCode = gstState?.code;
               return buyerCode ? buyerCode !== SUPPLIER_STATE_CODE : false;
             }
-            // No GSTIN → check manually selected state
             const stateCode = parseCodeFromDisplay(form.state_name)
               || Object.entries(stateCodeToName).find(
                   ([, name]) => name.toLowerCase() === form.state_name?.trim().toLowerCase()
@@ -907,26 +914,14 @@ Thanks for doing business with us!`,
               className="w-full text-sm p-2 border rounded resize-y"
             />
           </div>
-          <div className="lg:col-span-1 border p-4 rounded bg-gray-50 text-sm">
-            <h4 className="font-semibold mb-2">Bank Details</h4>
-            <p>ICICI Bank</p>
-            <p>Account: 343405500379</p>
-            <p>IFSC: ICIC0003434</p>
-          </div>
-          <div className="lg:col-span-1 border p-4 rounded bg-gray-50 text-sm text-center flex flex-col justify-between">
-            <div>
-              <LetterheadSignatoryLine />
-              <Image
-                src="/images/sign.png"
-                alt="Sign"
-                width={100}
-                height={80}
-                className="mx-auto mt-2"
-                unoptimized
-              />
-            </div>
-            <p className="mt-2 font-semibold">Authorized Signatory</p>
-          </div>
+          <QuotationBankDetailsBlock
+            className="lg:col-span-1"
+            hideGstBreakdown={hideGstBreakdown}
+          />
+          <QuotationSignatoryBlock
+            className="lg:col-span-1"
+            hideGstBreakdown={hideGstBreakdown}
+          />
         </div>
         <div className="text-center">
           <button

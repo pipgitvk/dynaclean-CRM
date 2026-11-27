@@ -33,7 +33,12 @@ async function resolvePriceWithSpecial(customerId, productCode, basePrice, itemT
   return { finalPrice: basePrice, specialPrice: null };
 }
 
-export default function QuotationTable({ items, setItems, customerId }) {
+export default function QuotationTable({
+  items,
+  setItems,
+  customerId,
+  hideTaxColumns = false,
+}) {
   const [productSuggestions, setProductSuggestions] = useState([]);
   const [activeRowIndex, setActiveRowIndex] = useState(null);
   const itemsRef = useRef(items);
@@ -201,10 +206,11 @@ export default function QuotationTable({ items, setItems, customerId }) {
     (acc, item) => {
       const taxable = (item.quantity || 0) * (item.price || 0);
       const gstAmt = taxable * ((item.gst || 0) / 100);
+      const lineTotal = hideTaxColumns ? taxable : taxable + gstAmt;
       acc.totalQty += item.quantity || 0;
       acc.totalTaxable += taxable;
       acc.totalGst += gstAmt;
-      acc.grandTotal += taxable + gstAmt;
+      acc.grandTotal += lineTotal;
       return acc;
     },
     { totalQty: 0, totalTaxable: 0, totalGst: 0, grandTotal: 0 }
@@ -224,9 +230,13 @@ export default function QuotationTable({ items, setItems, customerId }) {
             <th className="border px-2 py-2">Qty</th>
             <th className="border px-2 py-2">Unit</th>
             <th className="border px-2 py-2">Price/Unit</th>
-            <th className="border px-2 py-2">GST %</th>
-            <th className="border px-2 py-2">Taxable</th>
-            <th className="border px-2 py-2">GST Amt</th>
+            {!hideTaxColumns ? (
+              <>
+                <th className="border px-2 py-2">GST %</th>
+                <th className="border px-2 py-2">Taxable</th>
+                <th className="border px-2 py-2">GST Amt</th>
+              </>
+            ) : null}
             <th className="border px-2 py-2">Total</th>
             <th className="border px-2 py-2"></th>
           </tr>
@@ -235,7 +245,7 @@ export default function QuotationTable({ items, setItems, customerId }) {
           {items.map((item, idx) => {
             const taxable = (item.quantity || 0) * (item.price || 0);
             const gstAmt = taxable * ((item.gst || 0) / 100);
-            const total = taxable + gstAmt;
+            const total = hideTaxColumns ? taxable : taxable + gstAmt;
 
             return (
               <tr key={idx} className="border-t">
@@ -333,18 +343,22 @@ export default function QuotationTable({ items, setItems, customerId }) {
                     className="border p-1 w-24 text-xs rounded"
                   />
                 </td>
-                <td className="border px-2 py-2">
-                  <input
-                    type="number"
-                    value={item.gst ?? 18}
-                    onChange={(e) => handleChange(idx, "gst", e.target.value)}
-                    className="border p-1 w-16 text-xs rounded text-center"
-                    min="0"
-                    step="0.5"
-                  />
-                </td>
-                <td className="border px-2 py-2">₹ {taxable.toFixed(2)}</td>
-                <td className="border px-2 py-2">₹ {gstAmt.toFixed(2)}</td>
+                {!hideTaxColumns ? (
+                  <>
+                    <td className="border px-2 py-2">
+                      <input
+                        type="number"
+                        value={item.gst ?? 18}
+                        onChange={(e) => handleChange(idx, "gst", e.target.value)}
+                        className="border p-1 w-16 text-xs rounded text-center"
+                        min="0"
+                        step="0.5"
+                      />
+                    </td>
+                    <td className="border px-2 py-2">₹ {taxable.toFixed(2)}</td>
+                    <td className="border px-2 py-2">₹ {gstAmt.toFixed(2)}</td>
+                  </>
+                ) : null}
                 <td className="border px-2 py-2 font-medium">₹ {total.toFixed(2)}</td>
                 <td className="border px-2 py-2 text-center">
                   <button
@@ -364,9 +378,13 @@ export default function QuotationTable({ items, setItems, customerId }) {
             <td className="border px-2 py-2">{totals.totalQty}</td>
             <td className="border px-2 py-2"></td>
             <td className="border px-2 py-2"></td>
-            <td className="border px-2 py-2"></td>
-            <td className="border px-2 py-2">₹ {totals.totalTaxable.toFixed(2)}</td>
-            <td className="border px-2 py-2">₹ {totals.totalGst.toFixed(2)}</td>
+            {!hideTaxColumns ? (
+              <>
+                <td className="border px-2 py-2"></td>
+                <td className="border px-2 py-2">₹ {totals.totalTaxable.toFixed(2)}</td>
+                <td className="border px-2 py-2">₹ {totals.totalGst.toFixed(2)}</td>
+              </>
+            ) : null}
             <td className="border px-2 py-2">₹ {totals.grandTotal.toFixed(2)}</td>
             <td className="border px-2 py-2"></td>
           </tr>

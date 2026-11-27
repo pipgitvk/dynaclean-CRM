@@ -104,6 +104,7 @@ function buildAdminOrderListSql(userRole, username, serviceSupportOnly) {
                 no.warehouse_in_image,
                 no.warehouse_in_by,
                 qr.company_name, qr.emp_name, qr.state, qr.grand_total as quotation_grand_total, qr.subtotal as quotation_subtotal, qr.gst as quotation_gst,
+                qr.round_off AS quotation_round_off, qr.hide_gst_breakdown AS quotation_hide_gst_breakdown,
                 MAX(c.lead_campaign) AS lead_campaign,
                 MAX(cn.id) as credit_note_id,
                 MAX(cn.credit_note_number) as credit_note_number,
