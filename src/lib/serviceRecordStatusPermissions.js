@@ -29,6 +29,46 @@ export function thirdPartyIdFromRecord(record) {
   return tpId != null && tpId !== "" ? String(tpId) : "";
 }
 
+function firstNonEmpty(...values) {
+  for (const value of values) {
+    const s = String(value ?? "").trim();
+    if (s) return s;
+  }
+  return "";
+}
+
+/** Installation assign payload — order / warranty fields already on the row. */
+export function installationSiteFromRecord(record = {}) {
+  return {
+    installation_address: firstNonEmpty(
+      record.installation_address,
+      record.installed_address,
+      record.installed_address_from_wp,
+      record.delivery_address,
+    ),
+    site_person: firstNonEmpty(
+      record.site_person,
+      record.contact_person_from_wp,
+      record.contact_person,
+    ),
+    site_email: firstNonEmpty(
+      record.site_email,
+      record.site_email_from_wp,
+      record.email,
+    ),
+    site_contact: firstNonEmpty(record.site_contact, record.contact),
+  };
+}
+
+export function installationSiteComplete(site) {
+  return Boolean(
+    firstNonEmpty(site?.installation_address) &&
+      firstNonEmpty(site?.site_person) &&
+      firstNonEmpty(site?.site_email) &&
+      firstNonEmpty(site?.site_contact),
+  );
+}
+
 export function canChangeServiceStatus(role, record) {
   if (record?.status?.toUpperCase() === "COMPLETED") return false;
   const roleNorm = String(role ?? "").trim().replace(/\s+/g, " ").toUpperCase();
@@ -122,15 +162,29 @@ export async function assignServiceRecordEngineer(
   serviceId,
   assignedTo,
   thirdPartyEngineerId,
+  installationSite = null,
 ) {
+  const body = {
+    service_id: serviceId,
+    assigned_to: assignedTo,
+    third_party_engineer_id: thirdPartyEngineerId || null,
+  };
+  const site = installationSite || {};
+  if (
+    site.installation_address ||
+    site.site_person ||
+    site.site_email ||
+    site.site_contact
+  ) {
+    body.installation_address = site.installation_address || "";
+    body.site_person = site.site_person || "";
+    body.site_email = site.site_email || "";
+    body.site_contact = site.site_contact || "";
+  }
   const res = await fetch("/api/service-status/assign", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      service_id: serviceId,
-      assigned_to: assignedTo,
-      third_party_engineer_id: thirdPartyEngineerId || null,
-    }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));

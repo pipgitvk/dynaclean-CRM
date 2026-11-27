@@ -1084,6 +1084,7 @@ const OPEN_INSTALLATION_LIST_SELECT = `
          ELSE NULL
        END AS contact_person,
        no.contact,
+       no.email,
        no.state,
        no.created_by AS emp_name,
        no.created_by AS order_sales_person,

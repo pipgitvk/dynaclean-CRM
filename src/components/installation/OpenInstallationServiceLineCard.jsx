@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import ServiceRecordStatusInlineCell from "@/components/services/ServiceRecordStatusInlineCell";
-import { OPEN_INSTALLATION_INLINE_STATUS_OPTIONS } from "@/lib/serviceRecordStatusPermissions";
+import {
+  OPEN_INSTALLATION_INLINE_STATUS_OPTIONS,
+  installationSiteFromRecord,
+} from "@/lib/serviceRecordStatusPermissions";
 import { OpenInstallationServiceReportButtons } from "@/components/installation/OpenInstallationReportButton";
 import { patchOpenInstallationRowService } from "@/components/installation/OpenInstallationStatusColumn";
 
@@ -26,6 +29,7 @@ function itemToServiceRecord(item, row) {
     third_party_engineer_id: row.third_party_engineer_id,
     assigned_to_id: row.assigned_to_id,
     assigned_to_type: row.assigned_to_type,
+    ...installationSiteFromRecord(row),
   };
 }
 

@@ -10,6 +10,8 @@ import {
   canAssignServiceEngineer,
   canChangeServiceStatus,
   fetchActiveEngineerOptions,
+  installationSiteComplete,
+  installationSiteFromRecord,
   plannedDateForInput,
   thirdPartyIdFromRecord,
 } from "@/lib/serviceRecordStatusPermissions";
@@ -76,7 +78,10 @@ export default function ServiceRecordStatusInlineCell({
     patchLocal(patch);
   };
 
+  const siteFromRecord = (rec) => installationSiteFromRecord(rec || r);
+
   const openPlannedDatePopup = async (rec) => {
+    const site = siteFromRecord(rec);
     setPlannedPopupError("");
     setPlannedDatePopup({
       serviceId: rec.service_id,
@@ -84,6 +89,7 @@ export default function ServiceRecordStatusInlineCell({
       assignEngineer: rec.assigned_to || "NOT ASSIGNED",
       thirdPartyId: thirdPartyIdFromRecord(rec),
       notes: (rec.status_description || "").trim(),
+      ...site,
     });
     if (canAssignServiceEngineer(role)) {
       try {
@@ -159,6 +165,24 @@ export default function ServiceRecordStatusInlineCell({
       return;
     }
     const notes = (plannedDatePopup.notes || "").trim();
+    const assignEngineer = plannedDatePopup.assignEngineer || "NOT ASSIGNED";
+    const thirdPartyId = plannedDatePopup.thirdPartyId;
+    const wantsAssign =
+      canAssignServiceEngineer(role) &&
+      (String(assignEngineer).trim().toUpperCase() !== "NOT ASSIGNED" ||
+        Boolean(String(thirdPartyId || "").trim()));
+    const site = {
+      installation_address: plannedDatePopup.installation_address || "",
+      site_person: plannedDatePopup.site_person || "",
+      site_email: plannedDatePopup.site_email || "",
+      site_contact: plannedDatePopup.site_contact || "",
+    };
+    if (wantsAssign && !installationSiteComplete(site)) {
+      setPlannedPopupError(
+        "Please fill installation address, site person, email and contact.",
+      );
+      return;
+    }
     try {
       setPlannedPopupSaving(true);
       setPlannedPopupError("");
@@ -168,18 +192,18 @@ export default function ServiceRecordStatusInlineCell({
         description: notes,
         planned_date: plannedDate,
       });
-      if (canAssignServiceEngineer(role)) {
+      if (wantsAssign) {
         const assignRes = await assignServiceRecordEngineer(
           plannedDatePopup.serviceId,
-          plannedDatePopup.assignEngineer || "NOT ASSIGNED",
-          plannedDatePopup.thirdPartyId,
+          assignEngineer,
+          thirdPartyId,
+          site,
         );
         patchLocal({
-          assigned_to: plannedDatePopup.assignEngineer || "NOT ASSIGNED",
-          third_party_engineer_id: plannedDatePopup.thirdPartyId
-            ? Number(plannedDatePopup.thirdPartyId)
-            : null,
+          assigned_to: assignEngineer,
+          third_party_engineer_id: thirdPartyId ? Number(thirdPartyId) : null,
           engineer_assigned_by: assignRes?.engineer_assigned_by || undefined,
+          ...site,
         });
       }
       setPlannedDatePopup(null);
@@ -238,15 +262,28 @@ export default function ServiceRecordStatusInlineCell({
         planned_date: isPlannedTarget ? plannedDate : null,
       });
       if (isPlannedTarget && canAssignServiceEngineer(role)) {
-        const assignRes = await assignServiceRecordEngineer(
-          statusForm.service_id,
-          statusForm.assignEngineer || "NOT ASSIGNED",
-          statusForm.thirdPartyId,
-        );
-        patchLocal({
-          assigned_to: statusForm.assignEngineer || "NOT ASSIGNED",
-          engineer_assigned_by: assignRes?.engineer_assigned_by || undefined,
-        });
+        const assignEngineer = statusForm.assignEngineer || "NOT ASSIGNED";
+        const thirdPartyId = statusForm.thirdPartyId;
+        const wantsAssign =
+          String(assignEngineer).trim().toUpperCase() !== "NOT ASSIGNED" ||
+          Boolean(String(thirdPartyId || "").trim());
+        if (wantsAssign) {
+          const site = installationSiteFromRecord({
+            ...r,
+            ...statusForm,
+          });
+          const assignRes = await assignServiceRecordEngineer(
+            statusForm.service_id,
+            assignEngineer,
+            thirdPartyId,
+            site,
+          );
+          patchLocal({
+            assigned_to: assignEngineer,
+            engineer_assigned_by: assignRes?.engineer_assigned_by || undefined,
+            ...site,
+          });
+        }
       }
       setStatusModalOpen(false);
     } catch (err) {
@@ -376,6 +413,65 @@ export default function ServiceRecordStatusInlineCell({
                     </option>
                   ))}
                 </select>
+                {!installationSiteComplete(plannedDatePopup) ? (
+                  <div className="mt-4 space-y-3 rounded-md border border-amber-100 bg-amber-50/60 p-3">
+                    <p className="text-xs font-semibold text-amber-900">
+                      Installation site details
+                    </p>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Installation address
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                      value={plannedDatePopup.installation_address || ""}
+                      onChange={(e) =>
+                        setPlannedDatePopup((p) =>
+                          p ? { ...p, installation_address: e.target.value } : p,
+                        )
+                      }
+                    />
+                    <label className="block text-sm font-medium text-gray-700">
+                      Site person
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                      value={plannedDatePopup.site_person || ""}
+                      onChange={(e) =>
+                        setPlannedDatePopup((p) =>
+                          p ? { ...p, site_person: e.target.value } : p,
+                        )
+                      }
+                    />
+                    <label className="block text-sm font-medium text-gray-700">
+                      Site email
+                    </label>
+                    <input
+                      type="email"
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                      value={plannedDatePopup.site_email || ""}
+                      onChange={(e) =>
+                        setPlannedDatePopup((p) =>
+                          p ? { ...p, site_email: e.target.value } : p,
+                        )
+                      }
+                    />
+                    <label className="block text-sm font-medium text-gray-700">
+                      Site contact
+                    </label>
+                    <input
+                      type="tel"
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                      value={plannedDatePopup.site_contact || ""}
+                      onChange={(e) =>
+                        setPlannedDatePopup((p) =>
+                          p ? { ...p, site_contact: e.target.value } : p,
+                        )
+                      }
+                    />
+                  </div>
+                ) : null}
               </>
             ) : null}
             <label className="mb-1 mt-4 block text-sm font-medium text-gray-700">Notes</label>

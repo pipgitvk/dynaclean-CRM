@@ -250,6 +250,7 @@ export function buildUpcomingInstallationsQuery({
       no.company_name,
       NULLIF(TRIM(no.client_name), '') AS contact_person,
       no.contact,
+      no.email,
       no.state,
       no.created_by AS emp_name,
       no.created_by AS order_sales_person,
