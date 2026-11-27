@@ -21,13 +21,11 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import dayjs from "dayjs";
 import {
   buildOrderPaymentRows,
-  getOrderPaidAmountForDisplay,
+  getOrderInvoiceLinkedPaidAmount,
   sumOrderPaymentAmounts,
 } from "@/lib/orderPaymentHistory";
-import {
-  deriveOrderListPaymentStatus,
-  getOrderTotalForPayment,
-} from "@/lib/paymentOrderStatus";
+import { deriveOrderListPaymentStatus } from "@/lib/paymentOrderStatus";
+import { getAdminOrderTotalAmount } from "@/lib/adminOrderAmounts";
 import {
   canManageReturnBookingRole,
   canManageAnyOrderDeliveryRole,
@@ -112,16 +110,12 @@ function orderListPaymentStatusKey(order) {
 function getOrderTotalAmount(order) {
   const invGrand = Number(order?.invoice_grand_total);
   if (Number.isFinite(invGrand) && invGrand > 0) return invGrand;
-  return getOrderTotalForPayment(order);
-}
-
-function getOrderPaidAmount(order) {
-  return getOrderPaidAmountForDisplay(order);
+  return getAdminOrderTotalAmount(order);
 }
 
 function getOrderBalanceAmount(order) {
   const total = getOrderTotalAmount(order);
-  const paid = getOrderPaidAmount(order);
+  const paid = getOrderInvoiceLinkedPaidAmount(order);
   return Math.max(0, total - paid);
 }
 
@@ -679,7 +673,7 @@ export default function OrderTable({ userRole }) {
         order.invoice_number || "",
         order.amount_received ?? "",
         dayjs(order.duedate).format("DD-MM-YYYY"),
-        order.totalamt || 0,
+        getOrderTotalAmount(order),
         totalPaid,
       ];
     });
@@ -1451,7 +1445,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
 
 function ViewPaymentButton({ order }) {
   const [open, setOpen] = useState(false);
-  const totalamt = order.totalamt || 0;
+  const totalamt = getOrderTotalAmount(order);
   const rows = buildOrderPaymentRows(order);
 
   const formatPrevDate = (d) => {

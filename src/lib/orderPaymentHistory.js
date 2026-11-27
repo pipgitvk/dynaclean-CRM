@@ -6,6 +6,7 @@ import {
   orderHasInvoiceNumber,
   parseInvoiceLinkedTransIds,
 } from "@/lib/orderLinkedPaymentsDisplay";
+import { getAdminOrderTotalAmount } from "@/lib/adminOrderAmounts";
 
 /** Without invoice link, neworder.payment_amount counts only for orders before this date. */
 export const LEGACY_NEWORDER_PAYMENT_AMOUNT_BEFORE_YMD = "2026-04-08";
@@ -57,13 +58,7 @@ function advanceRequestedForOrderListPaid(order) {
 function orderTotalForPaidCap(order) {
   const invGrand = Number(order?.invoice_grand_total);
   if (Number.isFinite(invGrand) && invGrand > 0) return invGrand;
-  const quotationTotal = Number(order?.quotation_grand_total) || 0;
-  if (quotationTotal > 0) return quotationTotal;
-  const total = Number(order?.totalamt) || 0;
-  if (total > 0) return total;
-  const base = Number(order?.baseAmount) || 0;
-  const tax = Number(order?.taxamt) || 0;
-  return Math.max(total, base + tax);
+  return getAdminOrderTotalAmount(order);
 }
 
 /**
@@ -413,6 +408,30 @@ export function sumAdvanceRequestedForDisplay(order) {
  * — before LEGACY_NEWORDER_PAYMENT_AMOUNT_BEFORE_YMD: advance_requested or payment_amount;
  * — after that date: advance_requested only until accountant sets payment_amount.
  */
+/**
+ * Accounts balance: deduct only payments linked on the invoice (Link Payment).
+ * Booking advance / neworder payment_amount without invoice link → 0.
+ */
+export function getOrderInvoiceLinkedPaidAmount(order) {
+  if (!orderInvoiceHasPaymentLink(order)) return 0;
+
+  let paid =
+    sumOrderPaymentHoverLines(order) || sumStatementLinkedOrderPayments(order);
+
+  if (!(paid > 0)) {
+    const invPaid = Number(order?.invoice_amount_paid);
+    if (Number.isFinite(invPaid) && invPaid > 0) {
+      paid = invPaid;
+    }
+  }
+
+  const orderTotal = orderTotalForPaidCap(order);
+  if (orderTotal > 0) {
+    paid = Math.min(paid, orderTotal);
+  }
+  return Math.max(0, paid);
+}
+
 export function getOrderPaidAmountForDisplay(order) {
   const orderTotal = orderTotalForPaidCap(order);
   let paid = 0;
