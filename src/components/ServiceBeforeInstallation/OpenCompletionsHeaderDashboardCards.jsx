@@ -12,7 +12,7 @@ const HEADER_CARDS = [
     id: "oc-pending-48h",
     bucket: "pending_over_48h_no_plan",
     Icon: AlertTriangle,
-    title: "No Follow-up > 48 hrs",
+    title: "No Follow-up > 48h",
     subtitleClass: "text-rose-700/90",
     activeRing: "ring-2 ring-rose-500/75 ring-offset-2 ring-offset-rose-50/60",
     waveId: "sbi-wave-oc-no-followup-header",
@@ -22,8 +22,8 @@ const HEADER_CARDS = [
     bucket: "google_feedback",
     Icon: MessageCircle,
     title: "Google Feedback",
-    subtitleClass: "text-rose-700/90",
-    activeRing: "ring-2 ring-rose-500/75 ring-offset-2 ring-offset-rose-50/60",
+    subtitleClass: "text-sky-700/90",
+    activeRing: "ring-2 ring-sky-500/75 ring-offset-2 ring-offset-sky-50/60",
     waveId: "sbi-wave-oc-google-feedback-header",
   },
 ];
@@ -62,14 +62,16 @@ function OpenCompletionsHeaderMiniCard({
           <Icon className="h-5 w-5" strokeWidth={2.25} aria-hidden />
         </div>
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-base font-bold text-slate-900">{def.title}</h2>
+          <h2 className="truncate text-sm font-bold leading-snug text-slate-900">
+            {def.title}
+          </h2>
           <p
-            className={`line-clamp-2 text-xs font-semibold leading-snug sm:text-[13px] ${def.subtitleClass}`}
+            className={`mt-0.5 line-clamp-2 text-[11px] font-medium leading-snug text-slate-500 sm:text-xs ${def.subtitleClass}`}
           >
             {card.subtitle}
           </p>
-          <div className="mt-1.5">
-            <span className="text-3xl font-bold tabular-nums leading-none tracking-tight text-slate-900 sm:text-[2.125rem]">
+          <div className="mt-1">
+            <span className="text-2xl font-bold tabular-nums leading-none tracking-tight text-slate-900 sm:text-[1.875rem]">
               {waiting ? "…" : formatSbiNum(displayTotal)}
             </span>
           </div>

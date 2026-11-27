@@ -88,6 +88,14 @@ const COMPACT_TITLES = {
   "open-installation-planned": "Installation Planned",
   "open-installation-completed": "Installation Completed",
   "open-installation-feedback-collected": "Google Feedback",
+  "oc-pending-spares": "Pending by Us",
+  "oc-pending-customer": "Pending by Customer",
+  "oc-pending-48h": "No Follow-up > 48h",
+  "oc-total-registered": "Total Complaints",
+  "oc-pending": "Pending",
+  "oc-planned": "Planned",
+  "oc-completed": "Completed",
+  "oc-google-feedback": "Google Feedback",
 };
 
 export function formatSbiNum(n) {
@@ -339,7 +347,7 @@ export default function ServiceBeforeInstallationKpiCard({
               >
                 <Icon className="h-[1.15rem] w-[1.15rem] sm:h-5 sm:w-5" strokeWidth={2.25} aria-hidden />
               </div>
-              <h2 className="line-clamp-2 text-sm font-bold leading-snug text-slate-900 sm:text-base">
+              <h2 className="line-clamp-2 text-sm font-bold leading-snug text-slate-900">
                 {title}
               </h2>
             </div>
@@ -358,7 +366,7 @@ export default function ServiceBeforeInstallationKpiCard({
                 ) : null}
               </div>
               {card.countCaption ? (
-                <p className="mt-2 text-sm font-bold leading-snug text-slate-800 sm:text-[0.9375rem]">
+                <p className="mt-1.5 line-clamp-2 text-xs font-medium leading-snug text-slate-500">
                   <CountCaptionText text={card.countCaption} />
                 </p>
               ) : null}

@@ -300,10 +300,10 @@ export const OPEN_COMPLETIONS_COMPLAINT_KPI_CARDS = [
     title: "Google Feedback",
     subtitle: "Complaints with Google feedback Yes",
     countCaption: "No. of complaint Google feedback collected",
-    chartColor: "#f43f5e",
-    surface: "border-rose-200/60 bg-rose-50/30",
-    iconSurface: "bg-gradient-to-br from-rose-500 to-orange-600",
-    glow: "bg-rose-400/20",
+    chartColor: "#0ea5e9",
+    surface: "border-sky-200/50 bg-sky-50/35",
+    iconSurface: "bg-gradient-to-br from-sky-500 to-blue-600",
+    glow: "bg-sky-400/25",
   },
 ];
 
