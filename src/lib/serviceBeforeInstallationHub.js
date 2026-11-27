@@ -63,7 +63,7 @@ export const OPEN_INSTALLATION_DETAIL_KPI_STRIP = [
   },
   {
     id: "open-installation-planned",
-    title: "Installation Pending",
+    title: "Installation Planned",
     subtitle: "Installation service in PLANNED status",
     countCaption: "No. of installation planned",
     countKey: "installation_planned",

@@ -24,6 +24,7 @@ function cardHasSettledCount(value) {
 
 export default function ServiceBeforeInstallationOpenInstallationKpiStrip({
   openInstallationBucket = "",
+  warrantyRegistration = "",
   totals = {},
   loading = false,
   plannedLoading = false,
@@ -33,7 +34,12 @@ export default function ServiceBeforeInstallationOpenInstallationKpiStrip({
   onCardSelect,
 }) {
   const cards = useMemo(() => getOpenInstallationDetailKpiCards(), []);
-  const activeCardId = openInstallationKpiCardIdFromFilter(openInstallationBucket);
+  const activeCardId = useMemo(() => {
+    const bucket = String(openInstallationBucket || "").trim();
+    const reg = String(warrantyRegistration || "").trim();
+    if (bucket === "completed" && reg === "not_registered") return "";
+    return openInstallationKpiCardIdFromFilter(openInstallationBucket);
+  }, [openInstallationBucket, warrantyRegistration]);
 
   return (
     <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 lg:gap-4">

@@ -86,7 +86,7 @@ const COMPACT_TITLES = {
   "open-installation-overdue-delayed": "Overdue (Delayed)",
   "open-installation-delivery-pending": "On the Way",
   "open-installation-delivered-pending": "Delivered",
-  "open-installation-planned": "Installation Pending",
+  "open-installation-planned": "Installation Planned",
   "open-installation-completed": "Installation Completed",
   "open-installation-feedback-collected": "Google Feedback",
 };

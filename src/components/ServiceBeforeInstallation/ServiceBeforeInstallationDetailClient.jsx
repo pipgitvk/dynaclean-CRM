@@ -4008,6 +4008,7 @@ export default function ServiceBeforeInstallationDetailClient({
         {segment === "open-installation" ? (
           <ServiceBeforeInstallationOpenInstallationKpiStrip
             openInstallationBucket={appliedFilters.openInstallationBucket}
+            warrantyRegistration={appliedFilters.warrantyRegistration}
             totals={openInstallationBreakdown}
             loading={openInstallationKpiLoading}
             plannedLoading={plannedKpiLoading}
