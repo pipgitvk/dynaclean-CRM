@@ -16,6 +16,7 @@ import {
   U_INSTALLATION_COMPLETED_SQL,
   U_OPEN_INSTALLATION_ORDER_SQL,
   U_INSTALLATION_PLANNED_SQL,
+  U_NO_TEMP_DISPATCH_SERIAL_SQL,
 } from "@/lib/openInstallationKpiSql";
 
 const DISPATCH_ON_ORDER_QUOTE = sqlTrimUtf8EqColumns("d.quote_number", "no.quote_number");
@@ -216,7 +217,8 @@ export function buildUpcomingInstallationListFilterSql(
     if (f.openInstallationBucket === "delivered_pending") {
       sql += ` AND ${U_DELIVERED_INSTALLATION_PENDING_SQL}`;
     } else if (f.openInstallationBucket === "overdue_delayed") {
-      sql += ` AND u.delivery_date < DATE_SUB(CURDATE(), INTERVAL 2 DAY)`;
+      sql += ` AND u.delivery_date < DATE_SUB(CURDATE(), INTERVAL 2 DAY)
+        AND ${U_NO_TEMP_DISPATCH_SERIAL_SQL}`;
     } else if (f.openInstallationBucket === "delivery_pending") {
       sql += ` AND ${U_DELIVERY_PENDING_AFTER_DISPATCH_SQL}`;
     } else if (f.openInstallationBucket === "installation_planned") {

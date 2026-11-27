@@ -23,7 +23,8 @@ export function buildNeworderOpenInstallationBucketWhereSql(openInstallationBuck
   if (b === "overdue_delayed") {
     return `AND COALESCE(no.installation_status, 0) = 0
       AND no.delivery_date IS NOT NULL
-      AND no.delivery_date < DATE_SUB(CURDATE(), INTERVAL 2 DAY)`;
+      AND no.delivery_date < DATE_SUB(CURDATE(), INTERVAL 2 DAY)
+      AND ${NO_TEMP_DISPATCH_SERIAL_SQL}`;
   }
   if (b === "installation_planned") {
     // Quote list resolved from PLANNED INSTALLATION service_records (see quote prefilter).

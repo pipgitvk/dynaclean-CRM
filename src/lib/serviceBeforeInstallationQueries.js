@@ -53,6 +53,7 @@ import {
   NO_DELIVERY_PENDING_AFTER_DISPATCH_SQL,
   NO_INSTALLATION_PLANNED_SQL,
   NO_TEMP_DISPATCH_SERIAL_SQL,
+  U_NO_TEMP_DISPATCH_SERIAL_SQL,
   SQL_SERVICE_RECORD_INSTALLATION_PLANNED,
   sqlDispatchSerialIsTemp,
   openInstallationBucketRecordCount,
@@ -66,7 +67,8 @@ import { mergeOpenInstallationParallelEnrichment } from "@/lib/openInstallationL
 import { enrichRowsWithLastMachineFollowup } from "@/lib/enrichSbiLastFollowup";
 
 function upcomingOverdueDelayedExtraSql() {
-  return ` AND u.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)`;
+  return ` AND u.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)
+    AND ${U_NO_TEMP_DISPATCH_SERIAL_SQL}`;
 }
 
 /** Pending installation orders with delivery date older than this many days. */
@@ -78,7 +80,7 @@ const OPEN_INSTALLATION_KPI_CACHE = new Map();
 const OPEN_INSTALLATION_KPI_INFLIGHT = new Map();
 const OPEN_INSTALLATION_KPI_TTL_MS = 90_000;
 /** Bump when count semantics change so stale under-counts (e.g. forced products) are dropped. */
-const OPEN_INSTALLATION_KPI_CACHE_VER = "v16-overdue-card";
+const OPEN_INSTALLATION_KPI_CACHE_VER = "v17-overdue-no-temp";
 
 const DELIVERED_ON_SQL = `(
   no.delivered_on IS NOT NULL
@@ -242,7 +244,8 @@ function appendOpenInstallationNeworderExtraFilters(
   const f = parseSbiFilters(filters);
 
   if (overdueDelayedOnly) {
-    sql += ` AND no.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)`;
+    sql += ` AND no.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)
+      AND ${NO_TEMP_DISPATCH_SERIAL_SQL}`;
   }
   if (f.from) {
     sql += ` AND DATE(no.delivery_date) >= ?`;
@@ -411,7 +414,8 @@ async function countUpcomingInstallationHubTotals(conn, filters) {
     const type = resolveUpcomingInstallationType(f.itemType);
     const inner = buildUpcomingInstallationsQuery({ type, registration: null });
     const listFilter = buildUpcomingInstallationListFilterSql(filters);
-    const overdueSql = `u.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)`;
+    const overdueSql = `u.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)
+         AND ${U_NO_TEMP_DISPATCH_SERIAL_SQL}`;
     const [[row]] = await conn.execute(
       `SELECT
          COUNT(*) AS open_installation,
@@ -428,7 +432,8 @@ async function countUpcomingInstallationHubTotals(conn, filters) {
   const type = resolveUpcomingInstallationType(f.itemType);
   const typeJoin = dispatchTypeJoin(type === "all" ? null : type);
   const quoteKey = sqlUtf8TrimExpr("d.quote_number");
-  const overdueSql = `no.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)`;
+  const overdueSql = `no.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)
+       AND ${NO_TEMP_DISPATCH_SERIAL_SQL}`;
 
   let dateSql = "";
   const params = [];
@@ -474,6 +479,7 @@ function openInstallationBreakdownAggregateSql(inner, listFilter, extraSql) {
     SUM(CASE WHEN ${U_DELIVERED_INSTALLATION_PENDING_SQL} THEN 1 ELSE 0 END) AS delivered_installation_pending,
     SUM(CASE WHEN COALESCE(u.order_installation_status, 0) = 0
       AND u.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)
+      AND ${U_NO_TEMP_DISPATCH_SERIAL_SQL}
       THEN 1 ELSE 0 END) AS overdue_delayed_installation,
     SUM(CASE WHEN ${U_DELIVERY_PENDING_AFTER_DISPATCH_SQL} THEN 1 ELSE 0 END) AS delivery_pending_after_dispatch,
     SUM(CASE WHEN ${U_INSTALLATION_PLANNED_SQL} THEN 1 ELSE 0 END) AS installation_planned,
@@ -578,6 +584,7 @@ async function fetchOpenInstallationBreakdownLite(
            WHEN COALESCE(no.installation_status, 0) = 0
             AND no.delivery_date IS NOT NULL
             AND no.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)
+            AND ${NO_TEMP_DISPATCH_SERIAL_SQL}
            THEN 1 ELSE 0
          END
        ) AS overdue_delayed_installation,
@@ -931,7 +938,8 @@ function buildOpenInstallationNeworderWhereSql(
   } else if (bucket === "overdue_delayed") {
     sql += ` AND COALESCE(no.installation_status, 0) = 0
       AND no.delivery_date IS NOT NULL
-      AND no.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)`;
+      AND no.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)
+      AND ${NO_TEMP_DISPATCH_SERIAL_SQL}`;
   } else if (bucket === "installation_planned") {
     // Quote keys from PLANNED INSTALLATION service_records (see buildOpenInstallationNeworderWhereWithQuotePrefilters).
   } else if (bucket === "completed") {
@@ -1186,7 +1194,9 @@ async function fetchOpenInstallationNeworderPage(
 
   const bucket = String(parsed.openInstallationBucket || "").trim().toLowerCase();
   const withoutTemp =
-    bucket === "delivery_pending" || bucket === "delivered_pending"
+    bucket === "delivery_pending" ||
+    bucket === "delivered_pending" ||
+    bucket === "overdue_delayed"
       ? await excludeOpenInstallationTempSerialRows(conn, rows)
       : rows;
 
@@ -1541,7 +1551,8 @@ async function fetchOpenInstallationQuotePageKeys(
   const quoteKey = sqlUtf8TrimExpr("d.quote_number");
   const bucketWhere = buildNeworderOpenInstallationBucketWhereSql(parsed.openInstallationBucket);
   const overdueSql = overdueDelayedOnly
-    ? ` AND no.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)`
+    ? ` AND no.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)
+        AND ${NO_TEMP_DISPATCH_SERIAL_SQL}`
     : "";
 
   const [rows] = await conn.execute(

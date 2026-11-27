@@ -19,6 +19,7 @@ export const SQL_QUOTE_HAS_TEMP_DISPATCH_SERIAL = (quoteNumberColumn) => `EXISTS
 )`;
 
 export const NO_TEMP_DISPATCH_SERIAL_SQL = `(NOT ${SQL_QUOTE_HAS_TEMP_DISPATCH_SERIAL("no.quote_number")})`;
+export const U_NO_TEMP_DISPATCH_SERIAL_SQL = `(NOT ${SQL_QUOTE_HAS_TEMP_DISPATCH_SERIAL("u.quote_number")})`;
 
 /** Row flags on upcoming-installations inner query alias `u`. */
 
