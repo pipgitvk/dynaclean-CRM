@@ -16,6 +16,7 @@ import {
   formatOrderRequestedAmountInr,
   getSalesOrderAmountFieldDisplay,
 } from "@/lib/orderPaymentHistory";
+import { orderQuotationItemsHideTax } from "@/components/orders/orderQuotationItemsHideTax";
 
 const DOCUMENT_FIELDS = [
   { label: "E-way Bill", key: "ewaybill_file" },
@@ -39,6 +40,7 @@ export default function OrderDetailsClient({
   showDualPaymentAmountFields = false,
   delhiveryLr = null,
   returnDelhiveryLr = null,
+  quotationHideGst = null,
 }) {
   const formatDate = (value) => {
     if (!value) return "";
@@ -46,6 +48,14 @@ export default function OrderDetailsClient({
     if (!d.isValid()) return String(value);
     return d.format("ddd MMM DD YYYY");
   };
+  const hideTaxColumns = useMemo(
+    () =>
+      orderQuotationItemsHideTax(items, {
+        hide_gst_breakdown: quotationHideGst,
+      }),
+    [items, quotationHideGst],
+  );
+
   const { totalQty, totalTaxable, totalGst, totalAmount } = useMemo(() => {
     let totalQty = 0,
       totalTaxable = 0,
@@ -190,8 +200,12 @@ export default function OrderDetailsClient({
                 <th>Qty</th>
                 <th>Unit</th>
                 <th>Price/Unit</th>
-                <th>Taxable</th>
-                <th>GST</th>
+                {!hideTaxColumns ? (
+                  <>
+                    <th>Taxable</th>
+                    <th>GST</th>
+                  </>
+                ) : null}
                 <th>Total</th>
               </tr>
             </thead>
@@ -213,15 +227,27 @@ export default function OrderDetailsClient({
                     <td>{item.quantity}</td>
                     <td>{item.unit}</td>
                     <td>₹{Number(item.price_per_unit).toFixed(2)}</td>
-                    <td>₹{Number(item.total_taxable_amt || item.taxable_price || 0).toFixed(2)}</td>
-                    <td>{Number(item.gst || 0).toFixed(0)}%</td>
+                    {!hideTaxColumns ? (
+                      <>
+                        <td>
+                          {item.total_taxable_amt != null || item.taxable_price != null
+                            ? `₹${Number(item.total_taxable_amt || item.taxable_price || 0).toFixed(2)}`
+                            : "—"}
+                        </td>
+                        <td>
+                          {item.gst != null && item.gst !== ""
+                            ? `${Number(item.gst).toFixed(0)}%`
+                            : "—"}
+                        </td>
+                      </>
+                    ) : null}
                     <td>₹{Number(item.total_price).toFixed(2)}</td>
                   </tr>
                 ))
               ) : (
                 <tr>
                   <td
-                    colSpan="11"
+                    colSpan={hideTaxColumns ? 9 : 11}
                     className="text-center text-gray-500 italic py-4"
                   >
                     No items found.
@@ -237,8 +263,12 @@ export default function OrderDetailsClient({
                 <td>{totalQty}</td>
                 <td></td>
                 <td></td>
-                <td>₹{totalTaxable.toFixed(2)}</td>
-                <td>₹{totalGst.toFixed(2)}</td>
+                {!hideTaxColumns ? (
+                  <>
+                    <td>₹{totalTaxable.toFixed(2)}</td>
+                    <td>₹{totalGst.toFixed(2)}</td>
+                  </>
+                ) : null}
                 <td>₹{totalAmount.toFixed(2)}</td>
               </tr>
             </tfoot>
@@ -273,13 +303,22 @@ export default function OrderDetailsClient({
                 <strong>Price/Unit:</strong> ₹
                 {Number(item.price_per_unit).toFixed(2)}
               </p>
-              <p>
-                <strong>Taxable:</strong> ₹
-                {Number(item.total_taxable_amt || item.taxable_price || 0).toFixed(2)}
-              </p>
-              <p>
-                <strong>GST:</strong> {Number(item.gst || 0).toFixed(0)}%
-              </p>
+              {!hideTaxColumns ? (
+                <>
+                  <p>
+                    <strong>Taxable:</strong>{" "}
+                    {item.total_taxable_amt != null || item.taxable_price != null
+                      ? `₹${Number(item.total_taxable_amt || item.taxable_price || 0).toFixed(2)}`
+                      : "—"}
+                  </p>
+                  <p>
+                    <strong>GST:</strong>{" "}
+                    {item.gst != null && item.gst !== ""
+                      ? `${Number(item.gst).toFixed(0)}%`
+                      : "—"}
+                  </p>
+                </>
+              ) : null}
               <p>
                 <strong>Total:</strong> ₹{Number(item.total_price).toFixed(2)}
               </p>

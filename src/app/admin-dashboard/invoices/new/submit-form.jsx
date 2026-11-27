@@ -15,7 +15,6 @@ import { Pencil } from "lucide-react";
 import AddSpecialPriceModal from "@/components/specialPrice/AddSpecialPriceModal";
 import dynacleanLogo from "@/components/logo1.jpg";
 import DocumentLetterheadHeader from "@/components/invoice/DocumentLetterheadHeader";
-import { LetterheadBankLine, LetterheadSignatoryLine } from "@/components/invoice/InvoiceLetterheadSection";
 import {
   documentFromCompanyForSubmit,
   getDefaultDocumentFromCompany,
@@ -33,6 +32,15 @@ import {
   isInterstateInvoiceSupply,
   totalGstPercentFromInvoiceItem,
 } from "@/lib/gstSupplyType";
+import {
+  hideGstBreakdownFromRow,
+  quotationLineTotalAmount,
+  quotationSummaryTotals,
+} from "@/lib/ensureQuotationHideGstColumn";
+import {
+  QuotationBankDetailsBlock,
+  QuotationSignatoryBlock,
+} from "@/components/Quotation/QuotationBankSignatoryFooter";
 
 
 export default function InvoiceForm({
@@ -63,6 +71,7 @@ export default function InvoiceForm({
   const [quotationNumber, setQuotationNumber] = useState(String(initialQuotationNumber || "").trim());
   const [orderId, setOrderId] = useState(String(initialOrderId || "").trim());
   const [isFromQuotation, setIsFromQuotation] = useState(false);
+  const [hideGstBreakdown, setHideGstBreakdown] = useState(false);
   const [showPaymentLinkModal, setShowPaymentLinkModal] = useState(false);
   const [linkedTransIds, setLinkedTransIds] = useState([]);
 
@@ -197,6 +206,17 @@ export default function InvoiceForm({
   const [showStateSuggestions, setShowStateSuggestions] = useState(false);
   const [isAutoRoundOff, setIsAutoRoundOff] = useState(true);
 
+  const interstateSupply = useMemo(
+    () =>
+      isInterstateInvoiceSupply({
+        buyerGstin: form.gst_number?.trim(),
+        buyerStateCode: form.state_code,
+        stateDisplay: form.state,
+        parseCodeFromDisplay,
+      }),
+    [form.gst_number, form.state, form.state_code],
+  );
+
   const taxSummary = useMemo(() => {
     let subtotal = 0;
     let cgst = 0;
@@ -217,17 +237,14 @@ export default function InvoiceForm({
     });
 
     const totalTax = cgst + sgst + igst;
-    const totalBeforeRound = subtotal + totalTax;
-    let finalRoundOff = parseFloat(roundOff) || 0;
-    
-    if (isAutoRoundOff) {
-      finalRoundOff = Math.round(totalBeforeRound) - totalBeforeRound;
-    }
-    
-    const grandTotal = totalBeforeRound + finalRoundOff;
-
-    return { subtotal, cgst, sgst, igst, totalTax, grandTotal, finalRoundOff };
-  }, [items, roundOff, isAutoRoundOff]);
+    return quotationSummaryTotals(hideGstBreakdown, {
+      subtotal,
+      totalTax,
+      roundOff,
+      isAutoRoundOff,
+      isInterstate: interstateSupply,
+    });
+  }, [items, roundOff, isAutoRoundOff, hideGstBreakdown, interstateSupply]);
 
   useEffect(() => {
     if (isAutoRoundOff) {
@@ -236,17 +253,6 @@ export default function InvoiceForm({
   }, [taxSummary.finalRoundOff, isAutoRoundOff]);
 
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(true);
-
-  const interstateSupply = useMemo(
-    () =>
-      isInterstateInvoiceSupply({
-        buyerGstin: form.gst_number?.trim(),
-        buyerStateCode: form.state_code,
-        stateDisplay: form.state,
-        parseCodeFromDisplay,
-      }),
-    [form.gst_number, form.state, form.state_code],
-  );
 
   const lineTaxSignature = useMemo(
     () =>
@@ -278,6 +284,7 @@ export default function InvoiceForm({
 
   // Re-apply line GST when products / place-of-supply change (not only on GSTIN blur)
   useEffect(() => {
+    if (hideGstBreakdown) return;
     const interstate = interstateSupply;
     const { cgstRate: cR, sgstRate: sR, igstRate: iR } = invoiceHeaderTaxRates(
       items,
@@ -300,7 +307,7 @@ export default function InvoiceForm({
         );
       return same ? prev : next;
     });
-  }, [lineTaxSignature, interstateSupply]);
+  }, [lineTaxSignature, interstateSupply, hideGstBreakdown]);
 
   const [editableTerms, setEditableTerms] = useState(
     invoiceType === "performa"
@@ -354,13 +361,21 @@ export default function InvoiceForm({
         const igstAmount = (taxableValue * (item.igst_percent || 0)) / 100;
         const totalAmount = taxableValue + cgstAmount + sgstAmount + igstAmount;
 
+        const lineTotal = quotationLineTotalAmount(
+          hideGstBreakdown,
+          taxableValue,
+          totalAmount,
+        );
         return {
           ...item,
           taxable_value: taxableValue,
-          cgst_amount: cgstAmount,
-          sgst_amount: sgstAmount,
-          igst_amount: igstAmount,
-          total_amount: totalAmount,
+          cgst_percent: hideGstBreakdown ? null : item.cgst_percent,
+          sgst_percent: hideGstBreakdown ? null : item.sgst_percent,
+          igst_percent: hideGstBreakdown ? null : item.igst_percent,
+          cgst_amount: hideGstBreakdown ? null : cgstAmount,
+          sgst_amount: hideGstBreakdown ? null : sgstAmount,
+          igst_amount: hideGstBreakdown ? null : igstAmount,
+          total_amount: lineTotal,
         };
       });
       const amountPaid = Number(form.amount_paid || 0);
@@ -404,6 +419,7 @@ export default function InvoiceForm({
         cgst_rate: cgstRate,
         sgst_rate: sgstRate,
         igst_rate: igstRate,
+        hideGstBreakdown,
         linked_trans_ids: linkedTransIds.length > 0 ? linkedTransIds : null,
         ...documentFromCompanyForSubmit(documentFromCompany, letterheadRef),
       };
@@ -521,16 +537,21 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
       const cg = Number(it.cgst_percent) || 0;
       const sg = Number(it.sgst_percent) || 0;
       const ig = Number(it.igst_percent) || 0;
+      const qty = Number(it.quantity) || 1;
+      const rate = Number(it.rate ?? it.price_per_unit) || 0;
+      const discountAmount = Number(it.discount_amount) || 0;
+      const taxable_value = qty * rate - discountAmount;
       return {
         item_name: it.item_name || "",
         item_code: it.item_code || "",
         description: it.specification || it.description || "",
         hsn_code: it.hsn_sac || it.hsn_code || "",
-        quantity: it.quantity || 1,
+        quantity: qty,
         unit: it.unit || "",
-        rate: it.rate || it.price_per_unit || 0,
+        rate,
         discount_percent: it.discount_percent || 0,
-        discount_amount: it.discount_amount || 0,
+        discount_amount: discountAmount,
+        taxable_value,
         cgst_percent: cg,
         sgst_percent: sg,
         igst_percent: ig,
@@ -552,12 +573,34 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
       };
     });
 
-    const taxedItems = applyTaxPercentsToInvoiceItems(mappedItems, interstate);
+    const hideGst = hideGstBreakdownFromRow({
+      hide_gst_breakdown: quotation.hide_gst_breakdown,
+    });
+    setHideGstBreakdown(hideGst);
+
+    const itemsForTax = hideGst
+      ? mappedItems.map((row) => ({
+          ...row,
+          cgst_percent: 0,
+          sgst_percent: 0,
+          igst_percent: 0,
+          gst: 0,
+        }))
+      : mappedItems;
+    const taxedItems = hideGst
+      ? itemsForTax
+      : applyTaxPercentsToInvoiceItems(mappedItems, interstate);
     setItems(taxedItems);
-    const rates = invoiceHeaderTaxRates(taxedItems, interstate);
-    setCgstRate(rates.cgstRate);
-    setSgstRate(rates.sgstRate);
-    setIgstRate(rates.igstRate);
+    if (!hideGst) {
+      const rates = invoiceHeaderTaxRates(taxedItems, interstate);
+      setCgstRate(rates.cgstRate);
+      setSgstRate(rates.sgstRate);
+      setIgstRate(rates.igstRate);
+    } else {
+      setCgstRate(0);
+      setSgstRate(0);
+      setIgstRate(0);
+    }
 
     if (quotation.round_off) {
       setRoundOff(Number(quotation.round_off) || 0);
@@ -1001,6 +1044,7 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
         setItems={setItems}
         canEditHsn={canEditHsn}
         interstate={interstateSupply}
+        hideTaxColumns={hideGstBreakdown}
       />
 
       {/* Tax Summary */}
@@ -1021,6 +1065,7 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
           setCgstRate={setCgstRate}
           setSgstRate={setSgstRate}
           setIgstRate={setIgstRate}
+          hideGstBreakdown={hideGstBreakdown}
         />
 
       {/* Notes, Terms & Bank Details */}
@@ -1074,28 +1119,8 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
 
         {/* Bank Details & Signatory */}
         <div className="lg:col-span-1 space-y-4">
-          <div className="border p-4 rounded bg-gray-50 text-sm">
-            <h4 className="font-semibold mb-2">Bank Details</h4>
-            <LetterheadBankLine values={documentFromCompany} />
-            <p>ICICI Bank</p>
-            <p>Account: 343405500379</p>
-            <p>IFSC: ICIC0003434</p>
-          </div>
-
-          <div className="border p-4 rounded bg-gray-50 text-sm text-center flex flex-col justify-between">
-            <div>
-              <LetterheadSignatoryLine values={documentFromCompany} />
-              <Image
-                src="/images/sign.png"
-                alt="Sign"
-                width={100}
-                height={80}
-                className="mx-auto mt-2"
-                unoptimized
-              />
-            </div>
-            <p className="mt-2 font-semibold">Authorized Signatory</p>
-          </div>
+          <QuotationBankDetailsBlock hideGstBreakdown={hideGstBreakdown} />
+          <QuotationSignatoryBlock hideGstBreakdown={hideGstBreakdown} />
         </div>
       </div>
 

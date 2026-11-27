@@ -51,6 +51,8 @@ export default function TaxAndSummary({
   setIsAutoRoundOff,
   grandTotal,
   interstate,
+  hideGstBreakdown = false,
+  onHideGstBreakdownChange,
 }) {
   // Group items by GST rate and compute per-rate taxable amounts
   const gstGroups = React.useMemo(() => {
@@ -78,52 +80,67 @@ export default function TaxAndSummary({
     <div className="flex flex-col md:flex-row gap-6 mt-6 p-4 border rounded-md bg-gray-50 shadow text-sm">
       {/* Left — Tax breakdown by GST rate */}
       <div className="flex-1 space-y-2">
-        <h4 className="font-semibold text-lg text-gray-800">Tax Summary</h4>
-        <div className="text-xs text-gray-600 mb-2">
-          Mode:{" "}
-          {interstate ? (
-            <span className="font-semibold text-indigo-700">Interstate (IGST)</span>
-          ) : (
-            <span className="font-semibold text-emerald-700">Intrastate (CGST + SGST)</span>
-          )}
+        <div className="flex items-center gap-2 mb-2">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={hideGstBreakdown}
+              onChange={(e) => onHideGstBreakdownChange?.(e.target.checked)}
+              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              title="Hide GST %, Taxable, GST Amt columns and GST breakdown"
+            />
+            <h4 className="font-semibold text-lg text-gray-800">Tax Summary</h4>
+          </label>
         </div>
-
-        {/* Per-rate GST rows */}
-        {gstGroups.length === 0 && (
-          <div className="text-xs text-gray-400 italic">No items added yet</div>
-        )}
-
-        {gstGroups.map(({ rate, taxable, taxAmt }) => (
-          <div key={rate} className="text-xs text-gray-700 border rounded p-2 bg-white">
-            <div className="flex justify-between font-medium text-gray-600 mb-1">
-              <span>GST @ {rate}% — Taxable: ₹ {taxable.toFixed(2)}</span>
+        {!hideGstBreakdown ? (
+          <>
+            <div className="text-xs text-gray-600 mb-2">
+              Mode:{" "}
+              {interstate ? (
+                <span className="font-semibold text-indigo-700">Interstate (IGST)</span>
+              ) : (
+                <span className="font-semibold text-emerald-700">Intrastate (CGST + SGST)</span>
+              )}
             </div>
-            {interstate ? (
-              <div className="flex justify-between pl-2">
-                <span>IGST ({rate}%)</span>
-                <span>₹ {taxAmt.toFixed(2)}</span>
-              </div>
-            ) : (
-              <>
-                <div className="flex justify-between pl-2">
-                  <span>CGST ({(rate / 2).toFixed(1)}%)</span>
-                  <span>₹ {(taxAmt / 2).toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between pl-2">
-                  <span>SGST ({(rate / 2).toFixed(1)}%)</span>
-                  <span>₹ {(taxAmt / 2).toFixed(2)}</span>
-                </div>
-              </>
-            )}
-          </div>
-        ))}
 
-        {/* Total Tax */}
-        {gstGroups.length > 0 && (
-          <div className="flex justify-between items-center text-gray-700 font-semibold pt-1 border-t">
-            <span>Total Tax</span>
-            <span>₹ {totalTax.toFixed(2)}</span>
-          </div>
+            {gstGroups.length === 0 && (
+              <div className="text-xs text-gray-400 italic">No items added yet</div>
+            )}
+
+            {gstGroups.map(({ rate, taxable, taxAmt }) => (
+              <div key={rate} className="text-xs text-gray-700 border rounded p-2 bg-white">
+                <div className="flex justify-between font-medium text-gray-600 mb-1">
+                  <span>GST @ {rate}% — Taxable: ₹ {taxable.toFixed(2)}</span>
+                </div>
+                {interstate ? (
+                  <div className="flex justify-between pl-2">
+                    <span>IGST ({rate}%)</span>
+                    <span>₹ {taxAmt.toFixed(2)}</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex justify-between pl-2">
+                      <span>CGST ({(rate / 2).toFixed(1)}%)</span>
+                      <span>₹ {(taxAmt / 2).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between pl-2">
+                      <span>SGST ({(rate / 2).toFixed(1)}%)</span>
+                      <span>₹ {(taxAmt / 2).toFixed(2)}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+
+            {gstGroups.length > 0 && (
+              <div className="flex justify-between items-center text-gray-700 font-semibold pt-1 border-t">
+                <span>Total Tax</span>
+                <span>₹ {totalTax.toFixed(2)}</span>
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="text-xs text-gray-500 italic">Taxable amounts and GST breakdown hidden.</p>
         )}
       </div>
 
@@ -133,14 +150,16 @@ export default function TaxAndSummary({
           <h3 className="text-center font-bold text-lg text-gray-800 mb-4">Summary</h3>
 
           <div className="flex justify-between py-2 border-b text-sm text-gray-700">
-            <span>Sub Total:</span>
+            <span>{hideGstBreakdown ? "Total:" : "Sub Total:"}</span>
             <span>₹ {(subtotal ?? computedSubtotal).toFixed(2)}</span>
           </div>
 
-          <div className="flex justify-between py-2 border-b text-sm text-gray-700">
-            <span>Total GST:</span>
-            <span>₹ {totalTax.toFixed(2)}</span>
-          </div>
+          {!hideGstBreakdown ? (
+            <div className="flex justify-between py-2 border-b text-sm text-gray-700">
+              <span>Total GST:</span>
+              <span>₹ {totalTax.toFixed(2)}</span>
+            </div>
+          ) : null}
 
           <div className="flex justify-between items-center py-2 border-b text-sm text-gray-700">
             <span className="flex items-center gap-2">

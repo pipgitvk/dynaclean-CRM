@@ -3,12 +3,19 @@
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import toast from "react-hot-toast";
 import QuotationItemsTable from "@/app/admin-dashboard/quotations/new/quotation-table";
 import TaxAndSummary from "@/app/admin-dashboard/quotations/new/TaxAndSummary";
 import DocumentLetterheadHeader from "@/components/invoice/DocumentLetterheadHeader";
-import { LetterheadBankLine, LetterheadSignatoryLine } from "@/components/invoice/InvoiceLetterheadSection";
+import {
+  QuotationBankDetailsBlock,
+  QuotationSignatoryBlock,
+} from "@/components/Quotation/QuotationBankSignatoryFooter";
+import {
+  hideGstBreakdownFromRow,
+  quotationLineTotalAmount,
+  quotationSummaryTotals,
+} from "@/lib/ensureQuotationHideGstColumn";
 import {
   documentFromCompanyForSubmit,
   getDefaultDocumentFromCompany,
@@ -39,6 +46,7 @@ export default function QuotationEditForm({ quoteId }) {
   const [igstRate, setIgstRate] = useState(0);
   const [roundOff, setRoundOff] = useState(0);
   const [isAutoRoundOff, setIsAutoRoundOff] = useState(true);
+  const [hideGstBreakdown, setHideGstBreakdown] = useState(false);
   const [editableTerms, setEditableTerms] = useState("");
   const [documentFromCompany, setDocumentFromCompany] = useState(
     getDefaultDocumentFromCompany,
@@ -95,9 +103,10 @@ export default function QuotationEditForm({ quoteId }) {
       isAutoRoundOff,
       editableTerms,
       documentFromCompany,
+      hideGstBreakdown,
     };
     return !deepEqual(originalSnapshot, currentSnapshot);
-  }, [originalSnapshot, form, items, quoteDate, cgstRate, sgstRate, igstRate, roundOff, isAutoRoundOff, editableTerms, documentFromCompany]);
+  }, [originalSnapshot, form, items, quoteDate, cgstRate, sgstRate, igstRate, roundOff, isAutoRoundOff, editableTerms, documentFromCompany, hideGstBreakdown]);
 
   const getStateFromGSTIN = (gstin) => {
     if (!gstin || gstin.length < 2) return null;
@@ -157,6 +166,8 @@ export default function QuotationEditForm({ quoteId }) {
         setSgstRate(origSgst);
         setIgstRate(origIgst);
         setRoundOff(origRound);
+        const origHideGst = hideGstBreakdownFromRow(h);
+        setHideGstBreakdown(origHideGst);
 
         // Map DB items to form items shape
         const mappedItems = (data.items || []).map((item) => {
@@ -234,6 +245,7 @@ export default function QuotationEditForm({ quoteId }) {
           isAutoRoundOff: true,
           editableTerms: origTerms,
           documentFromCompany: origLetterhead,
+          hideGstBreakdown: origHideGst,
         });
       } catch (err) {
         console.error("Error loading quotation:", err);
@@ -273,20 +285,14 @@ export default function QuotationEditForm({ quoteId }) {
       return stateCode !== SUPPLIER_STATE_CODE;
     })();
 
-    const cgst = isInterstate ? 0 : totalTax / 2;
-    const sgst = isInterstate ? 0 : totalTax / 2;
-    const igst = isInterstate ? totalTax : 0;
-
-    const totalBeforeRound = subtotal + totalTax;
-    let finalRoundOff = parseFloat(roundOff) || 0;
-
-    if (isAutoRoundOff) {
-      finalRoundOff = Math.round(totalBeforeRound) - totalBeforeRound;
-    }
-
-    const grandTotal = totalBeforeRound + finalRoundOff;
-    return { subtotal, cgst, sgst, igst, totalTax, grandTotal, finalRoundOff };
-  }, [items, roundOff, isAutoRoundOff, form.gstin_no, form.state_name]);
+    return quotationSummaryTotals(hideGstBreakdown, {
+      subtotal,
+      totalTax,
+      roundOff,
+      isAutoRoundOff,
+      isInterstate,
+    });
+  }, [items, roundOff, isAutoRoundOff, form.gstin_no, form.state_name, hideGstBreakdown]);
 
   useEffect(() => {
     if (isAutoRoundOff) {
@@ -303,7 +309,12 @@ export default function QuotationEditForm({ quoteId }) {
         const taxable = item.quantity * item.price;
         const gstAmount = taxable * (item.gst / 100);
         const total = taxable + gstAmount;
-        return { ...item, taxable_amount: taxable, total_amount: total, IGSTamt: gstAmount };
+        return {
+          ...item,
+          taxable_amount: taxable,
+          total_amount: quotationLineTotalAmount(hideGstBreakdown, taxable, total),
+          IGSTamt: gstAmount,
+        };
       });
 
       const isInterstate = taxSummary.igst > 0;
@@ -334,6 +345,7 @@ export default function QuotationEditForm({ quoteId }) {
         igstRate: effectiveIgstRate,
         terms: editableTerms,
         has_changes: hasChanges,
+        hideGstBreakdown,
         ...documentFromCompanyForSubmit(documentFromCompany, letterheadRef),
       };
 
@@ -545,6 +557,7 @@ export default function QuotationEditForm({ quoteId }) {
         sgstRate={sgstRate}
         igstRate={igstRate}
         editableSpecification={false}
+        hideTaxColumns={hideGstBreakdown}
       />
 
       {/* Tax Summary */}
@@ -566,16 +579,21 @@ export default function QuotationEditForm({ quoteId }) {
         setSgstRate={setSgstRate}
         setIgstRate={setIgstRate}
         interstate={isInterstate}
+        hideGstBreakdown={hideGstBreakdown}
+        onHideGstBreakdownChange={setHideGstBreakdown}
       />
 
-      {/* Terms & Conditions */}
-      <div className="border p-4 rounded bg-gray-50">
-        <h4 className="font-semibold text-base mb-2 text-gray-800">Terms & Conditions</h4>
-        <textarea
-          value={editableTerms}
-          onChange={(e) => setEditableTerms(e.target.value)}
-          className="w-full text-sm border rounded-md p-3 min-h-[140px] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="border p-4 rounded bg-gray-50">
+          <h4 className="font-semibold text-base mb-2 text-gray-800">Terms & Conditions</h4>
+          <textarea
+            value={editableTerms}
+            onChange={(e) => setEditableTerms(e.target.value)}
+            className="w-full text-sm border rounded-md p-3 min-h-[140px] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <QuotationBankDetailsBlock hideGstBreakdown={hideGstBreakdown} />
+        <QuotationSignatoryBlock hideGstBreakdown={hideGstBreakdown} />
       </div>
 
       <div className="flex gap-4 justify-end pb-8">

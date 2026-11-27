@@ -1,6 +1,12 @@
 import { getDbConnection } from "@/lib/db";
 import { ensureDocumentFromCompanyColumns } from "@/lib/ensureDocumentFromCompanyColumns";
 import {
+  ensureQuotationHideGstColumn,
+  hideGstBreakdownFromBody,
+  quotationItemTaxColumnsForDb,
+  quotationLineTotalAmount,
+} from "@/lib/ensureQuotationHideGstColumn";
+import {
   documentFromCompanyInsertColumnSql,
   documentFromCompanyInsertPlaceholders,
   documentFromCompanyInsertValues,
@@ -91,6 +97,8 @@ export async function PATCH(req, { params }) {
 
   try {
     conn = await pool.getConnection();
+    await ensureDocumentFromCompanyColumns(conn);
+    await ensureQuotationHideGstColumn(conn);
 
     const [rows] = await conn.execute(
       "SELECT * FROM quotations_records WHERE quote_number = ?",
@@ -164,6 +172,12 @@ export async function PATCH(req, { params }) {
     const docCols = documentFromCompanyInsertColumnSql();
     const docPh = documentFromCompanyInsertPlaceholders();
     const docVals = documentFromCompanyInsertValues(letterhead);
+    const hideGstBreakdown =
+      body.hideGstBreakdown !== undefined || body.hide_gst_breakdown !== undefined
+        ? hideGstBreakdownFromBody(body)
+        : quote.hide_gst_breakdown
+          ? 1
+          : 0;
 
     const dateStr = now.toISOString().slice(0, 10).replace(/-/g, "");
     const todayPrefix = `QUOTE${dateStr}`;
@@ -192,8 +206,8 @@ export async function PATCH(req, { params }) {
       try {
         await conn.execute(
           `INSERT INTO quotations_records
-           (quote_number, quote_date, customer_id, company_name, company_address, state, gstin, ship_to, qty, gst, cgst_rate, sgst_rate, igst_rate, emp_name, subtotal, round_off, grand_total, term_con, payment_term_days, ${docCols}, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${docPh}, NOW())`,
+           (quote_number, quote_date, customer_id, company_name, company_address, state, gstin, ship_to, qty, gst, cgst_rate, sgst_rate, igst_rate, emp_name, subtotal, round_off, grand_total, term_con, payment_term_days, hide_gst_breakdown, ${docCols}, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${docPh}, NOW())`,
           [
             finalQuoteNumber,
             quote_date ?? quote.quote_date,
@@ -216,6 +230,7 @@ export async function PATCH(req, { params }) {
             grand_total ?? quote.grand_total,
             terms !== undefined ? String(terms ?? "") : quote.term_con,
             payment_term_days ?? quote.payment_term_days,
+            hideGstBreakdown,
             ...docVals,
           ],
         );
@@ -243,6 +258,22 @@ export async function PATCH(req, { params }) {
         const cgstAmt = isInterstate ? 0 : gstAmt / 2;
         const sgstAmt = isInterstate ? 0 : gstAmt / 2;
         const igstAmt = isInterstate ? gstAmt : 0;
+        const lineTotal = quotationLineTotalAmount(
+          hideGstBreakdown === 1,
+          taxable,
+          total,
+        );
+        const taxCols = quotationItemTaxColumnsForDb(hideGstBreakdown === 1, {
+          taxable_price: taxable,
+          total_taxable_amt: taxable,
+          gst: item.gst || 0,
+          cgsttax: isInterstate ? 0 : (item.gst || 0) / 2,
+          cgsttxamt: cgstAmt,
+          sgsttax: isInterstate ? 0 : (item.gst || 0) / 2,
+          sgstxamt: sgstAmt,
+          igsttax: isInterstate ? item.gst || 0 : 0,
+          igsttamt: igstAmt,
+        });
 
         await conn.execute(
           `INSERT INTO quotation_items
@@ -259,16 +290,16 @@ export async function PATCH(req, { params }) {
             item.quantity || 0,
             item.unit || "",
             item.price || item.price_per_unit || 0,
-            taxable,
-            taxable,
-            item.gst || 0,
-            total,
-            isInterstate ? 0 : (item.gst || 0) / 2,
-            cgstAmt,
-            isInterstate ? 0 : (item.gst || 0) / 2,
-            sgstAmt,
-            isInterstate ? item.gst || 0 : 0,
-            igstAmt,
+            taxCols.taxable_price,
+            taxCols.total_taxable_amt,
+            taxCols.gst,
+            lineTotal,
+            taxCols.cgsttax,
+            taxCols.cgsttxamt,
+            taxCols.sgsttax,
+            taxCols.sgstxamt,
+            taxCols.igsttax,
+            taxCols.igsttamt,
             item.imageUrl || item.img_url || "",
           ],
         );

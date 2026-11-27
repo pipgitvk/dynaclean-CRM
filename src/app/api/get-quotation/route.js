@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
+import { ensureQuotationHideGstColumn } from "@/lib/ensureQuotationHideGstColumn";
 
 export async function GET(req) {
   try {
@@ -14,6 +15,7 @@ export async function GET(req) {
     }
 
     const conn = await getDbConnection();
+    await ensureQuotationHideGstColumn(conn);
 
     // 1️⃣ Fetch quotation record
     // const [quotationRows] = await conn.execute(
@@ -155,6 +157,8 @@ export async function GET(req) {
         cgstRate: Number(quotation.cgst_rate) || 0,
         sgstRate: Number(quotation.sgst_rate) || 0,
         igstRate: Number(quotation.igst_rate) || 0,
+
+        hide_gst_breakdown: quotation.hide_gst_breakdown,
 
         terms_conditions: quotation.term_con || "",
 

@@ -2,6 +2,9 @@
 import { useState, useMemo } from "react";
 import { useUser } from "@/context/UserContext";
 import OrderPoDateField from "@/components/orders/OrderPoDateField";
+import OrderFormProductsSection, {
+  orderFormQuotationHideGst,
+} from "@/components/orders/OrderFormProductsSection";
 
 export default function OrderForm({ quotation, reset }) {
   const { user } = useUser();
@@ -18,6 +21,8 @@ export default function OrderForm({ quotation, reset }) {
     paymentAmount: "",
     ...quotation,
   });
+  const hideTaxColumns = orderFormQuotationHideGst(quotation);
+
   const [hasPO, setHasPO] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [paymentProofPreviews, setPaymentProofPreviews] = useState([]);
@@ -128,8 +133,13 @@ export default function OrderForm({ quotation, reset }) {
       fd.append("quantity", firstItem.quantity || "");
       fd.append("unit", firstItem.unit || "");
       fd.append("price_per_unit", firstItem.price_per_unit || "");
-      fd.append("taxable_price", firstItem.taxable_price || "");
-      fd.append("gst", firstItem.gst || "");
+      if (!hideTaxColumns) {
+        fd.append(
+          "taxable_price",
+          firstItem.taxable_price ?? firstItem.total_taxable_amt ?? "",
+        );
+        fd.append("gst", firstItem.gst ?? "");
+      }
       fd.append("total_price", firstItem.total_price || "");
       fd.append("img_url", firstItem.img_url || "");
     }
@@ -295,95 +305,10 @@ export default function OrderForm({ quotation, reset }) {
       {/* Product Table or Card */}
       <section className="bg-gray-50 p-4 rounded shadow">
         <h2 className="font-semibold mb-4 text-lg">Products</h2>
-
-        {/* Desktop Table */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="min-w-full text-sm table-auto border">
-            <thead className="bg-gray-100">
-              <tr className="divide-x">
-                {[
-                  "Image",
-                  "Name",
-                  "Code",
-                  "Spec",
-                  "Qty",
-                  "Unit",
-                  "Price/Unit",
-                  "Taxable",
-                  "GST",
-                  "Total",
-                ].map((h) => (
-                  <th key={h} className="px-2 py-2 text-left">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {quotation.items.map((i, idx) => (
-                <tr key={idx} className="divide-x text-center border-t">
-                  <td className="p-2">
-                    <img
-                      src={i.img_url}
-                      className="h-12 mx-auto object-contain"
-                    />
-                  </td>
-                  <td>{i.item_name}</td>
-                  <td>{i.item_code}</td>
-                  <td>{i.specification}</td>
-                  <td>{i.quantity}</td>
-                  <td>{i.unit}</td>
-                  <td>₹{i.price_per_unit}</td>
-                  <td>₹{Number(i.taxable_price).toFixed(2)}</td>
-                  <td>₹{Number(i.gst).toFixed(2)}</td>
-                  <td>₹{Number(i.total_price).toFixed(2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Mobile Cards */}
-        <div className="md:hidden space-y-4">
-          {quotation.items.map((i, idx) => (
-            <div
-              key={idx}
-              className="border rounded p-3 shadow-sm bg-white text-sm"
-            >
-              <div className="flex justify-between items-center mb-2">
-                <span className="font-medium">{i.item_name}</span>
-                <img src={i.img_url} className="h-10 w-10 object-contain" />
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-gray-700">
-                <div>
-                  <strong>Code:</strong> {i.item_code}
-                </div>
-                <div>
-                  <strong>Spec:</strong> {i.specification}
-                </div>
-                <div>
-                  <strong>Qty:</strong> {i.quantity}
-                </div>
-                <div>
-                  <strong>Unit:</strong> {i.unit}
-                </div>
-                <div>
-                  <strong>Price:</strong> ₹{i.price_per_unit}
-                </div>
-                <div>
-                  <strong>Taxable:</strong> ₹
-                  {Number(i.taxable_price).toFixed(2)}
-                </div>
-                <div>
-                  <strong>GST:</strong> ₹{Number(i.gst).toFixed(2)}
-                </div>
-                <div>
-                  <strong>Total:</strong> ₹{Number(i.total_price).toFixed(2)}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+        <OrderFormProductsSection
+          items={quotation.items}
+          hideTaxColumns={hideTaxColumns}
+        />
       </section>
 
       {/* File Inputs */}

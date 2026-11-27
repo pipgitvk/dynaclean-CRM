@@ -14,6 +14,7 @@ export default function InvoiceItemsTable({
   canEditHsn = false,
   canRemoveItems = false,
   interstate = false,
+  hideTaxColumns = false,
 }) {
   const [productSuggestions, setProductSuggestions] = useState([]);
   const [activeRowIndex, setActiveRowIndex] = useState(null);
@@ -223,7 +224,11 @@ export default function InvoiceItemsTable({
             <th className="border px-2 py-2">Rate</th>
             <th className="border px-2 py-2">Disc %</th>
             <th className="border px-2 py-2">Disc ₹</th>
-            <th className="border px-2 py-2">Taxable</th>
+            {!hideTaxColumns ? (
+              <th className="border px-2 py-2">Taxable</th>
+            ) : (
+              <th className="border px-2 py-2">Total</th>
+            )}
             <th className="border px-2 py-2"></th>
           </tr>
         </thead>
@@ -371,7 +376,7 @@ export default function InvoiceItemsTable({
                   />
                 </td>
                 <td className="border px-2 py-2">
-                  ₹ {(item.taxable_value || 0).toFixed(2)}
+                  ₹ {(item.taxable_value ?? 0).toFixed(2)}
                 </td>
                 <td className="border px-2 py-2 text-center">
                   {showRemoveRow ? (

@@ -1,12 +1,14 @@
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { getDbConnection } from "@/lib/db";
+import { ensureQuotationHideGstColumn } from "@/lib/ensureQuotationHideGstColumn";
 import QuotationViewer from "@/components/Quotation/QuotationViewer";
 
 export const dynamic = "force-dynamic";
 
 async function getQuotationData(quoteId) {
   const conn = await getDbConnection();
+  await ensureQuotationHideGstColumn(conn);
 
   const [[headerRows]] = await conn.execute(
     "SELECT * FROM quotations_records WHERE quote_number = ?",

@@ -6,10 +6,8 @@ import Link from "next/link";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import LetterheadDocumentBlock from "@/components/invoice/LetterheadDocumentBlock";
-import {
-  LetterheadBankLine,
-  LetterheadSignatoryLine,
-} from "@/components/invoice/InvoiceLetterheadSection";
+import { QuotationViewerBankSignatoryFooter } from "@/components/Quotation/QuotationBankSignatoryFooter";
+import { hideGstBreakdownFromRow } from "@/lib/ensureQuotationHideGstColumn";
 
 // Mask PII for PDF download
 function maskName(name) {
@@ -45,12 +43,17 @@ export default forwardRef(function QuotationViewer({
 }, ref) {
   const containerRef = useRef();
   const totalQty = items.reduce((sum, i) => sum + Number(i.quantity), 0);
+  const hideTaxColumns = hideGstBreakdownFromRow(header);
 
   // Calculate true grand total dynamically, just in case database has a mismatch
   const calcSubtotal = Number(header.subtotal) || 0;
   const calcGst = Number(header.gst) || 0;
   const calcRoundOff = Number(header.round_off) || 0;
-  const displayGrandTotal = (calcSubtotal + calcGst + calcRoundOff).toFixed(2);
+  const displayGrandTotal = (
+    hideTaxColumns
+      ? calcSubtotal + calcRoundOff
+      : calcSubtotal + calcGst + calcRoundOff
+  ).toFixed(2);
   // Map payment_term_days to readable text
   const paymentTermDays = useMemo(() => {
     const map = {
@@ -479,9 +482,13 @@ export default forwardRef(function QuotationViewer({
                 <th className="p-2">Qty</th>
                 <th className="p-2">Unit</th>
                 <th className="p-2">Rate</th>
-                <th className="p-2">Base Amount</th>
-                <th className="p-2">GST</th>
-                <th className="p-2">GST Amount</th>
+                {!hideTaxColumns ? (
+                  <>
+                    <th className="p-2">Base Amount</th>
+                    <th className="p-2">GST</th>
+                    <th className="p-2">GST Amount</th>
+                  </>
+                ) : null}
                 <th className="p-2">Net Amount</th>
               </tr>
             </thead>
@@ -514,11 +521,15 @@ export default forwardRef(function QuotationViewer({
                   <td className="p-1">
                     ₹{Number(it.price_per_unit).toFixed(2)}
                   </td>
-                  <td className="p-1">
-                    ₹{Number(it.total_taxable_amt).toFixed(2)}
-                  </td>
-                  <td className="p-1">{it.gst}</td>
-                  <td className="p-1">{it.igsttamt}</td>
+                  {!hideTaxColumns ? (
+                    <>
+                      <td className="p-1">
+                        ₹{Number(it.total_taxable_amt).toFixed(2)}
+                      </td>
+                      <td className="p-1">{it.gst}</td>
+                      <td className="p-1">{it.igsttamt}</td>
+                    </>
+                  ) : null}
                   <td className="p-1">₹{Number(it.total_price).toFixed(2)}</td>
                 </tr>
               ))}
@@ -527,9 +538,35 @@ export default forwardRef(function QuotationViewer({
               <tr className="text-center border-t-2 border-gray-400">
                 <td colSpan={8} className="p-2 text-left"></td>
                 <td className="p-2">₹{Number(items.reduce((sum, it) => sum + Number(it.price_per_unit || 0), 0)).toFixed(2)}</td>
-                <td className="p-2">₹{Number(items.reduce((sum, it) => sum + Number(it.total_taxable_amt || 0), 0)).toFixed(2)}</td>
-                <td className="p-2">{(items.reduce((sum, it) => sum + Number(it.gst || 0), 0) / Math.max(items.length, 1)).toFixed(2)}%</td>
-                <td className="p-2">₹{Number(items.reduce((sum, it) => sum + Number(it.igsttamt || 0), 0)).toFixed(2)}</td>
+                {!hideTaxColumns ? (
+                  <>
+                    <td className="p-2">
+                      ₹
+                      {Number(
+                        items.reduce(
+                          (sum, it) => sum + Number(it.total_taxable_amt || 0),
+                          0,
+                        ),
+                      ).toFixed(2)}
+                    </td>
+                    <td className="p-2">
+                      {(
+                        items.reduce((sum, it) => sum + Number(it.gst || 0), 0) /
+                        Math.max(items.length, 1)
+                      ).toFixed(2)}
+                      %
+                    </td>
+                    <td className="p-2">
+                      ₹
+                      {Number(
+                        items.reduce(
+                          (sum, it) => sum + Number(it.igsttamt || 0),
+                          0,
+                        ),
+                      ).toFixed(2)}
+                    </td>
+                  </>
+                ) : null}
                 <td className="p-2">₹{Number(items.reduce((sum, it) => sum + Number(it.total_price || 0), 0)).toFixed(2)}</td>
               </tr>
             </tfoot>
@@ -576,13 +613,17 @@ export default forwardRef(function QuotationViewer({
                 <div>
                   <strong>Rate:</strong> ₹{Number(it.price_per_unit).toFixed(2)}
                 </div>
-                <div>
-                  <strong>Base Amount:</strong> ₹
-                  {Number(it.taxable_price).toFixed(2)}
-                </div>
-                <div>
-                  <strong>GST:</strong> {it.gst}
-                </div>
+                {!hideTaxColumns ? (
+                  <>
+                    <div>
+                      <strong>Base Amount:</strong> ₹
+                      {Number(it.taxable_price).toFixed(2)}
+                    </div>
+                    <div>
+                      <strong>GST:</strong> {it.gst}
+                    </div>
+                  </>
+                ) : null}
                 <div className="col-span-2">
                   <strong>Net Amount:</strong>{" "}
                   <span className="font-bold">
@@ -604,13 +645,15 @@ export default forwardRef(function QuotationViewer({
         <div className="border p-4 rounded bg-gray-50 text-sm space-y-2">
           <div className="flex flex-col sm:flex-row sm:justify-between gap-4">
             <div className="flex-1 flex justify-between">
-              <span>Sub Total:</span>
+              <span>{hideTaxColumns ? "Total:" : "Sub Total:"}</span>
               <span>₹{header.subtotal}</span>
             </div>
-            <div className="flex-1 flex justify-between">
-              <span>Total GST:</span>
-              <span>₹{header.gst}</span>
-            </div>
+            {!hideTaxColumns ? (
+              <div className="flex-1 flex justify-between">
+                <span>Total GST:</span>
+                <span>₹{header.gst}</span>
+              </div>
+            ) : null}
             {header.round_off && Number(header.round_off) !== 0 ? (
               <div className="flex-1 flex justify-between">
                 <span>Round Off:</span>
@@ -631,30 +674,7 @@ export default forwardRef(function QuotationViewer({
             <div>{header.term_con}</div>
           </div>
 
-          {/* Bank */}
-          <div className="border p-4 rounded bg-gray-50">
-            <h4 className="font-semibold mb-1">Bank Details</h4>
-            <LetterheadBankLine label="A/C Holder Name" values={header} />
-            <p>ICICI Bank</p>
-            <p>Account: 343405500379</p>
-            <p>IFSC: ICIC0003434</p>
-          </div>
-
-          {/* Signatory */}
-          <div className="border p-4 rounded bg-gray-50 text-center flex flex-col justify-between">
-            <div>
-              <LetterheadSignatoryLine values={header} />
-              <Image
-                src="/images/sign.png"
-                alt="Sign"
-                width={250}
-                height={10}
-                className="mx-auto mt-2"
-                unoptimized
-              />
-            </div>
-            <p className="mt-2 font-semibold">Authorized Signatory</p>
-          </div>
+          <QuotationViewerBankSignatoryFooter hideGstBreakdown={hideTaxColumns} />
         </div>
       </div>
 

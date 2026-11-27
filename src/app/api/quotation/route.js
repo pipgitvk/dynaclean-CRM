@@ -6,6 +6,12 @@ import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
 import { ensureDocumentFromCompanyColumns } from "@/lib/ensureDocumentFromCompanyColumns";
 import {
+  ensureQuotationHideGstColumn,
+  hideGstBreakdownFromBody,
+  quotationItemTaxColumnsForDb,
+  quotationLineTotalAmount,
+} from "@/lib/ensureQuotationHideGstColumn";
+import {
   documentFromCompanyInsertColumnSql,
   documentFromCompanyInsertPlaceholders,
   documentFromCompanyInsertValues,
@@ -200,6 +206,7 @@ export async function POST(req) {
     conn = await pool.getConnection();
 
     await ensureDocumentFromCompanyColumns(conn);
+    await ensureQuotationHideGstColumn(conn);
 
     await conn.beginTransaction();
 
@@ -214,6 +221,7 @@ export async function POST(req) {
     const docCols = documentFromCompanyInsertColumnSql();
     const docPh = documentFromCompanyInsertPlaceholders();
     const docVals = documentFromCompanyInsertValues(letterhead);
+    const hideGstBreakdown = hideGstBreakdownFromBody(body);
 
     let attempt = 0;
     let finalQuoteNumber = "";
@@ -277,8 +285,8 @@ export async function POST(req) {
         // Try inserting the header row
         await conn.execute(
           `INSERT INTO quotations_records 
-           (quote_number, quote_date, customer_id, company_name, company_address, state, gstin, ship_to, qty, gst, cgst_rate, sgst_rate, igst_rate, emp_name, subtotal, round_off, grand_total, term_con, payment_term_days, ${docCols}, created_at) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${docPh}, NOW())`,
+           (quote_number, quote_date, customer_id, company_name, company_address, state, gstin, ship_to, qty, gst, cgst_rate, sgst_rate, igst_rate, emp_name, subtotal, round_off, grand_total, term_con, payment_term_days, hide_gst_breakdown, ${docCols}, created_at) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${docPh}, NOW())`,
           [
             finalQuoteNumber,
             serverQuoteDate,
@@ -299,6 +307,7 @@ export async function POST(req) {
             grand_total,
             terms,
             payment_term_days ?? null,
+            hideGstBreakdown,
             ...docVals,
           ]
         );
@@ -361,9 +370,23 @@ export async function POST(req) {
         sgstAmt = (taxable_price * calcSgstRate) / 100;
       }
       
-      const total_taxable_amt = item.taxable_amount;
-      const total_price = item.total_amount;
+      const total_price = quotationLineTotalAmount(
+        !!hideGstBreakdown,
+        taxable_price,
+        item.total_amount,
+      );
       const img_url = item.imageUrl ?? null;
+      const taxCols = quotationItemTaxColumnsForDb(hideGstBreakdown, {
+        taxable_price,
+        total_taxable_amt: item.taxable_amount,
+        gst: gstItem,
+        cgsttax: calcCgstRate,
+        cgsttxamt: cgstAmt,
+        sgsttax: calcSgstRate,
+        sgstxamt: sgstAmt,
+        igsttax: calcIgstRate,
+        igsttamt: igstAmt,
+      });
 
       await conn.execute(
         `INSERT INTO quotation_items 
@@ -378,16 +401,16 @@ export async function POST(req) {
           quantity,
           unit,
           price_per_unit,
-          taxable_price,
-          total_taxable_amt,
-          gstItem,
+          taxCols.taxable_price,
+          taxCols.total_taxable_amt,
+          taxCols.gst,
           total_price,
-          calcCgstRate,
-          cgstAmt,
-          calcSgstRate,
-          sgstAmt,
-          calcIgstRate,
-          igstAmt,
+          taxCols.cgsttax,
+          taxCols.cgsttxamt,
+          taxCols.sgsttax,
+          taxCols.sgstxamt,
+          taxCols.igsttax,
+          taxCols.igsttamt,
           img_url,
         ]
       );

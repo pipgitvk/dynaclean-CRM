@@ -1,6 +1,7 @@
 // app/api/quotations/[quoteId]/route.js
 import { getDbConnection } from "@/lib/db";
 import { ensureDocumentFromCompanyColumns } from "@/lib/ensureDocumentFromCompanyColumns";
+import { ensureQuotationHideGstColumn } from "@/lib/ensureQuotationHideGstColumn";
 import {
   documentFromCompanyUpdateSetSql,
   documentFromCompanyInsertValues,
@@ -25,6 +26,7 @@ export async function GET(req, { params }) {
   try {
     conn = await pool.getConnection();
     await ensureDocumentFromCompanyColumns(conn);
+    await ensureQuotationHideGstColumn(conn);
     const [headerRows] = await conn.execute(
       "SELECT * FROM quotations_records WHERE quote_number = ?",
       [quoteNumber],
@@ -79,6 +81,7 @@ export async function GET(req, { params }) {
       phone: customerPhone,
       email: customerEmail,
       delivery_location: header.delivery_location ?? "",
+      hide_gst_breakdown: header.hide_gst_breakdown,
     };
 
     return Response.json(response);

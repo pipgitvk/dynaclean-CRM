@@ -12,6 +12,10 @@ import { syncInvoiceAndOrderPaymentLink } from "@/lib/syncInvoiceOrderPaymentLin
 import { settleStatementsForInvoicePayment } from "@/lib/settleStatementsForInvoicePayment";
 import { linkCreatedInvoiceToNeworder } from "@/lib/linkCreatedInvoiceToNeworder";
 import { ensureDocumentFromCompanyColumns } from "@/lib/ensureDocumentFromCompanyColumns";
+import {
+  ensureQuotationHideGstColumn,
+  hideGstBreakdownFromBody,
+} from "@/lib/ensureQuotationHideGstColumn";
 import { letterheadPayloadForRole } from "@/lib/documentFromCompany";
 
 /** Parse linked_trans_ids JSON or plain string → array of strings */
@@ -1062,6 +1066,9 @@ export async function POST(req) {
       console.log("No quotation_id provided, using session username:", employeeName);
     }
 
+    await ensureQuotationHideGstColumn(conn);
+    const hideGstBreakdown = hideGstBreakdownFromBody(body);
+
     await conn.beginTransaction();
 
     // Generate invoice number from DB sequence (no hardcoded segment)
@@ -1252,6 +1259,7 @@ export async function POST(req) {
         pushCol("sgst_rate", bodySgstRate);
         pushCol("igst_rate", bodyIgstRate);
         pushCol("type", invoice_type);
+        pushCol("hide_gst_breakdown", hideGstBreakdown ? 1 : 0);
 
         if (statusColumnExists) {
           pushCol("status", bodyStatus);
@@ -1310,14 +1318,14 @@ export async function POST(req) {
       const rate = item.rate || 0;
       const discount_percent = item.discount_percent || 0;
       const discount_amount = item.discount_amount || 0;
-      const taxable_value = item.taxable_value || 0;
-      const cgst_percent = item.cgst_percent || 0;
-      const sgst_percent = item.sgst_percent || 0;
-      const igst_percent = item.igst_percent || 0;
-      const cgst_amount = item.cgst_amount || 0;
-      const sgst_amount = item.sgst_amount || 0;
-      const igst_amount = item.igst_amount || 0;
-      const total_amount = item.total_amount || 0;
+      const taxable_value = item.taxable_value ?? 0;
+      const cgst_percent = hideGstBreakdown ? null : item.cgst_percent ?? 0;
+      const sgst_percent = hideGstBreakdown ? null : item.sgst_percent ?? 0;
+      const igst_percent = hideGstBreakdown ? null : item.igst_percent ?? 0;
+      const cgst_amount = hideGstBreakdown ? null : item.cgst_amount ?? 0;
+      const sgst_amount = hideGstBreakdown ? null : item.sgst_amount ?? 0;
+      const igst_amount = hideGstBreakdown ? null : item.igst_amount ?? 0;
+      const total_amount = item.total_amount ?? taxable_value;
 
       await conn.execute(
         `INSERT INTO invoice_items 

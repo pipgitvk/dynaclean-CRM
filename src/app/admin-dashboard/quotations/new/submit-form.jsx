@@ -4,16 +4,22 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import QuotationItemsTable from "./quotation-table";
 import TaxAndSummary from "./TaxAndSummary";
 import { useRouter, useSearchParams } from "next/navigation";
-import Image from "next/image";
 import toast from "react-hot-toast";
 import { set } from "date-fns";
 import DocumentLetterheadHeader from "@/components/invoice/DocumentLetterheadHeader";
-import { LetterheadBankLine, LetterheadSignatoryLine } from "@/components/invoice/InvoiceLetterheadSection";
+import {
+  QuotationBankDetailsBlock,
+  QuotationSignatoryBlock,
+} from "@/components/Quotation/QuotationBankSignatoryFooter";
 import {
   documentFromCompanyForSubmit,
   getDefaultDocumentFromCompany,
   mergeDocumentFromCompany,
 } from "@/lib/documentFromCompany";
+import {
+  quotationLineTotalAmount,
+  quotationSummaryTotals,
+} from "@/lib/ensureQuotationHideGstColumn";
 const LINE_TYPES = new Set(["product", "spare", "multi", "mixed"]);
 
 function createEmptyQuotationItem(gstRate = 18) {
@@ -78,6 +84,7 @@ export default function QuotationForm() {
   const [igstRate, setIgstRate] = useState(0);
   const [roundOff, setRoundOff] = useState(0);
   const [isAutoRoundOff, setIsAutoRoundOff] = useState(true);
+  const [hideGstBreakdown, setHideGstBreakdown] = useState(false);
 
   // Supplier state is fixed (header shows: GSTIN: 07AAKCD6495M1ZV | State: Delhi (07))
   const SUPPLIER_STATE_CODE = "07";
@@ -193,21 +200,14 @@ export default function QuotationForm() {
       return stateCode !== SUPPLIER_STATE_CODE;
     })();
 
-    const cgst = isInterstate ? 0 : totalTax / 2;
-    const sgst = isInterstate ? 0 : totalTax / 2;
-    const igst = isInterstate ? totalTax : 0;
-
-    const totalBeforeRound = subtotal + totalTax;
-    let finalRoundOff = parseFloat(roundOff) || 0;
-
-    if (isAutoRoundOff) {
-      finalRoundOff = Math.round(totalBeforeRound) - totalBeforeRound;
-    }
-
-    const grandTotal = totalBeforeRound + finalRoundOff;
-
-    return { subtotal, cgst, sgst, igst, totalTax, grandTotal, finalRoundOff };
-  }, [items, roundOff, isAutoRoundOff, form.gstin_no, form.state_name]);
+    return quotationSummaryTotals(hideGstBreakdown, {
+      subtotal,
+      totalTax,
+      roundOff,
+      isAutoRoundOff,
+      isInterstate,
+    });
+  }, [items, roundOff, isAutoRoundOff, form.gstin_no, form.state_name, hideGstBreakdown]);
 
   useEffect(() => {
     if (isAutoRoundOff) {
@@ -523,9 +523,8 @@ export default function QuotationForm() {
         const total = taxable + gstAmount;
         return {
           ...item,
-          // Add the calculated taxable and total values to each item
           taxable_amount: taxable,
-          total_amount: total,
+          total_amount: quotationLineTotalAmount(hideGstBreakdown, taxable, total),
           IGSTamt: gstAmount,
         };
       });
@@ -561,6 +560,7 @@ export default function QuotationForm() {
         sgstRate: effectiveSgstRate,
         igstRate: effectiveIgstRate,
         terms: editableTerms,
+        hideGstBreakdown,
         ...documentFromCompanyForSubmit(documentFromCompany, letterheadRef),
       };
 
@@ -914,6 +914,7 @@ export default function QuotationForm() {
           sgstRate={sgstRate}
           igstRate={igstRate}
           lineType={lineType}
+          hideTaxColumns={hideGstBreakdown}
         />
 
         {/* Tax Summary */}
@@ -947,6 +948,8 @@ export default function QuotationForm() {
             if (!stateCode) return false;
             return stateCode !== SUPPLIER_STATE_CODE;
           })()}
+          hideGstBreakdown={hideGstBreakdown}
+          onHideGstBreakdownChange={setHideGstBreakdown}
         />
 
         {/* Terms + Bank + Signatory */}
@@ -964,30 +967,14 @@ export default function QuotationForm() {
             />
           </div>
 
-          {/* Bank Details */}
-          <div className="lg:col-span-1 border p-4 rounded bg-gray-50 text-sm">
-            <h4 className="font-semibold mb-2">Bank Details</h4>
-            <LetterheadBankLine label="A/C Holder Name" values={documentFromCompany} />
-            <p>Bank Name : ICICI Bank</p>
-            <p>A/c no. : 343405500379</p>
-            <p>Branch & IFS Code: ICIC0003434</p>
-          </div>
-
-          {/* Signatory */}
-          <div className="lg:col-span-1 border p-4 rounded bg-gray-50 text-sm text-center flex flex-col justify-between">
-            <div>
-              <LetterheadSignatoryLine values={documentFromCompany} />
-              <Image
-                src="/images/sign.png"
-                alt="Sign"
-                width={100}
-                height={80}
-                className="mx-auto mt-2"
-                unoptimized
-              />
-            </div>
-            <p className="mt-2 font-semibold">Authorized Signatory</p>
-          </div>
+          <QuotationBankDetailsBlock
+            className="lg:col-span-1"
+            hideGstBreakdown={hideGstBreakdown}
+          />
+          <QuotationSignatoryBlock
+            className="lg:col-span-1"
+            hideGstBreakdown={hideGstBreakdown}
+          />
         </div>
 
         {/* Submit */}

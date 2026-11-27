@@ -11,6 +11,7 @@ import {
 } from "@/lib/orderBookingBatches";
 import { fetchOrderDelhiveryLrs } from "@/lib/fetchOrderDelhiveryLrs";
 import { roleShowsDualOrderAmountFields } from "@/lib/orderPaymentHistory";
+import { ensureQuotationHideGstColumn } from "@/lib/ensureQuotationHideGstColumn";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,7 @@ async function fetchOrderData(orderId, { withDelhiveryTracking = false } = {}) {
   console.log("order id", orderId);
   const conn = await getDbConnection();
   await ensureOrderShipmentTrackingColumns(conn);
+  await ensureQuotationHideGstColumn(conn);
 
   const [orderRows] = await conn.execute(
     "SELECT * FROM neworder WHERE order_id = ?",
@@ -44,12 +46,14 @@ async function fetchOrderData(orderId, { withDelhiveryTracking = false } = {}) {
 
   // Fetch GSTIN from quotations_records using quote_number
   let gstin = null;
+  let quotationHideGst = null;
   try {
     const [quoteRows] = await conn.execute(
-      "SELECT gstin FROM quotations_records WHERE quote_number = ?",
+      "SELECT gstin, hide_gst_breakdown FROM quotations_records WHERE quote_number = ?",
       [orderDetails.quote_number],
     );
     gstin = quoteRows?.[0]?.gstin || null;
+    quotationHideGst = quoteRows?.[0]?.hide_gst_breakdown ?? null;
   } catch (_) {
     gstin = null;
   }
@@ -63,6 +67,7 @@ async function fetchOrderData(orderId, { withDelhiveryTracking = false } = {}) {
     items,
     statuses,
     gstin,
+    quotationHideGst,
     delhiveryLr,
     returnDelhiveryLr,
   };
@@ -88,7 +93,15 @@ export default async function Page({ params }) {
     userRole || payload?.role || payload?.userRole,
   );
 
-  const { orderDetails, items, statuses, gstin, delhiveryLr, returnDelhiveryLr } =
+  const {
+    orderDetails,
+    items,
+    statuses,
+    gstin,
+    quotationHideGst,
+    delhiveryLr,
+    returnDelhiveryLr,
+  } =
     await fetchOrderData(orderId, {
       withDelhiveryTracking: true,
     });
@@ -131,6 +144,7 @@ export default async function Page({ params }) {
         statuses={statuses}
         orderId={orderId}
         gstin={gstin}
+        quotationHideGst={quotationHideGst}
         userRole={userRole || payload?.role || payload?.userRole || ""}
         showDualPaymentAmountFields={showDualPaymentAmountFields}
         delhiveryLr={delhiveryLr}

@@ -24,6 +24,11 @@ import {
   orderPoDateToMysqlDateTime,
   parseOrderPoDateInput,
 } from "@/lib/orderPoDatePermissions";
+import {
+  ensureQuotationHideGstColumn,
+  hideGstBreakdownFromRow,
+  neworderLineTaxFieldsForDb,
+} from "@/lib/ensureQuotationHideGstColumn";
 
 const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
 
@@ -317,6 +322,7 @@ export async function POST(req) {
     await ensureNeworderQuotationIdColumn(conn);
     await ensureNeworderBookingPaymentColumns(conn);
     await ensureNeworderPunchDateColumn(conn);
+    await ensureQuotationHideGstColumn(conn);
 
     const [[{ count }]] = await conn.execute(
       "SELECT COUNT(*) AS count FROM neworder WHERE DATE(COALESCE(punch_date, created_at)) = CURDATE()",
@@ -324,11 +330,16 @@ export async function POST(req) {
     const orderId = generateOrderId(count);
 
     const [quotationRows] = await conn.execute(
-      `SELECT customer_id, payment_term_days, grand_total, \`S.No.\` AS quotation_id
+      `SELECT customer_id, payment_term_days, grand_total, hide_gst_breakdown, \`S.No.\` AS quotation_id
        FROM quotations_records WHERE quote_number = ? LIMIT 1`,
       [quote_number],
     );
     const quotationRecord = quotationRows?.[0] || {};
+    const hideQuoteGst = hideGstBreakdownFromRow(quotationRecord);
+    const neworderTax = neworderLineTaxFieldsForDb(hideQuoteGst, {
+      taxable_price,
+      gst,
+    });
     const customerIdFromQuotation = quotationRecord.customer_id ?? null;
     const quotationIdFromBody = fields.quotation_id
       ? Number(fields.quotation_id)
@@ -420,8 +431,8 @@ export async function POST(req) {
         quantity || null,
         unit || null,
         price_per_unit || null,
-        taxable_price || null,
-        gst || null,
+        neworderTax.taxable_price,
+        neworderTax.gst,
         total_price || null,
         img_url || null,
         customerIdFromQuotation,
