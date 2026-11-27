@@ -1971,20 +1971,30 @@ function registrationExport(row) {
   return [detail, status].filter(Boolean).join(" · ");
 }
 
+function openInstallationRegisterHref(dashboardBase, row) {
+  const orderId = String(row?.order_id || "").trim();
+  if (!dashboardBase || !orderId) return "";
+  return `/${dashboardBase}/warranty?order_id=${encodeURIComponent(orderId)}&mode=order`;
+}
+
 function OpenInstallationRegistrationCell({ row, dashboardBase }) {
   const registered = Number(row.warranty_registered) === 1;
   const orderId = String(row.order_id || "").trim();
   const productsHref =
     orderId &&
     `/${dashboardBase}/warranty/products?search=${encodeURIComponent(orderId)}`;
+  const registerHref = openInstallationRegisterHref(dashboardBase, row);
   return (
     <div className="min-w-[8rem] space-y-1.5">
       {registered ? <RegistrationDateByCell row={row} /> : null}
       <OpenInstallationRegistrationBadge row={row} dashboardBase={dashboardBase} />
-      {!registered ? (
-        <span className="block text-[10px] leading-snug text-slate-500">
-          Auto-registers when delivery is marked
-        </span>
+      {registerHref ? (
+        <Link
+          href={registerHref}
+          className="inline-flex rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700"
+        >
+          Register Now
+        </Link>
       ) : null}
       {registered && productsHref ? (
         <Link
