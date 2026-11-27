@@ -6,7 +6,7 @@ import utc from "dayjs/plugin/utc";
 import { History, Eye, X, ClipboardList } from "lucide-react";
 import toast from "react-hot-toast";
 import {
-  SERVICE_RECORD_INLINE_STATUS_OPTIONS,
+  SERVICE_RECORD_FOLLOWUP_STATUS_OPTIONS,
   serviceRecordStatusDisplayLabel,
 } from "@/lib/serviceRecordStatusPermissions";
 
@@ -34,7 +34,7 @@ export function followupStatusLabel(value) {
 
 const FOLLOWUP_STATUS_OPTIONS = Array.from(
   new Set(
-    SERVICE_RECORD_INLINE_STATUS_OPTIONS.map((s) => String(s || "").trim()).filter(Boolean),
+    SERVICE_RECORD_FOLLOWUP_STATUS_OPTIONS.map((s) => String(s || "").trim()).filter(Boolean),
   ),
 );
 

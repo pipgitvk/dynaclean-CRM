@@ -8,10 +8,10 @@ import {
 } from "@/lib/serviceSupportTeamScope";
 import { canViewAllMachinesFollowupHistory } from "@/lib/dataScope";
 import { fetchCustomerFollowupsByContact } from "@/lib/customerFollowupByContact";
-import { SERVICE_RECORD_INLINE_STATUS_OPTIONS } from "@/lib/serviceRecordStatusPermissions";
+import { SERVICE_RECORD_FOLLOWUP_STATUS_OPTIONS } from "@/lib/serviceRecordStatusPermissions";
 
 const FOLLOWUP_STATUS_VALUES = new Set(
-  SERVICE_RECORD_INLINE_STATUS_OPTIONS.map((s) => String(s).trim().toUpperCase()),
+  SERVICE_RECORD_FOLLOWUP_STATUS_OPTIONS.map((s) => String(s).trim().toUpperCase()),
 );
 
 let machinesFollowupStatusColumnReady = false;

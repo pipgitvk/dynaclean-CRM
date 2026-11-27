@@ -3,10 +3,15 @@ export const SERVICE_RECORD_INLINE_STATUS_OPTIONS = [
   "PLANNED",
   "PENDING FOR SPARES",
   "PENDING BY CUSTOMER",
-  "COMPLETED",
   "CANCELLED",
   "WORKED",
   "IN PROGRESS",
+];
+
+/** Follow-up forms / API — COMPLETED stays available here. */
+export const SERVICE_RECORD_FOLLOWUP_STATUS_OPTIONS = [
+  ...SERVICE_RECORD_INLINE_STATUS_OPTIONS,
+  "COMPLETED",
 ];
 
 /** Open Installation — status change dropdown (no Cancelled). */

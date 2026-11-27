@@ -762,7 +762,7 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
       "PENDING BY CUSTOMER",
       "PLANNED",
     ]),
-  );
+  ).filter((s) => String(s).trim().toUpperCase() !== "COMPLETED");
 
   const statusFilterOptions = Array.from(
     new Set([...uniqueStatuses.filter(Boolean), "PLANNED"]),
