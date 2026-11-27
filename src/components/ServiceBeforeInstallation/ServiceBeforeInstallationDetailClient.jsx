@@ -28,6 +28,7 @@ import {
 import { formatSbiNum } from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationKpiCard";
 import OpenInstallationOverdueDashboardCard from "@/components/ServiceBeforeInstallation/OpenInstallationOverdueDashboardCard";
 import OpenInstallationNotRegisteredDashboardCard from "@/components/ServiceBeforeInstallation/OpenInstallationNotRegisteredDashboardCard";
+import OpenCompletionsHeaderDashboardCards from "@/components/ServiceBeforeInstallation/OpenCompletionsHeaderDashboardCards";
 import {
   displayComplaintDateForServiceRecord,
   displayRegDateForServiceRecord,
@@ -3914,6 +3915,36 @@ export default function ServiceBeforeInstallationDetailClient({
     appliedFilters.openInstallationBucket,
   );
 
+  const handleOpenCompletionsBucketSelect = useCallback(
+    (openCompletionsBucket) => {
+      const nextBucket =
+        normalizeOpenCompletionsBucket(openCompletionsBucket) || "total_registered";
+      const current = String(
+        appliedFilters.openCompletionsBucket || "total_registered",
+      ).trim();
+      if (nextBucket === current) return;
+      stickyBucketRef.current = persistOpenCompletionsBucket(nextBucket);
+      setPage(0);
+      listTotalRef.current = 0;
+      setRows([]);
+      setPagination({ total: 0, hasMore: false });
+      setLoading(true);
+      setCountLoading(true);
+      const estTotal = openCompletionsBucketRecordCount(
+        nextBucket,
+        openCompletionsBreakdownRef.current,
+      );
+      if (estTotal > 0) {
+        applyListTotal(estTotal);
+        setPagination({ total: estTotal, hasMore: estTotal > pageSize });
+      }
+      const next = { ...appliedFilters, openCompletionsBucket: nextBucket };
+      setAppliedFilters(next);
+      setDraftFilters(next);
+    },
+    [appliedFilters, pageSize, applyListTotal],
+  );
+
   const showAddRegistered = isWarrantyProductSegment(segment);
 
   if (!meta) {
@@ -3944,6 +3975,13 @@ export default function ServiceBeforeInstallationDetailClient({
               <ActiveWarrantyAllProductsSummaryCard
                 totals={activeWarrantyBreakdown}
                 loading={activeWarrantyKpiLoading}
+              />
+            ) : segment === "open-completions" ? (
+              <OpenCompletionsHeaderDashboardCards
+                totals={openCompletionsBreakdown}
+                loading={openCompletionsKpiLoading}
+                activeBucket={appliedFilters.openCompletionsBucket || "total_registered"}
+                onSelect={handleOpenCompletionsBucketSelect}
               />
             ) : segment === "open-installation" ? (
               <div className="flex w-full min-w-0 flex-row items-stretch gap-3">
@@ -3976,32 +4014,7 @@ export default function ServiceBeforeInstallationDetailClient({
             openCompletionsBucket={appliedFilters.openCompletionsBucket || "total_registered"}
             totals={openCompletionsBreakdown}
             loading={openCompletionsKpiLoading}
-            onCardSelect={(openCompletionsBucket) => {
-              const nextBucket =
-                normalizeOpenCompletionsBucket(openCompletionsBucket) || "total_registered";
-              const current = String(
-                appliedFilters.openCompletionsBucket || "total_registered",
-              ).trim();
-              if (nextBucket === current) return;
-              stickyBucketRef.current = persistOpenCompletionsBucket(nextBucket);
-              setPage(0);
-              listTotalRef.current = 0;
-              setRows([]);
-              setPagination({ total: 0, hasMore: false });
-              setLoading(true);
-              setCountLoading(true);
-              const estTotal = openCompletionsBucketRecordCount(
-                nextBucket,
-                openCompletionsBreakdownRef.current,
-              );
-              if (estTotal > 0) {
-                applyListTotal(estTotal);
-                setPagination({ total: estTotal, hasMore: estTotal > pageSize });
-              }
-              const next = { ...appliedFilters, openCompletionsBucket: nextBucket };
-              setAppliedFilters(next);
-              setDraftFilters(next);
-            }}
+            onCardSelect={handleOpenCompletionsBucketSelect}
           />
         ) : null}
 

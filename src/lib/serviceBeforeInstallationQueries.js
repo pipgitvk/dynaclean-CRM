@@ -1942,23 +1942,28 @@ export async function fetchOpenCompletionsComplaintKpiBreakdown(conn, filters = 
        SUM(CASE WHEN UPPER(TRIM(COALESCE(sr.status, ''))) = 'COMPLETED' THEN 1 ELSE 0 END) AS completed_complaint,
        SUM(CASE WHEN UPPER(TRIM(COALESCE(sr.status, ''))) = 'PENDING BY CUSTOMER' THEN 1 ELSE 0 END) AS pending_by_customer,
        SUM(CASE WHEN UPPER(TRIM(COALESCE(sr.status, ''))) = 'PENDING FOR SPARES' THEN 1 ELSE 0 END) AS pending_for_spares,
-       SUM(CASE
-         WHEN UPPER(TRIM(COALESCE(sr.status, ''))) = 'PENDING'
-           AND sr.complaint_date IS NOT NULL
-           AND TIMESTAMPDIFF(HOUR, sr.complaint_date, NOW()) > 48
-           AND (
-             sr.planned_date IS NULL
-             OR TRIM(CAST(sr.planned_date AS CHAR)) IN ('', '0000-00-00', '0000-00-00 00:00:00')
-             OR DATE(sr.planned_date) <= '1970-01-01'
-           )
-         THEN 1 ELSE 0 END) AS pending_over_48h_no_plan,
+       0 AS pending_over_48h_no_plan,
        SUM(CASE WHEN LOWER(TRIM(COALESCE(sr.google_feedback_collected, ''))) = 'yes' THEN 1 ELSE 0 END) AS google_feedback
      ${OPEN_COMPLAINTS_SR_JOIN}
      ${where}`,
     [...srFilter.params],
   );
 
-  return parseOpenCompletionsComplaintKpiRow(row);
+  const data = parseOpenCompletionsComplaintKpiRow(row);
+  try {
+    const bucketSql = buildOpenCompletionsBucketWhereSql("pending_over_48h_no_plan");
+    const [[noFollowRow]] = await conn.execute(
+      `SELECT COUNT(*) AS cnt
+       ${OPEN_COMPLAINTS_SR_JOIN}
+       ${where}
+       ${bucketSql.sql}`,
+      [...srFilter.params, ...bucketSql.params],
+    );
+    data.pending_over_48h_no_plan = Number(noFollowRow?.cnt || 0);
+  } catch (err) {
+    console.warn("[open-completions kpi] no-followup count skipped:", err?.message || err);
+  }
+  return data;
 }
 
 /** Open Installation — pending installation jobs from Service Records (view_service_reports). */

@@ -21,7 +21,7 @@ const PIE_SEGMENTS = [
   { field: "planned_complaint", name: "Planned", color: "#8b5cf6" },
   { field: "pending_for_spares", name: "PENDING BY US", color: "#f97316" },
   { field: "pending_by_customer", name: "Pending by Customer", color: "#f43f5e" },
-  { field: "pending_over_48h_no_plan", name: "Pending > 48h (no plan)", color: "#dc2626" },
+  { field: "pending_over_48h_no_plan", name: "No follow-up > 48h", color: "#dc2626" },
 ];
 
 function cardHasSettledCount(value) {
@@ -35,7 +35,13 @@ export default function ServiceBeforeInstallationOpenCompletionsKpiSection({
   loading = false,
   onCardSelect,
 }) {
-  const cards = useMemo(() => getOpenCompletionsComplaintKpiCards(), []);
+  const cards = useMemo(
+    () =>
+      getOpenCompletionsComplaintKpiCards().filter(
+        (c) => c.id !== "oc-pending-48h" && c.id !== "oc-google-feedback",
+      ),
+    [],
+  );
   const activeCardId = openCompletionsKpiCardIdFromFilter(openCompletionsBucket);
 
   const pieData = useMemo(

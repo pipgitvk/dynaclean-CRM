@@ -286,8 +286,9 @@ export const OPEN_COMPLETIONS_COMPLAINT_KPI_CARDS = [
   {
     id: "oc-pending-48h",
     field: "pending_over_48h_no_plan",
-    title: "Pending > 48 hrs",
-    subtitle: "No plan made yet",
+    title: "No Follow-up > 48 hrs",
+    subtitle: "Open 48+ hours — still no follow-up",
+    countCaption: "No. of complaints with no follow-up after 48 hours",
     chartColor: "#dc2626",
     surface: "border-red-200/60 bg-red-50/30",
     iconSurface: "bg-gradient-to-br from-red-500 to-rose-600",

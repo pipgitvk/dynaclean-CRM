@@ -1,3 +1,5 @@
+import { sqlUtf8TrimExpr } from "@/lib/sqlUtf8Compare";
+
 /** Card bucket SQL for open-completions complaint tables (service_records). */
 
 export const OPEN_COMPLETIONS_BUCKET_VALUES = [
@@ -13,10 +15,34 @@ export const OPEN_COMPLETIONS_BUCKET_VALUES = [
 
 export const COMPLAINT_GOOGLE_FEEDBACK_SQL = `LOWER(TRIM(COALESCE(sr.google_feedback_collected, ''))) = 'yes'`;
 
-const NO_PLAN_DATE_SQL = `(
-  sr.planned_date IS NULL
-  OR TRIM(CAST(sr.planned_date AS CHAR)) IN ('', '0000-00-00', '0000-00-00 00:00:00')
-  OR DATE(sr.planned_date) <= '1970-01-01'
+/**
+ * Pending complaints with zero machines_followup rows — same meaning as an
+ * empty Last Followed cell (any follow-up on this service_id, serial, or machine).
+ */
+export const OPEN_COMPLAINTS_NO_FOLLOWUP_YET_SQL = `(
+  NOT EXISTS (
+    SELECT 1
+    FROM machines_followup mf
+    WHERE mf.service_id IS NOT NULL
+      AND mf.service_id > 0
+      AND sr.service_id IS NOT NULL
+      AND mf.service_id = CAST(sr.service_id AS UNSIGNED)
+  )
+  AND (
+    CHAR_LENGTH(${sqlUtf8TrimExpr("COALESCE(sr.serial_number, '')")}) = 0
+    OR NOT EXISTS (
+      SELECT 1
+      FROM machines_followup mf
+      WHERE ${sqlUtf8TrimExpr("mf.serial_number")} = ${sqlUtf8TrimExpr("sr.serial_number")}
+    )
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM machines_followup mf
+    WHERE wp.id IS NOT NULL
+      AND mf.machine_id IS NOT NULL
+      AND mf.machine_id = wp.id
+  )
 )`;
 
 export function buildOpenCompletionsBucketWhereSql(openCompletionsBucket) {
@@ -59,10 +85,16 @@ export function buildOpenCompletionsBucketWhereSql(openCompletionsBucket) {
   }
   if (b === "pending_over_48h_no_plan") {
     return {
-      sql: ` AND UPPER(TRIM(COALESCE(sr.status, ''))) = 'PENDING'
+      sql: ` AND UPPER(TRIM(COALESCE(sr.status, ''))) IN (
+          'PENDING',
+          'PENDING BY CUSTOMER',
+          'PENDING FOR SPARES',
+          'PENDING BY US',
+          'PLANNED'
+        )
         AND sr.complaint_date IS NOT NULL
         AND TIMESTAMPDIFF(HOUR, sr.complaint_date, NOW()) > 48
-        AND ${NO_PLAN_DATE_SQL}`,
+        AND ${OPEN_COMPLAINTS_NO_FOLLOWUP_YET_SQL}`,
       params: [],
     };
   }
