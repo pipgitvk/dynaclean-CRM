@@ -106,7 +106,6 @@ export default function ServiceBeforeInstallationHubClient({
   );
   const monthDefault = useMemo(() => getCurrentMonthThroughTodayIso(), []);
   const [counts, setCounts] = useState(initialCounts || {});
-  const [lastFollowups, setLastFollowups] = useState({});
   const [prevCounts, setPrevCounts] = useState({});
   const [loading, setLoading] = useState(!initialCounts);
   const [range, setRange] = useState(SBI_RANGE_SELECT.id);
@@ -121,15 +120,6 @@ export default function ServiceBeforeInstallationHubClient({
   useEffect(() => {
     customDraftRef.current = { from: customFrom, to: customTo };
   }, [customFrom, customTo]);
-
-  const loadLastFollowups = useCallback(() => {
-    axios
-      .get("/api/service-before-installation/hub/last-followups", { timeout: 12_000 })
-      .then((res) => {
-        if (res.data?.success) setLastFollowups(res.data.lastFollowups || {});
-      })
-      .catch(() => {});
-  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -153,10 +143,6 @@ export default function ServiceBeforeInstallationHubClient({
       setLoading(false);
     }
   }, [range, appliedCustom.from, appliedCustom.to]);
-
-  useEffect(() => {
-    loadLastFollowups();
-  }, [loadLastFollowups]);
 
   useEffect(() => {
     if (skipInitialFetch.current) {
@@ -249,7 +235,6 @@ export default function ServiceBeforeInstallationHubClient({
               card={card}
               total={counts[card.countKey] ?? 0}
               changePct={changes[card.countKey]}
-              lastFollowupAt={lastFollowups[card.countKey]}
               loading={loading}
             />
           ))}

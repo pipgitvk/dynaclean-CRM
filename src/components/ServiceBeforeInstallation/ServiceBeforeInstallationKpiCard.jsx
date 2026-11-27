@@ -20,7 +20,6 @@ import {
   Wrench,
 } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer } from "recharts";
-import { formatFollowedAtDisplay } from "@/lib/enrichSbiLastFollowup";
 
 export const SBI_CARD_ICONS = {
   "total-registered": Package,
@@ -225,7 +224,6 @@ export default function ServiceBeforeInstallationKpiCard({
   card,
   total,
   changePct = null,
-  lastFollowupAt = null,
   loading = false,
   active = false,
   variant = "hub",
@@ -319,14 +317,6 @@ export default function ServiceBeforeInstallationKpiCard({
                 )}
                 <span className="text-xs font-medium text-slate-400 sm:text-sm">vs last month</span>
               </div>
-            ) : null}
-            {!waiting ? (
-              <p className="mt-2 text-xs text-slate-500 sm:text-sm">
-                <span className="font-medium text-slate-400">Last Followed:</span>{" "}
-                <span className="font-semibold tabular-nums text-slate-700">
-                  {formatFollowedAtDisplay(lastFollowupAt) || "—"}
-                </span>
-              </p>
             ) : null}
           </div>
         </div>
