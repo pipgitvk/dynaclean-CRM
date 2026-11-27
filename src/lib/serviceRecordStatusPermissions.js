@@ -13,6 +13,14 @@ export const SERVICE_RECORD_INLINE_STATUS_OPTIONS = [
 export const OPEN_INSTALLATION_INLINE_STATUS_OPTIONS =
   SERVICE_RECORD_INLINE_STATUS_OPTIONS.filter((s) => s !== "CANCELLED");
 
+/** UI label for service_records.status (DB value unchanged). */
+export function serviceRecordStatusDisplayLabel(status) {
+  const key = String(status || "").trim().toUpperCase();
+  if (key === "PENDING FOR SPARES") return "PENDING BY US";
+  const raw = String(status || "").trim();
+  return raw || "—";
+}
+
 export function plannedDateForInput(value) {
   if (!value) return "";
   const s = String(value).trim();

@@ -4,7 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { ClipboardList, ExternalLink, Eye, FilePlus, History, UserPlus } from "lucide-react";
 import ServiceCompletionDateCell from "@/components/services/ServiceCompletionDateCell";
+import GoogleFeedbackProofCell from "@/components/services/GoogleFeedbackProofCell";
 import ServiceRecordStatusInlineCell from "@/components/services/ServiceRecordStatusInlineCell";
+import { normalizeOpenCompletionsBucket } from "@/lib/serviceBeforeInstallationFilters";
 import MachineRegistrationModal from "@/components/warranty/MachineRegistrationModal";
 import ServiceRecordAssignEngineerModal from "@/components/services/ServiceRecordAssignEngineerModal";
 import {
@@ -13,6 +15,7 @@ import {
 } from "@/components/service/MachineFollowupModals";
 import { displayComplaintDateForServiceRecord } from "@/lib/serviceRecordComplaintDisplay";
 import { formatFollowedAtDisplay } from "@/lib/enrichSbiLastFollowup";
+import { serviceRecordStatusDisplayLabel } from "@/lib/serviceRecordStatusPermissions";
 
 const TH =
   "px-3 py-3.5 text-left text-xs font-bold uppercase tracking-wide text-slate-500 bg-slate-50/95";
@@ -29,9 +32,11 @@ function actionBtn(colorClass) {
 }
 
 export function formatOpenCompletionsStatusLabel(status) {
-  const s = String(status || "").trim().toUpperCase();
-  if (s === "PENDING FOR SPARES") return "Pending by Us";
-  return status || "—";
+  return serviceRecordStatusDisplayLabel(status);
+}
+
+export function openCompletionsShowsGoogleFeedbackColumn(openCompletionsBucket) {
+  return normalizeOpenCompletionsBucket(openCompletionsBucket) === "google_feedback";
 }
 
 function OpenCompletionsCompanyCell({ row }) {
@@ -190,7 +195,9 @@ function OpenCompletionsActionsCell({
   );
 }
 
-export function OpenCompletionsComplaintTableHead() {
+export function OpenCompletionsComplaintTableHead({
+  showGoogleFeedbackColumn = false,
+} = {}) {
   return (
     <tr>
       <th className={TH}>#</th>
@@ -205,6 +212,9 @@ export function OpenCompletionsComplaintTableHead() {
       <th className={TH}>Completed Date</th>
       <th className={TH}>Complaint Summary</th>
       <th className={TH}>Step Video</th>
+      {showGoogleFeedbackColumn ? (
+        <th className={`${TH} min-w-[5.5rem]`}>Google Feedback</th>
+      ) : null}
       <th className={TH}>Last Followed</th>
       <th className={`${TH} min-w-[19rem]`}>Actions</th>
     </tr>
@@ -222,6 +232,7 @@ export function OpenCompletionsComplaintRows({
   onMachineFollowUp,
   onMachineHistory,
   onRowUpdated,
+  showGoogleFeedbackColumn = false,
 }) {
   const [machineSerial, setMachineSerial] = useState("");
   const [assignRecord, setAssignRecord] = useState(null);
@@ -293,6 +304,11 @@ export function OpenCompletionsComplaintRows({
             <td className="px-3 py-3.5 align-top">
               <OpenCompletionsStepVideos row={row} />
             </td>
+            {showGoogleFeedbackColumn ? (
+              <td className="px-3 py-3.5 align-top">
+                <GoogleFeedbackProofCell record={row} showNullState />
+              </td>
+            ) : null}
             <td className="min-w-[10.5rem] max-w-[14rem] px-3 py-3.5 text-sm align-top">
               {(() => {
                 const at = formatFollowedAtDisplay(row.last_followup_at);

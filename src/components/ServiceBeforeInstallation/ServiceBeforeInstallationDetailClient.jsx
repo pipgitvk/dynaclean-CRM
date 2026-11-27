@@ -62,6 +62,7 @@ import ServiceBeforeInstallationActiveAmcKpiStrip from "@/components/ServiceBefo
 import {
   OpenCompletionsComplaintRows,
   OpenCompletionsComplaintTableHead,
+  openCompletionsShowsGoogleFeedbackColumn,
 } from "@/components/ServiceBeforeInstallation/OpenCompletionsComplaintTable";
 import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { formatCrmDatetimeForISTDisplay } from "@/lib/timezone";
@@ -96,6 +97,7 @@ import {
 } from "@/components/warranty/WarrantyProductServiceModals";
 import GoogleFeedbackProofCell from "@/components/services/GoogleFeedbackProofCell";
 import { canExportServiceBeforeInstallationCsv } from "@/lib/serviceBeforeInstallationRoles";
+import { serviceRecordStatusDisplayLabel } from "@/lib/serviceRecordStatusPermissions";
 
 const DEFAULT_PAGE_SIZE = 10;
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
@@ -1574,9 +1576,7 @@ function WarrantyProductRows({
 }
 
 function formatComplaintStatusLabel(status) {
-  const s = String(status || "").trim().toUpperCase();
-  if (s === "PENDING FOR SPARES") return "Pending by Us";
-  return status || "—";
+  return serviceRecordStatusDisplayLabel(status);
 }
 
 function ServiceRows({ rows, dashboardBase, page, pageSize, variant = "complaint" }) {
@@ -2141,7 +2141,10 @@ function ServiceRecordTableHead({ dateLabel }) {
   );
 }
 
-function TableHead({ segment }) {
+function TableHead({ segment, openCompletionsBucket = "" }) {
+  const showOpenCompletionsGoogleFeedback =
+    segment === "open-completions" &&
+    openCompletionsShowsGoogleFeedbackColumn(openCompletionsBucket);
   const th =
     "px-4 py-3.5 text-left text-xs font-bold uppercase tracking-wide text-slate-500 bg-slate-50/95";
   if (segment === "open-installation" || segment === "overdue-delayed-installation") {
@@ -2165,7 +2168,11 @@ function TableHead({ segment }) {
     );
   }
   if (segment === "open-completions") {
-    return <OpenCompletionsComplaintTableHead />;
+    return (
+      <OpenCompletionsComplaintTableHead
+        showGoogleFeedbackColumn={showOpenCompletionsGoogleFeedback}
+      />
+    );
   }
   if (segment === "active-amc" || segment === "due-amc-expiring") {
     return (
@@ -2247,7 +2254,11 @@ function TableBody({
   onWarrantyAction,
   onServiceHistory,
   ProductFollowupIcons,
+  openCompletionsBucket = "",
 }) {
+  const showOpenCompletionsGoogleFeedback =
+    segment === "open-completions" &&
+    openCompletionsShowsGoogleFeedbackColumn(openCompletionsBucket);
   if (segment === "open-installation" || segment === "overdue-delayed-installation") {
     return (
       <OpenInstallationRows
@@ -2275,6 +2286,7 @@ function TableBody({
         onMachineFollowUp={onMachineFollowUp}
         onMachineHistory={onMachineHistory}
         onRowUpdated={onOpenCompletionsRowPatch}
+        showGoogleFeedbackColumn={showOpenCompletionsGoogleFeedback}
       />
     );
   }
@@ -2296,21 +2308,27 @@ function TableBody({
   );
 }
 
-function colSpanForSegment(segment) {
+function colSpanForSegment(segment, openCompletionsBucket = "") {
   if (segment === "total-registered") return 12;
   if (segment === "active-warranty") return 12;
   if (isWarrantyProductSegment(segment)) return 10;
-  if (segment === "open-completions") return 14;
+  if (segment === "open-completions") {
+    return openCompletionsShowsGoogleFeedbackColumn(openCompletionsBucket) ? 15 : 14;
+  }
   if (segment === "open-installation" || segment === "overdue-delayed-installation") return 11;
   if (segment === "active-amc" || segment === "due-amc-expiring") return 8;
   return 10;
 }
 
-function tableMinWidthClass(segment) {
+function tableMinWidthClass(segment, openCompletionsBucket = "") {
   if (segment === "open-installation" || segment === "overdue-delayed-installation") {
     return "min-w-[1380px]";
   }
-  if (segment === "open-completions") return "min-w-[1500px]";
+  if (segment === "open-completions") {
+    return openCompletionsShowsGoogleFeedbackColumn(openCompletionsBucket)
+      ? "min-w-[1620px]"
+      : "min-w-[1500px]";
+  }
   if (segment === "total-registered" || segment === "active-warranty") return "min-w-[1180px]";
   return "min-w-full";
 }
@@ -3584,7 +3602,8 @@ export default function ServiceBeforeInstallationDetailClient({
     ? Math.max(1, page + (pagination.hasMore ? 2 : 1))
     : Math.max(1, Math.ceil((pagination.total || 0) / pageSize));
   const pageWindow = useMemo(() => buildPageWindow(page, totalPages), [page, totalPages]);
-  const colSpan = colSpanForSegment(segment);
+  const openCompletionsBucket = appliedFilters.openCompletionsBucket || "";
+  const colSpan = colSpanForSegment(segment, openCompletionsBucket);
 
   const handleOpenInstallationRowPatch = useCallback((patchedRow) => {
     const key = patchedRow.order_id ?? patchedRow.id;
@@ -3970,10 +3989,13 @@ export default function ServiceBeforeInstallationDetailClient({
             syncKey={`${page}-${pageSize}-${rows.length}-${loading ? 1 : 0}`}
           >
             <table
-              className={`w-full ${tableMinWidthClass(segment)} text-sm transition-opacity ${loading && rows.length > 0 ? "opacity-50" : ""}`}
+              className={`w-full ${tableMinWidthClass(segment, openCompletionsBucket)} text-sm transition-opacity ${loading && rows.length > 0 ? "opacity-50" : ""}`}
             >
               <thead className="sticky top-0 z-10">
-                <TableHead segment={segment} />
+                <TableHead
+                  segment={segment}
+                  openCompletionsBucket={openCompletionsBucket}
+                />
               </thead>
               <tbody className="divide-y divide-slate-100/90">
                 {loading && rows.length === 0 ? (
@@ -4000,6 +4022,7 @@ export default function ServiceBeforeInstallationDetailClient({
                     page={page}
                     pageSize={pageSize}
                     userRole={userRole}
+                    openCompletionsBucket={openCompletionsBucket}
                     onOpenInstallationRowPatch={handleOpenInstallationRowPatch}
                     onOpenCompletionsRowPatch={handleOpenCompletionsRowPatch}
                     onMachineFollowUp={openMachineFollowUp}

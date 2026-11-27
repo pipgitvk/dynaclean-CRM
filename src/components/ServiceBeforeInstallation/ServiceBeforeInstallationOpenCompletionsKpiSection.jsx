@@ -19,7 +19,7 @@ import ServiceBeforeInstallationKpiCard from "@/components/ServiceBeforeInstalla
 const PIE_SEGMENTS = [
   { field: "pending_complaint", name: "Pending", color: "#eab308" },
   { field: "planned_complaint", name: "Planned", color: "#8b5cf6" },
-  { field: "pending_for_spares", name: "Pending by Us", color: "#f97316" },
+  { field: "pending_for_spares", name: "PENDING BY US", color: "#f97316" },
   { field: "pending_by_customer", name: "Pending by Customer", color: "#f43f5e" },
   { field: "pending_over_48h_no_plan", name: "Pending > 48h (no plan)", color: "#dc2626" },
 ];

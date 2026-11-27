@@ -5,7 +5,10 @@ import timezone from "dayjs/plugin/timezone";
 import utc from "dayjs/plugin/utc";
 import { History, Eye, X, ClipboardList } from "lucide-react";
 import toast from "react-hot-toast";
-import { SERVICE_RECORD_INLINE_STATUS_OPTIONS } from "@/lib/serviceRecordStatusPermissions";
+import {
+  SERVICE_RECORD_INLINE_STATUS_OPTIONS,
+  serviceRecordStatusDisplayLabel,
+} from "@/lib/serviceRecordStatusPermissions";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -26,9 +29,7 @@ export function toLocalDT(date) {
 }
 
 export function followupStatusLabel(value) {
-  const v = String(value || "").trim();
-  if (v.toUpperCase() === "PENDING FOR SPARES") return "Pending by Us";
-  return v;
+  return serviceRecordStatusDisplayLabel(value);
 }
 
 const FOLLOWUP_STATUS_OPTIONS = Array.from(

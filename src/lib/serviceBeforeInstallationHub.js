@@ -257,7 +257,7 @@ export const OPEN_COMPLETIONS_COMPLAINT_KPI_CARDS = [
   {
     id: "oc-pending-spares",
     field: "pending_for_spares",
-    title: "Pending by Us",
+    title: "PENDING BY US",
     subtitle: "Unavailability of spares",
     countCaption: "Unavailability of spares",
     chartColor: "#f97316",

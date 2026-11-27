@@ -13,6 +13,7 @@ import {
   installationSiteComplete,
   installationSiteFromRecord,
   plannedDateForInput,
+  serviceRecordStatusDisplayLabel,
   thirdPartyIdFromRecord,
 } from "@/lib/serviceRecordStatusPermissions";
 
@@ -311,7 +312,7 @@ export default function ServiceRecordStatusInlineCell({
           >
             {inlineOptions.map((s) => (
               <option key={s} value={s}>
-                {s}
+                {serviceRecordStatusDisplayLabel(s)}
               </option>
             ))}
           </select>
@@ -330,7 +331,9 @@ export default function ServiceRecordStatusInlineCell({
         </div>
       ) : (
         <div className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-slate-800">{status}</span>
+          <span className="text-xs font-semibold text-slate-800">
+            {serviceRecordStatusDisplayLabel(status)}
+          </span>
           {isPlanned && r.planned_date ? (
             <span className="text-[10px] font-medium text-indigo-700">
               Planned: {formatDate(r.planned_date)}
@@ -533,7 +536,7 @@ export default function ServiceRecordStatusInlineCell({
                   <option value="">Select status</option>
                   {inlineOptions.map((s) => (
                     <option key={s} value={s}>
-                      {s}
+                      {serviceRecordStatusDisplayLabel(s)}
                     </option>
                   ))}
                 </select>
