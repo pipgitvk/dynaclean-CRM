@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { formatSbiNum } from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationKpiCard";
 import OpenInstallationOverdueDashboardCard from "@/components/ServiceBeforeInstallation/OpenInstallationOverdueDashboardCard";
+import OpenInstallationNotRegisteredDashboardCard from "@/components/ServiceBeforeInstallation/OpenInstallationNotRegisteredDashboardCard";
 import {
   displayComplaintDateForServiceRecord,
   displayRegDateForServiceRecord,
@@ -1133,7 +1134,7 @@ function DetailSegmentHeader({ meta, segment, trailing = null }) {
         </div>
       </div>
       {trailing ? (
-        <div className="flex shrink-0 items-center sm:ml-auto sm:pl-2">{trailing}</div>
+        <div className="w-full min-w-0 shrink-0 sm:ml-auto sm:w-auto sm:pl-2">{trailing}</div>
       ) : null}
     </header>
   );
@@ -2559,6 +2560,7 @@ export default function ServiceBeforeInstallationDetailClient({
     delivery_pending_after_dispatch: null,
     installation_planned: null,
     completed_installation: null,
+    completed_not_registered: null,
     feedback_collected: null,
     total: null,
   });
@@ -2576,6 +2578,7 @@ export default function ServiceBeforeInstallationDetailClient({
     delivery_pending_after_dispatch: null,
     installation_planned: null,
     completed_installation: null,
+    completed_not_registered: null,
     feedback_collected: null,
     total: null,
   });
@@ -2592,6 +2595,9 @@ export default function ServiceBeforeInstallationDetailClient({
     () => segment === "open-installation",
   );
   const [feedbackCollectedKpiLoading, setFeedbackCollectedKpiLoading] = useState(
+    () => segment === "open-installation",
+  );
+  const [notRegisteredKpiLoading, setNotRegisteredKpiLoading] = useState(
     () => segment === "open-installation",
   );
   const [openCompletionsBreakdown, setOpenCompletionsBreakdown] = useState({
@@ -2668,6 +2674,17 @@ export default function ServiceBeforeInstallationDetailClient({
     );
     setOpenInstallationBucketReady(true);
   }, [segment, initialOpenInstallationBucket]);
+
+  useEffect(() => {
+    if (segment !== "open-installation") return;
+    const bucket = String(appliedFilters.openInstallationBucket || "").trim();
+    if (bucket !== "completed") return;
+    const reg = String(appliedFilters.warrantyRegistration || "").trim();
+    if (reg === "registered" || reg === "not_registered") return;
+    const next = { ...appliedFilters, warrantyRegistration: "registered" };
+    setAppliedFilters(next);
+    setDraftFilters(next);
+  }, [segment, appliedFilters]);
 
   useEffect(() => {
     if (segment !== "open-completions") {
@@ -2957,6 +2974,89 @@ export default function ServiceBeforeInstallationDetailClient({
     [segment, appliedFilters, patchFeedbackCollected, applyListTotal],
   );
 
+  /** Completed installs — warranty not registered (header card). */
+  const fetchCompletedNotRegisteredKpiCount = useCallback(
+    async (signal) => {
+      if (segment !== "open-installation") return;
+      const {
+        openInstallationBucket: _bucket,
+        warrantyRegistration: _reg,
+        ...countFilters
+      } = appliedFilters;
+      setNotRegisteredKpiLoading(true);
+      try {
+        const res = await axios.get(openInstallationTableCountApi("completed"), {
+          params: { ...countFilters, warrantyRegistration: "not_registered" },
+          signal,
+          timeout: 12_000,
+        });
+        if (res.data?.success) {
+          const n = Number(res.data.pagination?.total ?? 0);
+          patchBreakdownField("completed_not_registered", n);
+          const activeBucket = String(appliedFilters.openInstallationBucket || "").trim();
+          if (
+            activeBucket === "completed" &&
+            appliedFilters.warrantyRegistration === "not_registered"
+          ) {
+            applyListTotal(n);
+          }
+        } else {
+          setOpenInstallationBreakdown((prev) => {
+            if (prev.completed_not_registered != null) return prev;
+            const next = { ...prev, completed_not_registered: 0 };
+            openInstallationBreakdownRef.current = next;
+            return next;
+          });
+        }
+      } catch (e) {
+        if (e?.code !== "ERR_CANCELED") console.error(e);
+        setOpenInstallationBreakdown((prev) => {
+          if (prev.completed_not_registered != null) return prev;
+          const next = { ...prev, completed_not_registered: 0 };
+          openInstallationBreakdownRef.current = next;
+          return next;
+        });
+      } finally {
+        if (!signal?.aborted) setNotRegisteredKpiLoading(false);
+      }
+    },
+    [segment, appliedFilters, patchBreakdownField, applyListTotal],
+  );
+
+  /** Completed installs — warranty registered (Installation Completed KPI card). */
+  const fetchCompletedRegisteredKpiCount = useCallback(
+    async (signal) => {
+      if (segment !== "open-installation") return;
+      const {
+        openInstallationBucket: _bucket,
+        warrantyRegistration: _reg,
+        ...countFilters
+      } = appliedFilters;
+      setCompletedKpiLoading(true);
+      try {
+        const res = await axios.get(openInstallationTableCountApi("completed"), {
+          params: { ...countFilters, warrantyRegistration: "registered" },
+          signal,
+          timeout: 12_000,
+        });
+        if (res.data?.success) {
+          const n = Number(res.data.pagination?.total ?? 0);
+          patchBreakdownField("completed_installation", n);
+          const activeBucket = String(appliedFilters.openInstallationBucket || "").trim();
+          const reg = String(appliedFilters.warrantyRegistration || "").trim();
+          if (activeBucket === "completed" && (reg === "registered" || reg === "")) {
+            applyListTotal(n);
+          }
+        }
+      } catch (e) {
+        if (e?.code !== "ERR_CANCELED") console.error(e);
+      } finally {
+        if (!signal?.aborted) setCompletedKpiLoading(false);
+      }
+    },
+    [segment, appliedFilters, patchBreakdownField, applyListTotal],
+  );
+
   const fetchOpenInstallationKpiCard = useCallback(
     async ({ bucket, field, setLoading, signal, requestId }) => {
       if (segment !== "open-installation") return;
@@ -3029,6 +3129,7 @@ export default function ServiceBeforeInstallationDetailClient({
     setCompletedKpiLoading(true);
     setPlannedKpiLoading(true);
     setFeedbackCollectedKpiLoading(true);
+    setNotRegisteredKpiLoading(true);
 
     const { openInstallationBucket: _b, ...kpiFilters } = appliedFilters;
     const params = { ...kpiFilters, openInstallationBucket: "" };
@@ -3049,7 +3150,6 @@ export default function ServiceBeforeInstallationDetailClient({
               delivered_installation_pending: b.delivered_installation_pending,
               overdue_delayed_installation: b.overdue_delayed_installation,
               delivery_pending_after_dispatch: b.delivery_pending_after_dispatch,
-              completed_installation: b.completed_installation,
               total: b.total ?? prev.total,
             };
             openInstallationBreakdownRef.current = next;
@@ -3078,12 +3178,16 @@ export default function ServiceBeforeInstallationDetailClient({
       requestId,
     });
     void fetchFeedbackCollectedKpiCount(signal);
+    void fetchCompletedNotRegisteredKpiCount(signal);
+    void fetchCompletedRegisteredKpiCount(signal);
   }, [
     segment,
     openInstallationKpiFilterKey,
     appliedFilters,
     fetchOpenInstallationKpiCard,
     fetchFeedbackCollectedKpiCount,
+    fetchCompletedNotRegisteredKpiCount,
+    fetchCompletedRegisteredKpiCount,
   ]);
 
   const enrichOpenInstallationServiceColumns = useCallback(async (baseRows, listRequestId) => {
@@ -3743,25 +3847,68 @@ export default function ServiceBeforeInstallationDetailClient({
           stickyBucketRef.current ||
           appliedFilters.openInstallationBucket,
       );
-      if (nextBucket === String(appliedFilters.openInstallationBucket || "").trim()) {
+      const currentBucket = String(appliedFilters.openInstallationBucket || "").trim();
+      if (nextBucket === currentBucket) {
         stickyBucketRef.current = nextBucket;
+        if (
+          nextBucket === "completed" &&
+          appliedFilters.warrantyRegistration === "not_registered"
+        ) {
+          setPage(0);
+          setLoading(true);
+          setCountLoading(true);
+          const estTotal = Number(openInstallationBreakdown.completed_installation) || 0;
+          listTotalRef.current = estTotal;
+          setPagination({ total: estTotal, hasMore: estTotal > pageSize });
+          const next = { ...appliedFilters, warrantyRegistration: "registered" };
+          setAppliedFilters(next);
+          setDraftFilters(next);
+        }
         return;
       }
       stickyBucketRef.current = nextBucket;
       setPage(0);
       setLoading(true);
-      const estTotal = openInstallationBucketRecordCount(
-        nextBucket,
-        openInstallationBreakdown,
-      );
+      const estTotal =
+        nextBucket === "completed"
+          ? Number(openInstallationBreakdown.completed_installation) || 0
+          : openInstallationBucketRecordCount(nextBucket, openInstallationBreakdown);
       listTotalRef.current = estTotal;
       setPagination({ total: estTotal, hasMore: estTotal > pageSize });
-      const next = { ...appliedFilters, openInstallationBucket: nextBucket };
+      const next = {
+        ...appliedFilters,
+        openInstallationBucket: nextBucket,
+        warrantyRegistration: nextBucket === "completed" ? "registered" : "",
+      };
       setAppliedFilters(next);
       setDraftFilters(next);
     },
     [appliedFilters, openInstallationBreakdown, pageSize],
   );
+
+  const handleOpenInstallationNotRegisteredSelect = useCallback(() => {
+    const nextBucket = persistOpenInstallationBucket("completed");
+    if (
+      String(appliedFilters.openInstallationBucket || "").trim() === nextBucket &&
+      appliedFilters.warrantyRegistration === "not_registered"
+    ) {
+      return;
+    }
+    stickyBucketRef.current = nextBucket;
+    setPage(0);
+    setLoading(true);
+    setCountLoading(true);
+    const estTotal = Number(openInstallationBreakdown.completed_not_registered) || 0;
+    listTotalRef.current = estTotal;
+    setPagination({ total: estTotal, hasMore: estTotal > pageSize });
+    const next = {
+      ...appliedFilters,
+      openInstallationBucket: nextBucket,
+      warrantyRegistration: "not_registered",
+    };
+    setAppliedFilters(next);
+    setDraftFilters(next);
+  }, [appliedFilters, openInstallationBreakdown.completed_not_registered, pageSize]);
 
   const openInstallationActiveCardId = openInstallationKpiCardIdFromFilter(
     appliedFilters.openInstallationBucket,
@@ -3799,15 +3946,27 @@ export default function ServiceBeforeInstallationDetailClient({
                 loading={activeWarrantyKpiLoading}
               />
             ) : segment === "open-installation" ? (
-              <OpenInstallationOverdueDashboardCard
-                total={openInstallationBreakdown.overdue_delayed_installation}
-                loading={openInstallationKpiLoading}
-                active={
-                  openInstallationActiveCardId ===
-                  OPEN_INSTALLATION_OVERDUE_DASHBOARD_CARD.id
-                }
-                onClick={() => handleOpenInstallationBucketSelect("overdue_delayed")}
-              />
+              <div className="flex w-full min-w-0 flex-row items-stretch gap-3">
+                <OpenInstallationOverdueDashboardCard
+                  total={openInstallationBreakdown.overdue_delayed_installation}
+                  loading={openInstallationKpiLoading}
+                  active={
+                    openInstallationActiveCardId ===
+                    OPEN_INSTALLATION_OVERDUE_DASHBOARD_CARD.id
+                  }
+                  onClick={() => handleOpenInstallationBucketSelect("overdue_delayed")}
+                />
+                <OpenInstallationNotRegisteredDashboardCard
+                  total={openInstallationBreakdown.completed_not_registered}
+                  loading={notRegisteredKpiLoading}
+                  active={
+                    String(appliedFilters.openInstallationBucket || "").trim() ===
+                      "completed" &&
+                    appliedFilters.warrantyRegistration === "not_registered"
+                  }
+                  onClick={handleOpenInstallationNotRegisteredSelect}
+                />
+              </div>
             ) : null
           }
         />

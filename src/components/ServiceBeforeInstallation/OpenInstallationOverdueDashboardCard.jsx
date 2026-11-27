@@ -29,7 +29,7 @@ export default function OpenInstallationOverdueDashboardCard({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`group relative flex min-h-[6.5rem] w-full min-w-[14rem] max-w-[19rem] items-stretch overflow-hidden rounded-2xl border text-left transition-all duration-200 hover:-translate-y-px hover:shadow-md ${card.surface} ${activeRing}`}
+      className={`group relative flex min-h-[6.5rem] min-w-0 flex-1 basis-0 items-stretch overflow-hidden rounded-2xl border text-left transition-all duration-200 hover:-translate-y-px hover:shadow-md sm:max-w-[19rem] sm:flex-none sm:basis-auto sm:min-w-[14rem] ${card.surface} ${activeRing}`}
     >
       <div
         className={`absolute -left-8 -top-8 h-20 w-20 rounded-full opacity-80 blur-2xl ${card.glow}`}

@@ -18,6 +18,21 @@ export const OPEN_INSTALLATION_OVERDUE_DASHBOARD_CARD = {
   chartColor: "#e11d48",
 };
 
+/** Header card — completed installation without warranty registration. */
+export const OPEN_INSTALLATION_NOT_REGISTERED_DASHBOARD_CARD = {
+  id: "open-installation-completed-not-registered",
+  title: "Not Registered",
+  subtitle: "Installed — warranty not registered",
+  countCaption: "No. of completed installs not registered for warranty",
+  countKey: "completed_not_registered",
+  accent: "from-rose-500 to-red-600",
+  surface:
+    "bg-white/80 backdrop-blur-xl border-rose-200/40 shadow-[0_8px_30px_-8px_rgba(244,63,94,0.35)]",
+  glow: "bg-rose-400/25",
+  iconSurface: "bg-gradient-to-br from-rose-500 to-red-600",
+  chartColor: "#e11d48",
+};
+
 /** Open Installation list buckets — order: on the way → delivered → pending → completed → feedback. */
 export const OPEN_INSTALLATION_DETAIL_KPI_STRIP = [
   {
@@ -62,8 +77,8 @@ export const OPEN_INSTALLATION_DETAIL_KPI_STRIP = [
   {
     id: "open-installation-completed",
     title: "Installation Completed",
-    subtitle: "Delivered products with installation done",
-    countCaption: "No. of completed installation",
+    subtitle: "Installation done — warranty registered",
+    countCaption: "No. of completed installation (registered)",
     countKey: "completed_installation",
     accent: "from-emerald-500 to-teal-600",
     surface:
