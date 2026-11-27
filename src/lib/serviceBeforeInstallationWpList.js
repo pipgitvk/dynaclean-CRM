@@ -80,7 +80,7 @@ export async function fetchSimpleWarrantyProductPage(conn, where, baseParams, li
  * Avoid TRIM(CONVERT) joins across full customers/dispatch/service_records —
  * those blocked the pool (connectionLimit=5) and slowed every page.
  */
-export async function enrichTotalRegisteredRows(conn, rows) {
+export async function enrichTotalRegisteredRows(conn, rows, options = {}) {
   if (!rows?.length) return rows;
 
   for (const row of rows) {
@@ -95,7 +95,14 @@ export async function enrichTotalRegisteredRows(conn, rows) {
 
   try {
     await enrichTotalRegisteredRowsInner(conn, rows);
-    await enrichRowsWithLastMachineFollowup(conn, rows);
+    if (options.matchRegisteredFollowupHistory) {
+      await enrichRowsWithLastMachineFollowup(conn, rows, {
+        includeCustomerFollowups: true,
+        matchRegisteredFollowupHistory: true,
+      });
+    } else {
+      await enrichRowsWithLastMachineFollowup(conn, rows);
+    }
   } catch (err) {
     console.warn("[sbi enrich] skipped:", err?.message || err);
   }

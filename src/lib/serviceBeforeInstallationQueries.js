@@ -2186,7 +2186,9 @@ export async function fetchServiceBeforeInstallationSegmentPage(segment, options
       rows = await fetchTotalRegisteredBasePage(conn, where, baseParams, fetchLimit, safeSkip);
       const tBase = Date.now();
       const pageRows = deferTotal ? rows.slice(0, safeLimit) : rows;
-      await enrichTotalRegisteredRows(conn, pageRows);
+      await enrichTotalRegisteredRows(conn, pageRows, {
+        matchRegisteredFollowupHistory: true,
+      });
       const tEnrich = Date.now();
       if (tEnrich - t0 > 800) {
         console.warn(
