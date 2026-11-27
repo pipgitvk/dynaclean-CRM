@@ -26,10 +26,8 @@ export default function MetaCredentialsManageClient({ variant = "admin" }) {
 
   useEffect(() => {
     fetchCredentials();
-    if (!isMarketer) {
-      fetchCronStatus();
-    }
-  }, [isMarketer]);
+    fetchCronStatus();
+  }, []);
 
   useEffect(() => {
     if (!isMarketer && cronStatus?.interval) {
@@ -182,27 +180,31 @@ export default function MetaCredentialsManageClient({ variant = "admin" }) {
         </p>
       </div>
 
-      {!isMarketer ? (
-        <div className="mb-6 rounded-lg bg-white p-4 shadow-md md:p-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="flex-1">
-              <h2 className="mb-2 text-lg font-semibold text-gray-900 md:text-xl">Automatic Cron Status</h2>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-                {cronStatus?.isRunning ? (
-                  <div className="flex items-center gap-2 text-green-600">
-                    <div className="h-3 w-3 animate-pulse rounded-full bg-green-500" />
-                    <span className="font-medium">Running</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 text-red-600">
-                    <div className="h-3 w-3 rounded-full bg-red-500" />
-                    <span className="font-medium">Stopped</span>
-                  </div>
-                )}
-                <span className="text-sm text-gray-500">Schedule: Every {cronStatus?.interval || 1} minute(s)</span>
-              </div>
+      <div className="mb-6 rounded-lg bg-white p-4 shadow-md md:p-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex-1">
+            <h2 className="mb-2 text-lg font-semibold text-gray-900 md:text-xl">
+              {isMarketer ? "Automatic lead sync" : "Automatic Cron Status"}
+            </h2>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+              {cronStatus?.isRunning ? (
+                <div className="flex items-center gap-2 text-green-600">
+                  <div className="h-3 w-3 animate-pulse rounded-full bg-green-500" />
+                  <span className="font-medium">Running</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-red-600">
+                  <div className="h-3 w-3 rounded-full bg-red-500" />
+                  <span className="font-medium">Stopped</span>
+                </div>
+              )}
+              <span className="text-sm text-gray-500">
+                Schedule: Every {cronStatus?.interval || 1} minute(s)
+              </span>
             </div>
-            <div className="flex flex-col items-end gap-2 sm:flex-row sm:gap-3">
+          </div>
+          <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:gap-3">
+            {!isMarketer ? (
               <div className="flex items-center gap-2">
                 <label className="text-sm font-medium text-gray-700">Interval (min):</label>
                 <input
@@ -222,40 +224,40 @@ export default function MetaCredentialsManageClient({ variant = "admin" }) {
                   Update
                 </button>
               </div>
-              <button
-                type="button"
-                onClick={handleToggleCron}
-                className={`flex items-center justify-center gap-2 rounded-lg px-4 py-2 font-medium ${
-                  cronStatus?.isRunning
-                    ? "bg-red-600 text-white hover:bg-red-700"
-                    : "bg-green-600 text-white hover:bg-green-700"
-                }`}
-              >
-                {cronStatus?.isRunning ? (
-                  <>
-                    <PowerOff className="h-4 w-4" />
-                    Stop
-                  </>
-                ) : (
-                  <>
-                    <Power className="h-4 w-4" />
-                    Start
-                  </>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={handleManualSync}
-                disabled={syncing}
-                className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
-                {syncing ? "Syncing..." : "Sync"}
-              </button>
-            </div>
+            ) : null}
+            <button
+              type="button"
+              onClick={handleToggleCron}
+              className={`flex items-center justify-center gap-2 rounded-lg px-4 py-2 font-medium ${
+                cronStatus?.isRunning
+                  ? "bg-red-600 text-white hover:bg-red-700"
+                  : "bg-green-600 text-white hover:bg-green-700"
+              }`}
+            >
+              {cronStatus?.isRunning ? (
+                <>
+                  <PowerOff className="h-4 w-4" />
+                  Stop
+                </>
+              ) : (
+                <>
+                  <Power className="h-4 w-4" />
+                  Start
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={handleManualSync}
+              disabled={syncing}
+              className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+              {syncing ? "Syncing..." : "Sync"}
+            </button>
           </div>
         </div>
-      ) : null}
+      </div>
 
       <div className="mb-6 flex flex-col gap-3 sm:flex-row">
         <Link
