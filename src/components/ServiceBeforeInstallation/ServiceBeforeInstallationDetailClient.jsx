@@ -95,7 +95,7 @@ import {
   WarrantyInstallRequestModal,
 } from "@/components/warranty/WarrantyProductServiceModals";
 import GoogleFeedbackProofCell from "@/components/services/GoogleFeedbackProofCell";
-import { isSuperAdminRole } from "@/lib/serviceBeforeInstallationRoles";
+import { canExportServiceBeforeInstallationCsv } from "@/lib/serviceBeforeInstallationRoles";
 
 const DEFAULT_PAGE_SIZE = 10;
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
@@ -1988,7 +1988,7 @@ function OpenInstallationRegistrationCell({ row, dashboardBase }) {
     <div className="min-w-[8rem] space-y-1.5">
       {registered ? <RegistrationDateByCell row={row} /> : null}
       <OpenInstallationRegistrationBadge row={row} dashboardBase={dashboardBase} />
-      {registerHref ? (
+      {!registered && registerHref ? (
         <Link
           href={registerHref}
           className="inline-flex rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700"
@@ -2401,7 +2401,7 @@ export default function ServiceBeforeInstallationDetailClient({
   const meta = getSegmentMeta(segment);
   const hubHref = `/${dashboardBase}/service-before-installation`;
   const warrantyHref = `/${dashboardBase}/warranty`;
-  const canExportCsv = isSuperAdminRole(userRole);
+  const canExportCsv = canExportServiceBeforeInstallationCsv(userRole);
   const { ProductFollowupIcons, followupModals, openMachineFollowUp, openMachineHistory } =
     useWarrantyProductFollowup();
   const [warrantyRowModal, setWarrantyRowModal] = useState(null);

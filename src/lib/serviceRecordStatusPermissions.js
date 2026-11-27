@@ -31,13 +31,15 @@ export function thirdPartyIdFromRecord(record) {
 
 export function canChangeServiceStatus(role, record) {
   if (record?.status?.toUpperCase() === "COMPLETED") return false;
-  const roleNorm = String(role ?? "").trim().toUpperCase();
+  const roleNorm = String(role ?? "").trim().replace(/\s+/g, " ").toUpperCase();
   return (
     roleNorm === "ADMIN" ||
     roleNorm === "SUPERADMIN" ||
+    roleNorm === "DIRECTOR" ||
     roleNorm === "TEAM LEADER" ||
     roleNorm === "SERVICE HEAD" ||
     roleNorm === "SERVICE SUPPORT" ||
+    roleNorm === "SALES CUM BACKOFFICE" ||
     roleNorm === "SERVICE ENGINEER" ||
     roleNorm.includes("SERVICE ENGINEER") ||
     roleNorm === "THIRD PARTY ENGINEER"
