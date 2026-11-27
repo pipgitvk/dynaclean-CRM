@@ -869,6 +869,51 @@ function buildPageWindow(current, total) {
   return out;
 }
 
+const SBI_CSV_EXPORT_PAGE_LIMIT = 200;
+const SBI_CSV_EXPORT_MAX_ROWS = 50_000;
+
+async function fetchAllRowsForSbiExport({
+  listUrl,
+  listFilters,
+  deferServiceEnrich = "0",
+  extraParams = {},
+}) {
+  const all = [];
+  let skip = 0;
+
+  while (all.length < SBI_CSV_EXPORT_MAX_ROWS) {
+    const compactParams = Object.fromEntries(
+      Object.entries({
+        ...listFilters,
+        ...extraParams,
+        limit: SBI_CSV_EXPORT_PAGE_LIMIT,
+        skip,
+        includeFilterOptions: "0",
+        skipTotal: "1",
+        includeOpenInstallationBreakdown: "0",
+        deferServiceEnrich,
+      }).filter(([, v]) => v !== "" && v != null && v !== false),
+    );
+    const res = await axios.get(listUrl, {
+      params: compactParams,
+      timeout: 120_000,
+    });
+    if (!res.data?.success) break;
+    const batch = (res.data.data || []).filter(
+      (row) => !isTempSerialNumber(row.serial_number),
+    );
+    all.push(...batch);
+    const pag = res.data.pagination || {};
+    const total = Number(pag.total) || 0;
+    const hasMore =
+      Boolean(pag.hasMore) || batch.length >= SBI_CSV_EXPORT_PAGE_LIMIT;
+    skip += batch.length;
+    if (!batch.length || !hasMore) break;
+    if (total > 0 && all.length >= total) break;
+  }
+  return all;
+}
+
 function exportRowsCsv(rows, segment) {
   if (!rows.length) return;
   const headersBySegment = {
@@ -2518,6 +2563,7 @@ export default function ServiceBeforeInstallationDetailClient({
     total: null,
   });
   const [loading, setLoading] = useState(true);
+  const [exportingCsv, setExportingCsv] = useState(false);
   const [applyingFilters, setApplyingFilters] = useState(false);
   const [countLoading, setCountLoading] = useState(false);
   const [installationBreakdown, setInstallationBreakdown] = useState({
@@ -3515,6 +3561,72 @@ export default function ServiceBeforeInstallationDetailClient({
     applyListTotal,
   ]);
 
+  const handleExportCsv = useCallback(async () => {
+    setExportingCsv(true);
+    try {
+      let exportRows = rows;
+      const isOpenInstallationList =
+        segment === "open-installation" || segment === "overdue-delayed-installation";
+
+      if (isOpenInstallationList) {
+        const activeBucket = String(appliedFilters.openInstallationBucket || "").trim();
+        const { openInstallationBucket: _bucket, range: _range, ...listFilters } =
+          appliedFilters;
+        const listUrl =
+          segment === "open-installation"
+            ? openInstallationTableListApi(activeBucket)
+            : `/api/service-before-installation/${segment}`;
+        exportRows = await fetchAllRowsForSbiExport({
+          listUrl,
+          listFilters,
+          deferServiceEnrich: "0",
+        });
+      } else if (segment === "open-completions") {
+        const activeBucket = String(
+          appliedFilters.openCompletionsBucket || "total_registered",
+        ).trim();
+        const { openCompletionsBucket: _bucket, serviceStatus: _status, ...listFilters } =
+          appliedFilters;
+        exportRows = await fetchAllRowsForSbiExport({
+          listUrl: openCompletionsTableListApi(activeBucket),
+          listFilters,
+        });
+      } else if (segment === "active-warranty") {
+        const activeBucket = String(appliedFilters.warrantyBucket || "active").trim();
+        const { warrantyBucket: _bucket, ...listFilters } = appliedFilters;
+        exportRows = await fetchAllRowsForSbiExport({
+          listUrl: "/api/service-before-installation/active-warranty",
+          listFilters: { ...listFilters, warrantyBucket: activeBucket },
+          extraParams: { deferTotal: "0", skipTotal: "0" },
+        });
+      } else if (segment === "active-amc") {
+        const activeBucket = String(appliedFilters.amcBucket || "active").trim();
+        const { amcBucket: _bucket, ...listFilters } = appliedFilters;
+        exportRows = await fetchAllRowsForSbiExport({
+          listUrl: "/api/service-before-installation/active-amc",
+          listFilters: { ...listFilters, amcBucket: activeBucket },
+        });
+      } else {
+        exportRows = await fetchAllRowsForSbiExport({
+          listUrl: `/api/service-before-installation/${segment}`,
+          listFilters: appliedFilters,
+          extraParams: { deferTotal: "0", skipTotal: "0" },
+        });
+      }
+
+      if (!exportRows.length) {
+        window.alert("No rows to export.");
+        return;
+      }
+      exportRowsCsv(exportRows, segment);
+    } catch (e) {
+      console.error("[SBI CSV export]", e?.response?.data || e);
+      window.alert("Export failed. Please try again.");
+    } finally {
+      setExportingCsv(false);
+    }
+  }, [segment, appliedFilters, rows]);
+
   const fetchTableFilterOptions = useCallback(async () => {
     if (
       segment !== "total-registered" &&
@@ -3988,12 +4100,20 @@ export default function ServiceBeforeInstallationDetailClient({
               {canExportCsv ? (
                 <button
                   type="button"
-                  disabled={loading || rows.length === 0}
-                  onClick={() => exportRowsCsv(rows, segment)}
+                  disabled={
+                    loading ||
+                    exportingCsv ||
+                    (pagination.total === 0 && rows.length === 0)
+                  }
+                  onClick={() => void handleExportCsv()}
                   className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                 >
-                  <Download className="h-4 w-4" aria-hidden />
-                  Export
+                  {exportingCsv ? (
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                  ) : (
+                    <Download className="h-4 w-4" aria-hidden />
+                  )}
+                  {exportingCsv ? "Exporting…" : "Export"}
                 </button>
               ) : null}
               {showAddRegistered ? (
