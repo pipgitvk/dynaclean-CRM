@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { Toaster } from "react-hot-toast";
 import {
@@ -2301,9 +2301,92 @@ function colSpanForSegment(segment) {
   if (segment === "active-warranty") return 12;
   if (isWarrantyProductSegment(segment)) return 10;
   if (segment === "open-completions") return 14;
-  if (segment === "open-installation" || segment === "overdue-delayed-installation") return 14;
+  if (segment === "open-installation" || segment === "overdue-delayed-installation") return 11;
   if (segment === "active-amc" || segment === "due-amc-expiring") return 8;
   return 10;
+}
+
+function tableMinWidthClass(segment) {
+  if (segment === "open-installation" || segment === "overdue-delayed-installation") {
+    return "min-w-[1380px]";
+  }
+  if (segment === "open-completions") return "min-w-[1500px]";
+  if (segment === "total-registered" || segment === "active-warranty") return "min-w-[1180px]";
+  return "min-w-full";
+}
+
+/** Top scrollbar synced with table (no label — scrollbar only). */
+function SbiRecordsTableScroll({ syncKey = "", children }) {
+  const topRef = useRef(null);
+  const mainRef = useRef(null);
+  const spacerRef = useRef(null);
+  const syncLockRef = useRef(false);
+  const [showTopBar, setShowTopBar] = useState(true);
+
+  const syncScroll = useCallback((source, target) => {
+    if (!source || !target || syncLockRef.current) return;
+    syncLockRef.current = true;
+    target.scrollLeft = source.scrollLeft;
+    requestAnimationFrame(() => {
+      syncLockRef.current = false;
+    });
+  }, []);
+
+  const measureScroll = useCallback(() => {
+    const main = mainRef.current;
+    const spacer = spacerRef.current;
+    if (!main) return;
+    const table = main.querySelector("table");
+    const sw = Math.max(table?.scrollWidth || 0, main.scrollWidth, 0);
+    const cw = main.clientWidth;
+    if (spacer && sw > 0) spacer.style.width = `${sw}px`;
+    setShowTopBar(sw > cw + 2);
+  }, []);
+
+  useLayoutEffect(() => {
+    measureScroll();
+    const id = requestAnimationFrame(() => measureScroll());
+    return () => cancelAnimationFrame(id);
+  }, [measureScroll, syncKey]);
+
+  useEffect(() => {
+    const main = mainRef.current;
+    if (!main) return undefined;
+    const ro = new ResizeObserver(() => measureScroll());
+    ro.observe(main);
+    const table = main.querySelector("table");
+    if (table) ro.observe(table);
+    return () => ro.disconnect();
+  }, [measureScroll, syncKey]);
+
+  useEffect(() => {
+    if (!showTopBar) return;
+    const main = mainRef.current;
+    const top = topRef.current;
+    if (main && top) top.scrollLeft = main.scrollLeft;
+  }, [showTopBar, syncKey]);
+
+  return (
+    <div className="border-t border-slate-100">
+      <div
+        ref={topRef}
+        onScroll={() => syncScroll(topRef.current, mainRef.current)}
+        className={`max-w-full overflow-x-auto overflow-y-hidden ${showTopBar ? "h-3.5" : "hidden"}`}
+        aria-label="Scroll table horizontally"
+      >
+        <div ref={spacerRef} className="h-px shrink-0" aria-hidden />
+      </div>
+      <div
+        ref={mainRef}
+        onScroll={() => {
+          if (showTopBar) syncScroll(mainRef.current, topRef.current);
+        }}
+        className="relative max-w-full overflow-x-auto overscroll-x-contain pb-1"
+      >
+        {children}
+      </div>
+    </div>
+  );
 }
 
 export default function ServiceBeforeInstallationDetailClient({
@@ -3883,11 +3966,13 @@ export default function ServiceBeforeInstallationDetailClient({
             </div>
           </div>
 
-          <div className="relative overflow-x-auto">
+          <SbiRecordsTableScroll
+            syncKey={`${page}-${pageSize}-${rows.length}-${loading ? 1 : 0}`}
+          >
             <table
-              className={`min-w-full text-sm transition-opacity ${loading && rows.length > 0 ? "opacity-50" : ""}`}
+              className={`w-full ${tableMinWidthClass(segment)} text-sm transition-opacity ${loading && rows.length > 0 ? "opacity-50" : ""}`}
             >
-              <thead>
+              <thead className="sticky top-0 z-10">
                 <TableHead segment={segment} />
               </thead>
               <tbody className="divide-y divide-slate-100/90">
@@ -3950,7 +4035,7 @@ export default function ServiceBeforeInstallationDetailClient({
                 </div>
               </div>
             ) : null}
-          </div>
+          </SbiRecordsTableScroll>
 
           <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <label className="inline-flex items-center gap-2 text-sm text-slate-600">
