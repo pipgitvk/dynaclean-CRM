@@ -1792,6 +1792,12 @@ function openCompletionsListFilters(filters) {
   };
 }
 
+function normSerialKey(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase();
+}
+
 async function fetchOpenCompletionsComplaintsPage(conn, filters, limit, skip, { skipTotal = false } = {}) {
   await ensureServiceReportStepsTable();
   const f = openCompletionsListFilters(filters);

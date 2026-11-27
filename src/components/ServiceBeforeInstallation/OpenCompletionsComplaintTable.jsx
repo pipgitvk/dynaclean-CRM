@@ -55,10 +55,18 @@ function OpenCompletionsCompanyCell({ row }) {
   );
 }
 
+function openCompletionsCompletedBy(row) {
+  const assignedTo = String(row.assigned_to || "").trim();
+  if (!assignedTo || ["NOT ASSIGNED", "UNASSIGNED"].includes(assignedTo.toUpperCase())) {
+    return "";
+  }
+  return assignedTo;
+}
+
 function OpenCompletionsAssignCell({ row }) {
   const assignedBy = String(row.registered_by || "").trim();
   const assignedTo = String(row.assigned_to || "").trim();
-  const completedBy = String(row.completed_by_service_engineer || "").trim();
+  const completedBy = openCompletionsCompletedBy(row);
   if (!assignedBy && !assignedTo && !completedBy) {
     return <span className="text-slate-400">—</span>;
   }
