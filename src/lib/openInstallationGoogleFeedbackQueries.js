@@ -276,7 +276,7 @@ export async function fetchOpenInstallationGoogleFeedbackPage(
     enriched = await enrichOpenInstallationRowsWithServices(conn, enriched);
   }
   try {
-    await enrichRowsWithLastMachineFollowup(conn, enriched);
+    await enrichRowsWithLastMachineFollowup(conn, enriched, { machineIdField: null });
   } catch (err) {
     console.warn("[sbi google-feedback] last followup enrich skipped:", err?.message || err);
   }

@@ -106,6 +106,19 @@ function recordMachineFollowupHit(map, key, row) {
   }
 }
 
+/** neworder.id is not warranty_products.id — matching it pulls another machine's history. */
+function rowMachineFollowupId(row, machineIdField) {
+  if (!machineIdField || !row) return null;
+  if (
+    machineIdField === "id" &&
+    String(row.quote_number ?? "").trim() !== ""
+  ) {
+    return null;
+  }
+  const mid = Number(row[machineIdField]);
+  return Number.isFinite(mid) && mid > 0 ? mid : null;
+}
+
 function phoneDigits(value) {
   const digits = String(value || "").replace(/\D/g, "");
   return digits.length >= 10 ? digits.slice(-10) : "";
@@ -227,7 +240,7 @@ async function enrichCustomerFollowedAtForRows(conn, rows, { serviceSupportOnly 
  * @param {object} [options]
  * @param {string} [options.serialField]
  * @param {(row: object) => string[]} [options.getSerials]
- * @param {string} [options.machineIdField] — e.g. warranty_products `id`
+ * @param {string|null} [options.machineIdField] — warranty_products id; `null` skips (do not use neworder.id)
  * @param {boolean} [options.includeCustomerFollowups]
  * @param {boolean} [options.matchRegisteredFollowupHistory] — same filters as history modal (SS only)
  */
@@ -236,7 +249,8 @@ export async function enrichRowsWithLastMachineFollowup(conn, rows, options = {}
   if (!rows?.length) return rows;
 
   const serialField = options.serialField || "serial_number";
-  const machineIdField = options.machineIdField || "id";
+  const machineIdField =
+    options.machineIdField === undefined ? "id" : options.machineIdField;
   const getSerials =
     options.getSerials ||
     ((row) => splitRowSerialNumbers(row[serialField]));
@@ -248,8 +262,8 @@ export async function enrichRowsWithLastMachineFollowup(conn, rows, options = {}
       const trimmed = String(s).trim();
       if (trimmed) serialSet.add(trimmed);
     }
-    const mid = Number(row[machineIdField]);
-    if (Number.isFinite(mid) && mid > 0) machineIds.add(mid);
+    const mid = rowMachineFollowupId(row, machineIdField);
+    if (mid != null) machineIds.add(mid);
   }
 
   const serials = [...serialSet];
@@ -300,8 +314,8 @@ export async function enrichRowsWithLastMachineFollowup(conn, rows, options = {}
     for (const s of getSerials(row)) {
       pick = mergeFollowupPick(pick, bySerial.get(normSerialKey(s)));
     }
-    const mid = Number(row[machineIdField]);
-    if (Number.isFinite(mid) && mid > 0) {
+    const mid = rowMachineFollowupId(row, machineIdField);
+    if (mid != null) {
       pick = mergeFollowupPick(pick, byMachineId.get(mid));
     }
     if (pick) {

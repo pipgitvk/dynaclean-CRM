@@ -1211,7 +1211,9 @@ async function fetchOpenInstallationNeworderPage(
 
   if (enriched.length && !deferServiceEnrich) {
     try {
-      await enrichRowsWithLastMachineFollowup(conn, enriched);
+      await enrichRowsWithLastMachineFollowup(conn, enriched, {
+        machineIdField: null,
+      });
     } catch (err) {
       console.warn("[sbi open-installation] last followup enrich skipped:", err?.message || err);
     }
@@ -1574,7 +1576,7 @@ export async function enrichOpenInstallationListServices(rows) {
   const withServices = await enrichOpenInstallationRowsWithServices(conn, withDispatch);
   const merged = mergeOpenInstallationParallelEnrichment(withDispatch, withServices);
   try {
-    await enrichRowsWithLastMachineFollowup(conn, merged);
+    await enrichRowsWithLastMachineFollowup(conn, merged, { machineIdField: null });
   } catch (err) {
     console.warn("[sbi open-installation enrich] last followup skipped:", err?.message || err);
   }
