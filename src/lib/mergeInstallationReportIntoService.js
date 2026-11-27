@@ -9,6 +9,17 @@ export async function fetchLatestInstallationReport(conn, serviceId) {
   return rows?.[0] || null;
 }
 
+export async function fetchInstallationReportById(conn, serviceId, reportId) {
+  const sid = Number(serviceId);
+  const rid = Number(reportId);
+  if (!Number.isFinite(sid) || !Number.isFinite(rid) || rid <= 0) return null;
+  const [rows] = await conn.execute(
+    `SELECT * FROM installation_reports WHERE service_id = ? AND id = ? LIMIT 1`,
+    [sid, rid],
+  );
+  return rows?.[0] || null;
+}
+
 export function parseTraineesFromInstallationReport(install) {
   if (!install) {
     return [{ id: 1, name: "", designation: "", contact: "" }];

@@ -67,8 +67,36 @@ export function buildOpenInstallationServiceLineItems(row) {
       serial: serials[i] || "",
       status: detail.status && detail.status !== "—" ? detail.status : "PENDING",
       serviceDetail: detail,
+      reportIds: listOpenInstallationReportIdsForService(row, serviceId),
     });
   }
 
   return lines;
+}
+
+/** `235803:12,13;;235268:14` → report ids for one service_id. */
+export function parseOpenInstallationServiceReportIds(raw) {
+  const map = new Map();
+  for (const part of String(raw || "").split(";;")) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const colon = trimmed.indexOf(":");
+    const serviceId = (colon === -1 ? trimmed : trimmed.slice(0, colon)).trim();
+    const idsRaw = colon === -1 ? "" : trimmed.slice(colon + 1);
+    if (!serviceId) continue;
+    const ids = idsRaw
+      .split(",")
+      .map((id) => String(id).trim())
+      .filter(Boolean);
+    if (!ids.length) continue;
+    const prev = map.get(serviceId) || [];
+    map.set(serviceId, [...new Set([...prev, ...ids])]);
+  }
+  return map;
+}
+
+export function listOpenInstallationReportIdsForService(row, serviceId) {
+  const id = String(serviceId || "").trim();
+  if (!id) return [];
+  return parseOpenInstallationServiceReportIds(row?.service_report_ids).get(id) || [];
 }

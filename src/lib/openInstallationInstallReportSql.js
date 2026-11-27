@@ -11,6 +11,15 @@ export const INSTALLATION_REPORT_LATEST_JOIN_ON_SR = `
   ) ir_latest ON ir_latest.service_id = sr2.service_id
 `;
 
+/** All installation_reports ids per service (one button per saved report). */
+export const INSTALLATION_REPORT_IDS_JOIN_ON_SR = `
+  LEFT JOIN (
+    SELECT service_id, GROUP_CONCAT(id ORDER BY id SEPARATOR ',') AS report_ids
+    FROM installation_reports
+    GROUP BY service_id
+  ) ir_ids ON ir_ids.service_id = sr2.service_id
+`;
+
 export function sqlInstallationReportEngineerPick(serviceAlias = "sr2") {
   return `SUBSTRING_INDEX(
     GROUP_CONCAT(

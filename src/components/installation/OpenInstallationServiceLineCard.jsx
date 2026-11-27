@@ -3,7 +3,7 @@
 import Link from "next/link";
 import ServiceRecordStatusInlineCell from "@/components/services/ServiceRecordStatusInlineCell";
 import { OPEN_INSTALLATION_INLINE_STATUS_OPTIONS } from "@/lib/serviceRecordStatusPermissions";
-import OpenInstallationReportButton from "@/components/installation/OpenInstallationReportButton";
+import { OpenInstallationServiceReportButtons } from "@/components/installation/OpenInstallationReportButton";
 import { patchOpenInstallationRowService } from "@/components/installation/OpenInstallationStatusColumn";
 
 function itemToServiceRecord(item, row) {
@@ -102,10 +102,11 @@ export function OpenInstallationServiceLineTableRow({
       </td>
       <td className="whitespace-nowrap px-3 py-2.5 text-right">
         {dashboardBase ? (
-          <OpenInstallationReportButton
+          <OpenInstallationServiceReportButtons
             row={row}
             dashboardBase={dashboardBase}
             serviceId={serviceId}
+            reportIds={line.reportIds}
             compactLabel
             labelPrefix="Report"
           />
@@ -168,10 +169,11 @@ export default function OpenInstallationServiceLineCard({
           ) : null}
         </div>
         {dashboardBase ? (
-          <OpenInstallationReportButton
+          <OpenInstallationServiceReportButtons
             row={row}
             dashboardBase={dashboardBase}
             serviceId={serviceId}
+            reportIds={line.reportIds}
             compactLabel
             labelPrefix="Report"
           />

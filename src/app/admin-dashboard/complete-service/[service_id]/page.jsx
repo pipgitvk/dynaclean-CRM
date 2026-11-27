@@ -5,15 +5,18 @@ import dayjs from "dayjs";
 import ServiceForm from "./ServiceForm";
 import UpdateReportButton from "@/components/UpdateReportButton";
 import {
+  fetchInstallationReportById,
   fetchLatestInstallationReport,
   mergeInstallationReportIntoService,
 } from "@/lib/mergeInstallationReportIntoService";
 
 export const dynamic = "force-dynamic";
 
-export default async function CompleteServicePage({ params }) {
+export default async function CompleteServicePage({ params, searchParams }) {
   const { service_id } = await params;
   const serviceId = service_id;
+  const query = (await searchParams) || {};
+  const reportId = String(query.reportId || "").trim();
   const conn = await getDbConnection();
 
   const [[service]] = await conn.execute(
@@ -26,9 +29,11 @@ export default async function CompleteServicePage({ params }) {
     [service?.serial_number]
   );
 
-  const installationReport = service
-    ? await fetchLatestInstallationReport(conn, serviceId)
-    : null;
+  const installationReport = !service
+    ? null
+    : reportId
+      ? await fetchInstallationReportById(conn, serviceId, reportId)
+      : await fetchLatestInstallationReport(conn, serviceId);
 
   const warrantyExpiry = product?.installation_date
     ? dayjs(product.installation_date)

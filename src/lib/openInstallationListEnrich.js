@@ -26,6 +26,7 @@ export function mergeOpenInstallationParallelEnrichment(dispatchRows, serviceRow
       google_feedback_proof: svc.google_feedback_proof ?? row.google_feedback_proof,
       installation_report: svc.installation_report ?? row.installation_report,
       final_report_path: svc.final_report_path ?? row.final_report_path,
+      service_report_ids: svc.service_report_ids ?? row.service_report_ids,
     };
   });
 }

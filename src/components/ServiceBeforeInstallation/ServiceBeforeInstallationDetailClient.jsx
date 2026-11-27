@@ -78,7 +78,7 @@ import {
   parseUpcomingInstallationServiceDetails,
 } from "@/components/installation/UpcomingInstallationServiceStatusColumn";
 import OpenInstallationStatusColumn from "@/components/installation/OpenInstallationStatusColumn";
-import OpenInstallationReportButton from "@/components/installation/OpenInstallationReportButton";
+import { OpenInstallationServiceReportButtons } from "@/components/installation/OpenInstallationReportButton";
 import OpenInstallationServicesModal from "@/components/installation/OpenInstallationServicesModal";
 import PaymentPendingOrderDetailsModal from "@/components/reports/PaymentPendingOrderDetailsModal";
 import { parseOpenInstallationDispatchItems } from "@/lib/openInstallationDispatchItems";
@@ -1805,7 +1805,9 @@ function OpenInstallationReportButtons({ row, dashboardBase }) {
   const serviceIds = listUpcomingInstallationServiceIds(row);
   if (!serviceIds.length) return null;
   if (serviceIds.length === 1) {
-    return <OpenInstallationReportButton row={row} dashboardBase={dashboardBase} />;
+    return (
+      <OpenInstallationServiceReportButtons row={row} dashboardBase={dashboardBase} />
+    );
   }
 
   const hasMore = serviceIds.length > OPEN_INSTALLATION_MODEL_PREVIEW;
@@ -1816,7 +1818,7 @@ function OpenInstallationReportButtons({ row, dashboardBase }) {
 
   const renderReportButtons = (ids) =>
     ids.map((id) => (
-      <OpenInstallationReportButton
+      <OpenInstallationServiceReportButtons
         key={id}
         row={row}
         dashboardBase={dashboardBase}

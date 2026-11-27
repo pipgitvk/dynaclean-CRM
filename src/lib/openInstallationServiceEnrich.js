@@ -1,5 +1,6 @@
 import { sqlTrimUtf8EqColumns, sqlUtf8TrimExpr } from "@/lib/sqlUtf8Compare";
 import {
+  INSTALLATION_REPORT_IDS_JOIN_ON_SR,
   INSTALLATION_REPORT_LATEST_JOIN_ON_SR,
   sqlInstallationReportEngineerPick,
 } from "@/lib/openInstallationInstallReportSql";
@@ -153,11 +154,17 @@ export async function enrichOpenInstallationRowsWithServices(conn, rows) {
          '||',
          1
        ) AS completed_by_service_engineer,
-       ${sqlInstallationReportEngineerPick("sr2")} AS installation_report_engineer
+       ${sqlInstallationReportEngineerPick("sr2")} AS installation_report_engineer,
+       GROUP_CONCAT(
+         DISTINCT CONCAT(sr2.service_id, ':', COALESCE(ir_ids.report_ids, ''))
+         ORDER BY sr2.service_id
+         SEPARATOR ';;'
+       ) AS service_report_ids
      FROM dispatch d2
      INNER JOIN service_records sr2
        ON ${sqlTrimUtf8EqColumns("sr2.serial_number", "d2.serial_no")}
      ${INSTALLATION_REPORT_LATEST_JOIN_ON_SR}
+     ${INSTALLATION_REPORT_IDS_JOIN_ON_SR}
      WHERE ${quoteKeyD2} IN (${placeholders})
        AND d2.serial_no IS NOT NULL
        AND ${sqlUtf8TrimExpr("d2.serial_no")} <> ''
@@ -219,6 +226,9 @@ export async function enrichOpenInstallationRowsWithServices(conn, rows) {
     }
     if (hit.final_report_path != null && String(hit.final_report_path).trim() !== "") {
       next.final_report_path = String(hit.final_report_path).trim();
+    }
+    if (hit.service_report_ids != null && String(hit.service_report_ids).trim() !== "") {
+      next.service_report_ids = String(hit.service_report_ids).trim();
     }
     return next;
   });
