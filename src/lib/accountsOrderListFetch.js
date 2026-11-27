@@ -20,6 +20,7 @@ import { sqlOrderCreatedByEquals } from "@/lib/sqlCreatedByScope";
 import { normalizeOrderListDateRange } from "@/lib/orderTableDateDefaults";
 import { ensureDocumentFromCompanyColumns } from "@/lib/ensureDocumentFromCompanyColumns";
 import { ensureNeworderPunchDateColumn } from "@/lib/ensureNeworderPunchDateColumn";
+import { ensureQuotationHideGstColumn } from "@/lib/ensureQuotationHideGstColumn";
 
 const PAYMENT_TERM_LABEL_TO_DAYS = {
   Advance: 0,
@@ -37,6 +38,7 @@ export async function ensureAccountsOrderListSchema(conn) {
   await ensureDocumentFromCompanyColumns(conn);
   await ensureOrderLinkedPaymentColumns(conn);
   await ensureNeworderPunchDateColumn(conn);
+  await ensureQuotationHideGstColumn(conn);
   const safeAlters = [
     "ALTER TABLE neworder ADD COLUMN IF NOT EXISTS warehouse_in_done TINYINT(1) DEFAULT 0",
     "ALTER TABLE neworder ADD COLUMN IF NOT EXISTS warehouse_in_date DATE NULL",

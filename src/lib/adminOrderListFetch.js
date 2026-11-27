@@ -16,6 +16,7 @@ import { sqlOrderCreatedByEquals } from "@/lib/sqlCreatedByScope";
 import { normalizeOrderListDateRange } from "@/lib/orderTableDateDefaults";
 import { ensureDocumentFromCompanyColumns } from "@/lib/ensureDocumentFromCompanyColumns";
 import { ensureNeworderPunchDateColumn } from "@/lib/ensureNeworderPunchDateColumn";
+import { ensureQuotationHideGstColumn } from "@/lib/ensureQuotationHideGstColumn";
 
 let orderListSchemaReady = false;
 
@@ -42,6 +43,7 @@ export async function ensureAdminOrderListSchema(conn) {
   await ensureDocumentFromCompanyColumns(conn);
   await ensureOrderLinkedPaymentColumns(conn);
   await ensureNeworderPunchDateColumn(conn);
+  await ensureQuotationHideGstColumn(conn);
   for (const sql of ORDER_LIST_SCHEMA_ALTERS) {
     try {
       await conn.execute(sql);
