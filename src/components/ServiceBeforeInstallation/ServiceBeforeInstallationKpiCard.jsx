@@ -187,7 +187,7 @@ function ChangePill({ value, invertTrend = false, className = "", size = "defaul
   );
 }
 
-function CardWave({ color = "#8b5cf6", gradientId = "hub-wave", tall = false }) {
+export function SbiCardWave({ color = "#8b5cf6", gradientId = "hub-wave", tall = false }) {
   return (
     <svg
       className={`pointer-events-none absolute bottom-0 left-0 w-full ${tall ? "h-[4.5rem]" : "h-14 sm:h-16"}`}
@@ -377,7 +377,7 @@ export default function ServiceBeforeInstallationKpiCard({
         </>
       )}
 
-      <CardWave color={card.chartColor} gradientId={`sbi-wave-${card.id}`} tall={isHub} />
+      <SbiCardWave color={card.chartColor} gradientId={`sbi-wave-${card.id}`} tall={isHub} />
     </>
   );
 

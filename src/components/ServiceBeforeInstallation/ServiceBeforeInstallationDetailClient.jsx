@@ -25,9 +25,8 @@ import {
   X,
   History,
 } from "lucide-react";
-import ServiceBeforeInstallationKpiCard, {
-  formatSbiNum,
-} from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationKpiCard";
+import { formatSbiNum } from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationKpiCard";
+import OpenInstallationOverdueDashboardCard from "@/components/ServiceBeforeInstallation/OpenInstallationOverdueDashboardCard";
 import {
   displayComplaintDateForServiceRecord,
   displayRegDateForServiceRecord,
@@ -3688,20 +3687,15 @@ export default function ServiceBeforeInstallationDetailClient({
                 loading={activeWarrantyKpiLoading}
               />
             ) : segment === "open-installation" ? (
-              <div className="w-full sm:w-[min(100%,17.5rem)]">
-                <ServiceBeforeInstallationKpiCard
-                  card={OPEN_INSTALLATION_OVERDUE_DASHBOARD_CARD}
-                  total={openInstallationBreakdown.overdue_delayed_installation}
-                  loading={openInstallationKpiLoading}
-                  active={
-                    openInstallationActiveCardId ===
-                    OPEN_INSTALLATION_OVERDUE_DASHBOARD_CARD.id
-                  }
-                  variant="compact"
-                  showTrend={false}
-                  onClick={() => handleOpenInstallationBucketSelect("overdue_delayed")}
-                />
-              </div>
+              <OpenInstallationOverdueDashboardCard
+                total={openInstallationBreakdown.overdue_delayed_installation}
+                loading={openInstallationKpiLoading}
+                active={
+                  openInstallationActiveCardId ===
+                  OPEN_INSTALLATION_OVERDUE_DASHBOARD_CARD.id
+                }
+                onClick={() => handleOpenInstallationBucketSelect("overdue_delayed")}
+              />
             ) : null
           }
         />
