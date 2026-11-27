@@ -2442,6 +2442,7 @@ export default function ServiceBeforeInstallationDetailClient({
     pending_by_customer: null,
     pending_for_spares: null,
     pending_over_48h_no_plan: null,
+    google_feedback: null,
   });
   const [openCompletionsKpiLoading, setOpenCompletionsKpiLoading] = useState(
     () => segment === "open-completions",
@@ -2467,6 +2468,7 @@ export default function ServiceBeforeInstallationDetailClient({
     pending_by_customer: null,
     pending_for_spares: null,
     pending_over_48h_no_plan: null,
+    google_feedback: null,
   });
   openInstallationBreakdownRef.current = openInstallationBreakdown;
   openCompletionsBreakdownRef.current = openCompletionsBreakdown;

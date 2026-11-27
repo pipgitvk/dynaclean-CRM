@@ -90,8 +90,10 @@ export async function enrichOpenInstallationRowsWithServices(conn, rows) {
        SUBSTRING_INDEX(
          GROUP_CONCAT(
            CASE
-             WHEN LOWER(TRIM(COALESCE(sr2.google_feedback_collected, ''))) = 'yes' THEN 'yes'
-             WHEN LOWER(TRIM(COALESCE(sr2.google_feedback_collected, ''))) = 'no' THEN 'no'
+             WHEN UPPER(TRIM(COALESCE(sr2.service_type, ''))) = 'INSTALLATION'
+               AND LOWER(TRIM(COALESCE(sr2.google_feedback_collected, ''))) = 'yes' THEN 'yes'
+             WHEN UPPER(TRIM(COALESCE(sr2.service_type, ''))) = 'INSTALLATION'
+               AND LOWER(TRIM(COALESCE(sr2.google_feedback_collected, ''))) = 'no' THEN 'no'
              ELSE NULL
            END
            ORDER BY ${SR2_GOOGLE_FEEDBACK_PICK_ORDER}
@@ -102,7 +104,10 @@ export async function enrichOpenInstallationRowsWithServices(conn, rows) {
        ) AS google_feedback_collected,
        SUBSTRING_INDEX(
          GROUP_CONCAT(
-           NULLIF(TRIM(sr2.google_feedback_collection), '')
+           CASE
+             WHEN UPPER(TRIM(COALESCE(sr2.service_type, ''))) = 'INSTALLATION'
+             THEN NULLIF(TRIM(sr2.google_feedback_collection), '')
+           END
            ORDER BY ${SR2_GOOGLE_FEEDBACK_PICK_ORDER}
            SEPARATOR '||'
          ),
@@ -111,7 +116,10 @@ export async function enrichOpenInstallationRowsWithServices(conn, rows) {
        ) AS google_feedback_collection,
        SUBSTRING_INDEX(
          GROUP_CONCAT(
-           NULLIF(TRIM(sr2.google_feedback_proof), '')
+           CASE
+             WHEN UPPER(TRIM(COALESCE(sr2.service_type, ''))) = 'INSTALLATION'
+             THEN NULLIF(TRIM(sr2.google_feedback_proof), '')
+           END
            ORDER BY ${SR2_GOOGLE_FEEDBACK_PICK_ORDER}
            SEPARATOR '||'
          ),

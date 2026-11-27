@@ -10,6 +10,7 @@ export function sqlQuoteHasGoogleFeedbackCollected(orderAlias = "no") {
     WHERE ${sqlTrimUtf8EqColumns("d_gf.quote_number", `${orderAlias}.quote_number`)}
       AND d_gf.serial_no IS NOT NULL
       AND ${sqlUtf8TrimExpr("d_gf.serial_no")} <> ''
+      AND UPPER(TRIM(COALESCE(sr_gf.service_type, ''))) = 'INSTALLATION'
       AND LOWER(TRIM(COALESCE(sr_gf.google_feedback_collected, ''))) = 'yes'
   )`;
 }

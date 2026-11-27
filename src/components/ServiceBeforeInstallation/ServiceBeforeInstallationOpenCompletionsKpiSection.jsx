@@ -50,7 +50,7 @@ export default function ServiceBeforeInstallationOpenCompletionsKpiSection({
 
   const pieTotal = pieData.reduce((s, d) => s + d.value, 0);
 
-  const cardRows = useMemo(() => [cards.slice(0, 4), cards.slice(4, 7)], [cards]);
+  const cardRows = useMemo(() => [cards.slice(0, 4), cards.slice(4)], [cards]);
 
   const renderCard = (card) => {
     const value = totals[card.field];
@@ -85,7 +85,7 @@ export default function ServiceBeforeInstallationOpenCompletionsKpiSection({
         {cardRows[0].map(renderCard)}
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_minmax(17.5rem,26rem)] lg:items-stretch xl:grid-cols-[1fr_minmax(20rem,30rem)]">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {cardRows[1].map(renderCard)}
         </div>
 

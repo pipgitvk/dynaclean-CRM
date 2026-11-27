@@ -9,5 +9,8 @@ export function openCompletionsBucketRecordCount(bucket, breakdown = {}) {
   if (b === "pending_by_customer") return Number(breakdown.pending_by_customer ?? 0);
   if (b === "pending_for_spares") return Number(breakdown.pending_for_spares ?? 0);
   if (b === "pending_over_48h_no_plan") return Number(breakdown.pending_over_48h_no_plan ?? 0);
+  if (b === "google_feedback" || b === "feedback_collected") {
+    return Number(breakdown.google_feedback ?? 0);
+  }
   return Number(breakdown.total_complaints_registered ?? 0);
 }

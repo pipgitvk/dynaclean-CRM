@@ -275,6 +275,17 @@ export const OPEN_COMPLETIONS_COMPLAINT_KPI_CARDS = [
     iconSurface: "bg-gradient-to-br from-red-500 to-rose-600",
     glow: "bg-red-400/20",
   },
+  {
+    id: "oc-google-feedback",
+    field: "google_feedback",
+    title: "Google Feedback",
+    subtitle: "Complaints with Google feedback Yes",
+    countCaption: "No. of complaint Google feedback collected",
+    chartColor: "#f43f5e",
+    surface: "border-rose-200/60 bg-rose-50/30",
+    iconSurface: "bg-gradient-to-br from-rose-500 to-orange-600",
+    glow: "bg-rose-400/20",
+  },
 ];
 
 export function getOpenCompletionsComplaintKpiCards() {
@@ -422,6 +433,7 @@ const OPEN_COMPLETIONS_CARD_ID_TO_BUCKET = {
   "oc-pending-customer": "pending_by_customer",
   "oc-pending-spares": "pending_for_spares",
   "oc-pending-48h": "pending_over_48h_no_plan",
+  "oc-google-feedback": "google_feedback",
 };
 
 export function openCompletionsBucketFromKpiCardId(cardId) {
@@ -445,6 +457,7 @@ export const OPEN_COMPLETIONS_TABLE_API_SLUGS = [
   "pending-by-customer",
   "pending-for-spares",
   "pending-over-48h",
+  "google-feedback",
 ];
 
 export function openCompletionsApiSlugFromBucket(openCompletionsBucket) {
@@ -453,6 +466,7 @@ export function openCompletionsApiSlugFromBucket(openCompletionsBucket) {
   if (v === "pending_for_spares") return "pending-for-spares";
   if (v === "pending_over_48h_no_plan") return "pending-over-48h";
   if (v === "total_registered") return "total-registered";
+  if (v === "google_feedback" || v === "feedback_collected") return "google-feedback";
   if (v === "pending" || v === "planned" || v === "completed") return v;
   return "total-registered";
 }
@@ -467,6 +481,7 @@ export function openCompletionsBucketFromApiSlug(slug) {
     return "pending_over_48h_no_plan";
   }
   if (v === "total-registered") return "total_registered";
+  if (v === "google-feedback" || v === "feedback-collected") return "google_feedback";
   if (v === "pending" || v === "planned" || v === "completed") return v;
   return "";
 }

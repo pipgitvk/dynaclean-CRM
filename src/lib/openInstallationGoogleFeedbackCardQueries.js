@@ -65,7 +65,8 @@ function buildGoogleFeedbackYesFromSql(filters) {
       ON ${sqlTrimUtf8EqColumns("no.quote_number", "d.quote_number")}
      AND (no.is_cancelled = 0 OR no.is_cancelled IS NULL)
      AND (no.is_returned = 0 OR no.is_returned = 2 OR no.is_returned IS NULL)
-    WHERE LOWER(TRIM(COALESCE(sr.google_feedback_collected, ''))) = 'yes'
+    WHERE UPPER(TRIM(COALESCE(sr.service_type, ''))) = 'INSTALLATION'
+      AND LOWER(TRIM(COALESCE(sr.google_feedback_collected, ''))) = 'yes'
   `;
   const params = [];
 

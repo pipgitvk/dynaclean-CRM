@@ -8,7 +8,10 @@ export const OPEN_COMPLETIONS_BUCKET_VALUES = [
   "pending_by_customer",
   "pending_for_spares",
   "pending_over_48h_no_plan",
+  "google_feedback",
 ];
+
+export const COMPLAINT_GOOGLE_FEEDBACK_SQL = `LOWER(TRIM(COALESCE(sr.google_feedback_collected, ''))) = 'yes'`;
 
 const NO_PLAN_DATE_SQL = `(
   sr.planned_date IS NULL
@@ -60,6 +63,12 @@ export function buildOpenCompletionsBucketWhereSql(openCompletionsBucket) {
         AND sr.complaint_date IS NOT NULL
         AND TIMESTAMPDIFF(HOUR, sr.complaint_date, NOW()) > 48
         AND ${NO_PLAN_DATE_SQL}`,
+      params: [],
+    };
+  }
+  if (b === "google_feedback" || b === "feedback_collected") {
+    return {
+      sql: ` AND ${COMPLAINT_GOOGLE_FEEDBACK_SQL}`,
       params: [],
     };
   }

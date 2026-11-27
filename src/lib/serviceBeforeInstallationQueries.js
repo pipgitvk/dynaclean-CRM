@@ -1777,6 +1777,7 @@ function parseOpenCompletionsComplaintKpiRow(row) {
     pending_by_customer: Number(row?.pending_by_customer || 0),
     pending_for_spares: Number(row?.pending_for_spares || 0),
     pending_over_48h_no_plan: Number(row?.pending_over_48h_no_plan || 0),
+    google_feedback: Number(row?.google_feedback || 0),
   };
 }
 
@@ -1845,6 +1846,9 @@ async function fetchOpenCompletionsComplaintsPage(conn, filters, limit, skip, { 
        sr.service_rating,
        sr.final_feedback_on_call,
        sr.service_followup_at,
+       sr.google_feedback_collected,
+       sr.google_feedback_collection,
+       sr.google_feedback_proof,
        wp.id AS machine_id,
        wp.customer_name,
        wp.model,
@@ -1927,7 +1931,8 @@ export async function fetchOpenCompletionsComplaintKpiBreakdown(conn, filters = 
              OR TRIM(CAST(sr.planned_date AS CHAR)) IN ('', '0000-00-00', '0000-00-00 00:00:00')
              OR DATE(sr.planned_date) <= '1970-01-01'
            )
-         THEN 1 ELSE 0 END) AS pending_over_48h_no_plan
+         THEN 1 ELSE 0 END) AS pending_over_48h_no_plan,
+       SUM(CASE WHEN LOWER(TRIM(COALESCE(sr.google_feedback_collected, ''))) = 'yes' THEN 1 ELSE 0 END) AS google_feedback
      ${OPEN_COMPLAINTS_SR_JOIN}
      ${where}`,
     [...srFilter.params],

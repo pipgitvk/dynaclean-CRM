@@ -222,7 +222,10 @@ export function normalizeOpenCompletionsBucket(raw) {
     "pending_by_customer",
     "pending_for_spares",
     "pending_over_48h_no_plan",
+    "google_feedback",
+    "feedback_collected",
   ]);
+  if (v === "feedback_collected") return "google_feedback";
   if (allowed.has(v)) return v;
   return "";
 }
