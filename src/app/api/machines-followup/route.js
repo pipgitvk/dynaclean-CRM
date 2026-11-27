@@ -8,6 +8,24 @@ import {
 } from "@/lib/serviceSupportTeamScope";
 import { canViewAllMachinesFollowupHistory } from "@/lib/dataScope";
 import { fetchCustomerFollowupsByContact } from "@/lib/customerFollowupByContact";
+import { SERVICE_RECORD_INLINE_STATUS_OPTIONS } from "@/lib/serviceRecordStatusPermissions";
+
+const FOLLOWUP_STATUS_VALUES = new Set(
+  SERVICE_RECORD_INLINE_STATUS_OPTIONS.map((s) => String(s).trim().toUpperCase()),
+);
+
+let machinesFollowupStatusColumnReady = false;
+
+async function ensureMachinesFollowupStatusColumn(pool) {
+  if (machinesFollowupStatusColumnReady) return;
+  const [cols] = await pool.execute(`SHOW COLUMNS FROM machines_followup LIKE 'status'`);
+  if (!cols?.length) {
+    await pool.execute(
+      `ALTER TABLE machines_followup ADD COLUMN status VARCHAR(64) NULL`,
+    );
+  }
+  machinesFollowupStatusColumnReady = true;
+}
 
 export async function GET(req) {
   try {
@@ -169,6 +187,14 @@ export async function POST(req) {
     const imageFile = formData.get("image");
     const followedAt = formData.get("followed_at");
     const contact = formData.get("contact");
+    const statusRaw = String(formData.get("status") || "").trim();
+    const statusUpper = statusRaw.toUpperCase();
+    if (!statusRaw) {
+      return NextResponse.json({ success: false, error: "Status is required" }, { status: 400 });
+    }
+    if (statusUpper && !FOLLOWUP_STATUS_VALUES.has(statusUpper) && statusUpper.length > 64) {
+      return NextResponse.json({ success: false, error: "Invalid status" }, { status: 400 });
+    }
 
     // Validate followed_at is within last 24 hours (Asia/Kolkata timezone)
     const now = new Date();
@@ -226,6 +252,7 @@ export async function POST(req) {
     }
 
     const pool = await getDbConnection();
+    await ensureMachinesFollowupStatusColumn(pool);
 
     let machineId = machineIdRaw != null && String(machineIdRaw).trim() !== ""
       ? parseInt(machineIdRaw, 10)
@@ -256,8 +283,8 @@ export async function POST(req) {
     }
 
     const sql = `INSERT INTO machines_followup 
-      (machine_id, service_id, serial_number, product_model, notes, next_followup_date, added_by, image, followed_at, contact) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      (machine_id, service_id, serial_number, product_model, notes, next_followup_date, added_by, image, followed_at, contact, status) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     const values = [
       machineId,
       serviceId,
@@ -268,7 +295,8 @@ export async function POST(req) {
       username,
       imageUrl,
       followedDate,
-      contact || null
+      contact || null,
+      statusRaw,
     ];
 
     await pool.execute(sql, values);

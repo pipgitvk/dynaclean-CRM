@@ -5,6 +5,7 @@ import timezone from "dayjs/plugin/timezone";
 import utc from "dayjs/plugin/utc";
 import { History, Eye, X, ClipboardList } from "lucide-react";
 import toast from "react-hot-toast";
+import { SERVICE_RECORD_INLINE_STATUS_OPTIONS } from "@/lib/serviceRecordStatusPermissions";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -23,6 +24,18 @@ export function toLocalDT(date) {
   const h = String(d.getHours()).padStart(2, "0");
   return `${Y}-${M}-${D}T${h}:00`;
 }
+
+export function followupStatusLabel(value) {
+  const v = String(value || "").trim();
+  if (v.toUpperCase() === "PENDING FOR SPARES") return "Pending by Us";
+  return v;
+}
+
+const FOLLOWUP_STATUS_OPTIONS = Array.from(
+  new Set(
+    SERVICE_RECORD_INLINE_STATUS_OPTIONS.map((s) => String(s || "").trim()).filter(Boolean),
+  ),
+);
 
 export function toFollowupTarget(product) {
   return {
@@ -54,6 +67,7 @@ export function FollowUpModal({ fu, onClose, onSaved, allowEditIdentity = false 
     image: null,
     contact_mode: fu.contact_mode || "",
     purpose: fu.purpose || "",
+    status: "",
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -102,6 +116,7 @@ export function FollowUpModal({ fu, onClose, onSaved, allowEditIdentity = false 
     fd.append("followed_at", form.followed_at);
     fd.append("contact_mode", form.contact_mode);
     fd.append("purpose", form.purpose);
+    fd.append("status", form.status);
     fd.append("notes", form.notes);
     fd.append("next_followup_date", form.next_followup_date);
     if (form.image) fd.append("image", form.image);
@@ -291,6 +306,29 @@ export function FollowUpModal({ fu, onClose, onSaved, allowEditIdentity = false 
               <option value="AMC">AMC</option>
               <option value="Spare Parts">Spare Parts</option>
               <option value="Consumables">Consumables</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Status *</label>
+            <select
+              value={form.status}
+              onChange={set("status")}
+              required
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Select status...</option>
+              {FOLLOWUP_STATUS_OPTIONS.map((value) => (
+                <option key={value} value={value}>
+                  {followupStatusLabel(value)}
+                </option>
+              ))}
+              {form.status &&
+              !FOLLOWUP_STATUS_OPTIONS.some(
+                (v) => v.toUpperCase() === String(form.status).trim().toUpperCase(),
+              ) ? (
+                <option value={form.status}>{followupStatusLabel(form.status)}</option>
+              ) : null}
             </select>
           </div>
 
@@ -531,6 +569,12 @@ export function HistoryModal({
                         <div>
                           <span className="text-gray-500">Purpose:</span>{" "}
                           <span className="font-medium">{rec.purpose}</span>
+                        </div>
+                      )}
+                      {rec.status && (
+                        <div>
+                          <span className="text-gray-500">Status:</span>{" "}
+                          <span className="font-medium">{followupStatusLabel(rec.status)}</span>
                         </div>
                       )}
                       {rec.contact && (
