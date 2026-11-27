@@ -25,7 +25,9 @@ import {
   X,
   History,
 } from "lucide-react";
-import { formatSbiNum } from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationKpiCard";
+import ServiceBeforeInstallationKpiCard, {
+  formatSbiNum,
+} from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationKpiCard";
 import {
   displayComplaintDateForServiceRecord,
   displayRegDateForServiceRecord,
@@ -34,9 +36,11 @@ import {
   getActiveAmcKpiMeta,
   getActiveWarrantyKpiMeta,
   getSegmentMeta,
+  OPEN_INSTALLATION_OVERDUE_DASHBOARD_CARD,
   openCompletionsTableCountApi,
   openCompletionsTableListApi,
   OPEN_INSTALLATION_GOOGLE_FEEDBACK_API,
+  openInstallationKpiCardIdFromFilter,
   openInstallationTableCountApi,
   openInstallationTableListApi,
 } from "@/lib/serviceBeforeInstallationHub";
@@ -3620,6 +3624,38 @@ export default function ServiceBeforeInstallationDetailClient({
       prev.map((r) => (String(r.service_id) === id ? { ...r, ...patch } : r)),
     );
   }, []);
+
+  const handleOpenInstallationBucketSelect = useCallback(
+    (openInstallationBucket) => {
+      const nextBucket = persistOpenInstallationBucket(
+        openInstallationBucket ||
+          stickyBucketRef.current ||
+          appliedFilters.openInstallationBucket,
+      );
+      if (nextBucket === String(appliedFilters.openInstallationBucket || "").trim()) {
+        stickyBucketRef.current = nextBucket;
+        return;
+      }
+      stickyBucketRef.current = nextBucket;
+      setPage(0);
+      setLoading(true);
+      const estTotal = openInstallationBucketRecordCount(
+        nextBucket,
+        openInstallationBreakdown,
+      );
+      listTotalRef.current = estTotal;
+      setPagination({ total: estTotal, hasMore: estTotal > pageSize });
+      const next = { ...appliedFilters, openInstallationBucket: nextBucket };
+      setAppliedFilters(next);
+      setDraftFilters(next);
+    },
+    [appliedFilters, openInstallationBreakdown, pageSize],
+  );
+
+  const openInstallationActiveCardId = openInstallationKpiCardIdFromFilter(
+    appliedFilters.openInstallationBucket,
+  );
+
   const showAddRegistered = isWarrantyProductSegment(segment);
 
   if (!meta) {
@@ -3651,6 +3687,21 @@ export default function ServiceBeforeInstallationDetailClient({
                 totals={activeWarrantyBreakdown}
                 loading={activeWarrantyKpiLoading}
               />
+            ) : segment === "open-installation" ? (
+              <div className="w-full sm:w-[min(100%,17.5rem)]">
+                <ServiceBeforeInstallationKpiCard
+                  card={OPEN_INSTALLATION_OVERDUE_DASHBOARD_CARD}
+                  total={openInstallationBreakdown.overdue_delayed_installation}
+                  loading={openInstallationKpiLoading}
+                  active={
+                    openInstallationActiveCardId ===
+                    OPEN_INSTALLATION_OVERDUE_DASHBOARD_CARD.id
+                  }
+                  variant="compact"
+                  showTrend={false}
+                  onClick={() => handleOpenInstallationBucketSelect("overdue_delayed")}
+                />
+              </div>
             ) : null
           }
         />
@@ -3698,29 +3749,7 @@ export default function ServiceBeforeInstallationDetailClient({
             deliveryPendingLoading={deliveryPendingKpiLoading}
             completedLoading={completedKpiLoading}
             noFeedbackLoading={feedbackCollectedKpiLoading}
-            onCardSelect={(openInstallationBucket) => {
-              const nextBucket = persistOpenInstallationBucket(
-                openInstallationBucket ||
-                  stickyBucketRef.current ||
-                  appliedFilters.openInstallationBucket,
-              );
-              if (nextBucket === String(appliedFilters.openInstallationBucket || "").trim()) {
-                stickyBucketRef.current = nextBucket;
-                return;
-              }
-              stickyBucketRef.current = nextBucket;
-              setPage(0);
-              setLoading(true);
-              const estTotal = openInstallationBucketRecordCount(
-                nextBucket,
-                openInstallationBreakdown,
-              );
-              listTotalRef.current = estTotal;
-              setPagination({ total: estTotal, hasMore: estTotal > pageSize });
-              const next = { ...appliedFilters, openInstallationBucket: nextBucket };
-              setAppliedFilters(next);
-              setDraftFilters(next);
-            }}
+            onCardSelect={handleOpenInstallationBucketSelect}
           />
         ) : null}
 

@@ -3,36 +3,26 @@
  */
 /** Detail strip on Total Registered — not separate hub routes. */
 /** Detail strip on Open Installation — KPI filters for the list. */
+/** Shown in Installation Management Dashboard header (not in bucket strip). */
+export const OPEN_INSTALLATION_OVERDUE_DASHBOARD_CARD = {
+  id: "open-installation-overdue-delayed",
+  title: "Overdue Delayed Installation",
+  subtitle: "Pending from more than 2 days",
+  countCaption: "No. of overdue delayed installations",
+  countKey: "overdue_delayed_installation",
+  accent: "from-rose-500 to-red-600",
+  surface:
+    "bg-white/80 backdrop-blur-xl border-rose-200/40 shadow-[0_8px_30px_-8px_rgba(244,63,94,0.35)]",
+  glow: "bg-rose-400/25",
+  iconSurface: "bg-gradient-to-br from-rose-500 to-red-600",
+  chartColor: "#e11d48",
+};
+
+/** Open Installation list buckets — order: on the way → delivered → pending → completed → feedback. */
 export const OPEN_INSTALLATION_DETAIL_KPI_STRIP = [
   {
-    id: "open-installation-delivered-pending",
-    title: "Delivered — Installation Pending",
-    subtitle: "Product received at site, installation not done",
-    countCaption: "No. of products delivered (installation pending)",
-    countKey: "delivered_installation_pending",
-    accent: "from-amber-500 to-orange-600",
-    surface:
-      "bg-white/80 backdrop-blur-xl border-amber-200/40 shadow-[0_8px_30px_-8px_rgba(245,158,11,0.35)]",
-    glow: "bg-amber-400/25",
-    iconSurface: "bg-gradient-to-br from-amber-500 to-orange-600",
-    chartColor: "#f59e0b",
-  },
-  {
-    id: "open-installation-overdue-delayed",
-    title: "Overdue Delayed Installation",
-    subtitle: "Pending from more than 2 days",
-    countCaption: "No. of overdue delayed installations",
-    countKey: "overdue_delayed_installation",
-    accent: "from-rose-500 to-red-600",
-    surface:
-      "bg-white/80 backdrop-blur-xl border-rose-200/40 shadow-[0_8px_30px_-8px_rgba(244,63,94,0.35)]",
-    glow: "bg-rose-400/25",
-    iconSurface: "bg-gradient-to-br from-rose-500 to-red-600",
-    chartColor: "#e11d48",
-  },
-  {
     id: "open-installation-delivery-pending",
-    title: "On the Way Machine",
+    title: "On the Way",
     subtitle: "Dispatched, delivery still pending",
     countCaption: "No. of product delivery pending after dispatch OR on the way machine",
     countKey: "delivery_pending_after_dispatch",
@@ -44,8 +34,21 @@ export const OPEN_INSTALLATION_DETAIL_KPI_STRIP = [
     chartColor: "#0ea5e9",
   },
   {
+    id: "open-installation-delivered-pending",
+    title: "Delivered",
+    subtitle: "Product received at site, installation not done",
+    countCaption: "No. of products delivered (installation pending)",
+    countKey: "delivered_installation_pending",
+    accent: "from-amber-500 to-orange-600",
+    surface:
+      "bg-white/80 backdrop-blur-xl border-amber-200/40 shadow-[0_8px_30px_-8px_rgba(245,158,11,0.35)]",
+    glow: "bg-amber-400/25",
+    iconSurface: "bg-gradient-to-br from-amber-500 to-orange-600",
+    chartColor: "#f59e0b",
+  },
+  {
     id: "open-installation-planned",
-    title: "Installation Planned",
+    title: "Installation Pending",
     subtitle: "Installation service in PLANNED status",
     countCaption: "No. of installation planned",
     countKey: "installation_planned",
@@ -71,7 +74,7 @@ export const OPEN_INSTALLATION_DETAIL_KPI_STRIP = [
   },
   {
     id: "open-installation-feedback-collected",
-    title: "Google Feedback Collected",
+    title: "Google Feedback",
     subtitle: "Installation done — Google feedback marked Yes",
     countCaption: "No. of Google feedback collected",
     countKey: "feedback_collected",

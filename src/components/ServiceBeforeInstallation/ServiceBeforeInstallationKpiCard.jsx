@@ -84,6 +84,11 @@ export const SBI_SPARK_SEED = {
 const COMPACT_TITLES = {
   "overdue-delayed-installation": "Overdue (Delayed)",
   "open-installation-overdue-delayed": "Overdue (Delayed)",
+  "open-installation-delivery-pending": "On the Way",
+  "open-installation-delivered-pending": "Delivered",
+  "open-installation-planned": "Installation Pending",
+  "open-installation-completed": "Installation Completed",
+  "open-installation-feedback-collected": "Google Feedback",
 };
 
 export function formatSbiNum(n) {
@@ -258,7 +263,11 @@ export default function ServiceBeforeInstallationKpiCard({
         ? "ring-2 ring-emerald-500/75 ring-offset-2 ring-offset-emerald-50/60"
         : card.id === "open-installation-delivery-pending"
           ? "ring-2 ring-sky-500/75 ring-offset-2 ring-offset-sky-50/60"
-          : card.id === "open-installation-feedback-collected" ||
+          : card.id === "open-installation-planned"
+            ? "ring-2 ring-violet-500/75 ring-offset-2 ring-offset-violet-50/60"
+            : card.id === "open-installation-overdue-delayed"
+              ? "ring-2 ring-rose-500/75 ring-offset-2 ring-offset-rose-50/60"
+              : card.id === "open-installation-feedback-collected" ||
               card.id === "open-installation-no-feedback"
             ? "ring-2 ring-rose-500/75 ring-offset-2 ring-offset-rose-50/60"
             : card.id === "aw-expired" || card.id === "aa-expired"
