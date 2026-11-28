@@ -148,7 +148,8 @@ export default function ExpenseTable({
   const [searchQuery, setSearchQuery] = useState("");
   const [fromDate, setFromDate] = useState(dayjs().startOf("month").format("YYYY-MM-DD"));
   const [toDate, setToDate] = useState(dayjs().endOf("month").format("YYYY-MM-DD"));
-  const [periodMonth, setPeriodMonth] = useState(dayjs().format("YYYY-MM"));
+  /** SBI header period: today | month | custom */
+  const [datePeriodMode, setDatePeriodMode] = useState("month");
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [selectedExpenseIds, setSelectedExpenseIds] = useState(new Set());
 
@@ -561,28 +562,40 @@ export default function ExpenseTable({
     updateQueryParam("username", "");
     setSelectedStatus("");
     if (clickableSummaryCards) setSummaryBucket(null);
-    const defaultMonth = dayjs().format("YYYY-MM");
-    setPeriodMonth(defaultMonth);
+    setDatePeriodMode("month");
     setFromDate(dayjs().startOf("month").format("YYYY-MM-DD"));
     setToDate(dayjs().endOf("month").format("YYYY-MM-DD"));
   };
 
-  const periodMonthOptions = useMemo(() => {
-    const list = [];
-    const base = dayjs().startOf("month");
-    for (let i = 0; i < 18; i += 1) {
-      const d = base.subtract(i, "month");
-      list.push({ value: d.format("YYYY-MM"), label: d.format("MMM YYYY") });
-    }
-    return list;
-  }, []);
+  const currentMonthLabel = useMemo(() => dayjs().format("MMM YYYY"), []);
 
-  const handlePeriodMonthChange = (value) => {
-    setPeriodMonth(value);
-    const d = dayjs(`${value}-01`);
-    if (!d.isValid()) return;
-    setFromDate(d.startOf("month").format("YYYY-MM-DD"));
-    setToDate(d.endOf("month").format("YYYY-MM-DD"));
+  const handleDatePeriodModeChange = (mode) => {
+    setDatePeriodMode(mode);
+    if (clickableSummaryCards) setSummaryBucket(null);
+
+    const today = dayjs().format("YYYY-MM-DD");
+    if (mode === "today") {
+      setFromDate(today);
+      setToDate(today);
+      return;
+    }
+    if (mode === "month") {
+      setFromDate(dayjs().startOf("month").format("YYYY-MM-DD"));
+      setToDate(dayjs().endOf("month").format("YYYY-MM-DD"));
+      return;
+    }
+    // custom — keep existing from/to; user sets them in the filter bar
+  };
+
+  const handleCustomFromDate = (value) => {
+    setFromDate(value);
+    setDatePeriodMode("custom");
+    if (clickableSummaryCards) setSummaryBucket(null);
+  };
+
+  const handleCustomToDate = (value) => {
+    setToDate(value);
+    setDatePeriodMode("custom");
     if (clickableSummaryCards) setSummaryBucket(null);
   };
 
@@ -646,22 +659,20 @@ export default function ExpenseTable({
               </p>
             </div>
           </div>
-          <div className="relative inline-flex w-full max-w-[11rem] items-center sm:w-auto">
+          <div className="relative inline-flex w-full max-w-[14rem] items-center sm:w-auto">
             <CalendarDays
               className="pointer-events-none absolute left-3 z-10 h-4 w-4 text-violet-600"
               aria-hidden
             />
             <select
-              value={periodMonth}
-              onChange={(e) => handlePeriodMonthChange(e.target.value)}
+              value={datePeriodMode}
+              onChange={(e) => handleDatePeriodModeChange(e.target.value)}
               className={`${expenseSbiSelectClass} w-full pl-10 font-semibold`}
-              aria-label="Month"
+              aria-label="Date period"
             >
-              {periodMonthOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
+              <option value="today">Today</option>
+              <option value="month">This month ({currentMonthLabel})</option>
+              <option value="custom">Custom date</option>
             </select>
             <ChevronDown
               className="pointer-events-none absolute right-2.5 h-4 w-4 text-slate-400"
@@ -909,7 +920,7 @@ export default function ExpenseTable({
           </span>
           <TypeableDateFilterInput
             value={fromDate}
-            onChange={setFromDate}
+            onChange={isSbiUi ? handleCustomFromDate : setFromDate}
             className={
               isSbiUi
                 ? "rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm w-full sm:w-auto"
@@ -929,7 +940,7 @@ export default function ExpenseTable({
           </span>
           <TypeableDateFilterInput
             value={toDate}
-            onChange={setToDate}
+            onChange={isSbiUi ? handleCustomToDate : setToDate}
             className={
               isSbiUi
                 ? "rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm w-full sm:w-auto"
