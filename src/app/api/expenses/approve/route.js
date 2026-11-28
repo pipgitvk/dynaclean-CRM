@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
+import { ensureExpenseRejectionRemarkColumn } from "@/lib/fetchExpenseDashboardRows";
 import { jwtVerify } from "jose";
 
 export async function POST(req) {
@@ -12,6 +13,7 @@ export async function POST(req) {
       approval_status,
       approval_date,
       approved_by,
+      rejection_remark: rejectionRemarkRaw,
     } = body;
 
     const token = req.cookies.get("token")?.value;
@@ -30,16 +32,32 @@ export async function POST(req) {
     }
 
     const conn = await getDbConnection();
+    await ensureExpenseRejectionRemarkColumn(conn);
+
+    const status = String(approval_status || "").trim();
+    const isRejected = status.toLowerCase() === "rejected";
+    const rejectionRemark = String(rejectionRemarkRaw || "").trim();
+
+    if (isRejected && !rejectionRemark) {
+      return NextResponse.json(
+        { error: "Rejection remark is required." },
+        { status: 400 },
+      );
+    }
+
+    const remarkToStore = isRejected ? rejectionRemark : null;
 
     await conn.execute(
       `UPDATE expenses
-       SET approved_amount = ?, approval_status = ?, approval_date = ?, approved_by = ?
+       SET approved_amount = ?, approval_status = ?, approval_date = ?, approved_by = ?,
+           rejection_remark = ?
        WHERE ID = ?`,
       [
         approved_amount,
         approval_status,
         approval_date,
         approved_by,
+        remarkToStore,
         expense_id,
       ]
     );
@@ -48,7 +66,10 @@ export async function POST(req) {
 
     return NextResponse.json({ success: true, message: "Approval updated successfully" });
   } catch (err) {
-    console.error("❌ Approval Update Error:", err);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    console.error("Approval update error:", err?.message || err);
+    return NextResponse.json(
+      { error: err?.message || "Server error" },
+      { status: 500 },
+    );
   }
 }

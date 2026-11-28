@@ -84,7 +84,12 @@ export function ExpenseMeetingPersonCell({ personName, personContact, designatio
   );
 }
 
-export function ExpenseAmountApprovalCell({ expAmount, approvedAmount, approvedBy }) {
+export function ExpenseAmountApprovalCell({
+  expAmount,
+  approvedAmount,
+  approvedBy,
+  rejectionRemark,
+}) {
   const fields = [
     {
       label: "Exp Amount",
@@ -105,6 +110,16 @@ export function ExpenseAmountApprovalCell({ expAmount, approvedAmount, approvedB
       valueClass: "text-violet-900",
     },
   ];
+
+  const remark = String(rejectionRemark || "").trim();
+  if (remark) {
+    fields.push({
+      label: "Reject Remark",
+      value: remark,
+      labelClass: "text-rose-700",
+      valueClass: "text-rose-900",
+    });
+  }
 
   return (
     <div className="flex min-w-[9rem] max-w-[13rem] flex-col gap-1 text-xs sm:text-sm">

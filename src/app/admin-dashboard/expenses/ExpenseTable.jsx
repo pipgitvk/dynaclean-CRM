@@ -1137,6 +1137,11 @@ export default function ExpenseTable({
                                 : `₹${Number(row.approved_amount).toFixed(2)}`
                             }
                             approvedBy={row.approved_by}
+                            rejectionRemark={
+                              row.approval_status === "Rejected"
+                                ? row.rejection_remark
+                                : ""
+                            }
                           />
                         </td>
                         <td className="p-3">{row.FromLocation}</td>
@@ -1302,6 +1307,9 @@ export default function ExpenseTable({
                       : `₹${Number(row.approved_amount).toFixed(2)}`
                   }
                   approvedBy={row.approved_by}
+                  rejectionRemark={
+                    row.approval_status === "Rejected" ? row.rejection_remark : ""
+                  }
                 />
               ) : (
                 <div>

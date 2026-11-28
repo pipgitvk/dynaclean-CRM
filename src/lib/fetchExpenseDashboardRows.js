@@ -6,7 +6,7 @@ const EXPENSE_LIST_SQL = `
          e.FromLocation, e.Tolocation,
          e.TicketCost, e.HotelCost, e.MealsCost, e.OtherExpenses,
          e.person_name, e.person_contact, e.designation,
-         e.approved_amount, e.payment_date, e.approval_status, e.username,
+         e.approved_amount, e.payment_date, e.approval_status, e.rejection_remark, e.username,
          e.linked_statement_ids, e.approved_by,
          COALESCE(r.status, 1) AS employee_status
   FROM expenses e
@@ -48,6 +48,16 @@ export async function ensureExpenseTrainClassColumn(conn) {
   } catch (_) {
     try {
       await conn.execute("ALTER TABLE expenses ADD COLUMN train_class VARCHAR(128) NULL");
+    } catch (__) {}
+  }
+}
+
+export async function ensureExpenseRejectionRemarkColumn(conn) {
+  try {
+    await conn.execute("SELECT rejection_remark FROM expenses LIMIT 1");
+  } catch (_) {
+    try {
+      await conn.execute("ALTER TABLE expenses ADD COLUMN rejection_remark TEXT NULL");
     } catch (__) {}
   }
 }
@@ -101,6 +111,7 @@ export async function fetchExpenseDashboardRows() {
   await ensureExpenseLinkedStatementColumn(conn);
   await ensureExpenseTravelModeColumn(conn);
   await ensureExpenseTrainClassColumn(conn);
+  await ensureExpenseRejectionRemarkColumn(conn);
   await ensureExpenseStatusColumn(conn);
   await ensureExpenseDesignationColumn(conn);
   const [results] = await conn.execute(EXPENSE_LIST_SQL);

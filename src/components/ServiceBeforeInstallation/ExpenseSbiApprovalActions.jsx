@@ -1,7 +1,8 @@
 "use client";
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 
 const APPROVER_ROLES = new Set([
   "ACCOUNTANT",
@@ -26,6 +27,42 @@ function normalizeApprovalStatus(raw) {
 function isPendingApprovalStatus(raw) {
   const v = String(raw || "").trim().toLowerCase();
   return v === "pending" || v === "pending approval" || !v;
+}
+
+function ExpenseApprovalModal({ open, titleId, onClose, children }) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  if (!open || !mounted) return null;
+
+  return createPortal(
+  <div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="relative z-10 w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
+        {children}
+      </div>
+    </div>,
+    document.body,
+  );
 }
 
 async function postExpenseApproval(body) {
@@ -55,6 +92,8 @@ export default function ExpenseSbiApprovalActions({
   const current = normalizeApprovalStatus(approvalStatus);
   const [loading, setLoading] = useState(null);
   const [approveOpen, setApproveOpen] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectionRemark, setRejectionRemark] = useState("");
   const [approvedAmount, setApprovedAmount] = useState(
     String(Number(totalAmount || 0).toFixed(2)),
   );
@@ -73,9 +112,11 @@ export default function ExpenseSbiApprovalActions({
           ...payload,
         });
         setApproveOpen(false);
+        setRejectOpen(false);
+        setRejectionRemark("");
         onSuccess?.();
       } catch (err) {
-        alert(err.message || "Failed to update approval");
+        window.alert(err.message || "Failed to update approval");
       } finally {
         setLoading(null);
       }
@@ -93,12 +134,16 @@ export default function ExpenseSbiApprovalActions({
     });
   };
 
-  const setRejected = () => {
-    if (
-      !window.confirm(
-        "Reject this expense? You can change it back to Pending approval later.",
-      )
-    ) {
+  const openRejectModal = () => {
+    setRejectionRemark("");
+    setRejectOpen(true);
+  };
+
+  const submitRejected = (e) => {
+    e.preventDefault();
+    const remark = rejectionRemark.trim();
+    if (!remark) {
+      alert("Please enter a rejection remark.");
       return;
     }
     runUpdate("rejected", {
@@ -106,6 +151,7 @@ export default function ExpenseSbiApprovalActions({
       approval_status: "Rejected",
       approval_date: today,
       approved_by: approverUsername || "",
+      rejection_remark: remark,
     });
   };
 
@@ -167,7 +213,7 @@ export default function ExpenseSbiApprovalActions({
         <button
           type="button"
           disabled={loading != null}
-          onClick={setRejected}
+          onClick={openRejectModal}
           className={`${btnBase} ${
             current === "Rejected"
               ? "bg-rose-200 text-rose-950 ring-2 ring-rose-400/80"
@@ -177,66 +223,114 @@ export default function ExpenseSbiApprovalActions({
           Reject
         </button>
       </div>
-      {approveOpen ? (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="expense-approve-title"
+      <ExpenseApprovalModal
+        open={rejectOpen}
+        titleId="expense-reject-title"
+        onClose={() => {
+          setRejectOpen(false);
+          setRejectionRemark("");
+        }}
+      >
+        <h3
+          id="expense-reject-title"
+          className="text-base font-semibold text-slate-900"
         >
-          <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
-            <h3
-              id="expense-approve-title"
-              className="text-base font-semibold text-slate-900"
-            >
-              Approve expense #{expenseId}
-            </h3>
-            <form onSubmit={submitApproved} className="mt-4 space-y-3">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">
-                  Approved amount (₹)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={approvedAmount}
-                  onChange={(e) => setApprovedAmount(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                  required
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">
-                  Approval date
-                </label>
-                <TypeableDateFilterInput
-                  value={approvalDate}
-                  onChange={setApprovalDate}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                  required
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setApproveOpen(false)}
-                  className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading === "approved"}
-                  className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-                >
-                  {loading === "approved" ? "Saving…" : "Confirm approve"}
-                </button>
-              </div>
-            </form>
+          Reject expense #{expenseId}
+        </h3>
+        <p className="mt-1 text-xs text-slate-500">
+          Add a remark for the engineer. You can set this back to Pending approval later.
+        </p>
+        <form onSubmit={submitRejected} className="mt-4 space-y-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">
+              Rejection remark *
+            </label>
+            <textarea
+              value={rejectionRemark}
+              onChange={(e) => setRejectionRemark(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900"
+              rows={4}
+              required
+              autoFocus
+              placeholder="Enter reason for rejection…"
+            />
           </div>
-        </div>
-      ) : null}
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                setRejectOpen(false);
+                setRejectionRemark("");
+              }}
+              className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading === "rejected"}
+              className="rounded-lg bg-rose-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-50"
+            >
+              {loading === "rejected" ? "Saving…" : "Confirm reject"}
+            </button>
+          </div>
+        </form>
+      </ExpenseApprovalModal>
+      <ExpenseApprovalModal
+        open={approveOpen}
+        titleId="expense-approve-title"
+        onClose={() => setApproveOpen(false)}
+      >
+        <h3
+          id="expense-approve-title"
+          className="text-base font-semibold text-slate-900"
+        >
+          Approve expense #{expenseId}
+        </h3>
+        <form onSubmit={submitApproved} className="mt-4 space-y-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">
+              Approved amount (₹)
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={approvedAmount}
+              onChange={(e) => setApprovedAmount(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              required
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">
+              Approval date
+            </label>
+            <TypeableDateFilterInput
+              value={approvalDate}
+              onChange={setApprovalDate}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              required
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setApproveOpen(false)}
+              className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading === "approved"}
+              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {loading === "approved" ? "Saving…" : "Confirm approve"}
+            </button>
+          </div>
+        </form>
+      </ExpenseApprovalModal>
     </>
   );
 }
