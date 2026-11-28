@@ -27,6 +27,103 @@ export function formatExpenseStatusLabel(raw) {
   return EXPENSE_STATUS_LABELS[key] || raw;
 }
 
+function formatServiceTypeLabel(raw) {
+  const key = String(raw || "").trim().toLowerCase();
+  if (key === "installation") return "Installation";
+  if (key === "complaint") return "Complaint";
+  const text = String(raw || "").trim();
+  return text || "";
+}
+
+export function ExpenseServiceDetailsCell({ serviceType, serviceId }) {
+  const typeLabel = formatServiceTypeLabel(serviceType);
+  const id = String(serviceId || "").trim();
+  if (!typeLabel && !id) {
+    return <span className="text-slate-400">-</span>;
+  }
+
+  const fields = [
+    {
+      label: "Service Type",
+      value: typeLabel,
+      labelClass: "text-violet-700",
+      valueClass: "font-semibold text-violet-900",
+    },
+    {
+      label: "Service ID",
+      value: id ? `#${id}` : "",
+      labelClass: "text-slate-600",
+      valueClass: "font-semibold tabular-nums text-slate-900",
+    },
+  ];
+
+  return (
+    <div className="flex min-w-[8.5rem] max-w-[12rem] flex-col gap-1 text-xs sm:text-sm">
+      {fields.map(({ label, value, labelClass, valueClass }) => (
+        <div key={label} className="min-w-0 leading-snug">
+          <span className={`font-semibold ${labelClass}`}>{label}:</span>{" "}
+          <span className={`break-words ${valueClass}`}>
+            {formatMeetingFieldValue(value)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function ExpenseServiceTypeAndModeCell({
+  serviceType,
+  serviceId,
+  expenseStatus,
+}) {
+  const typeLabel = formatServiceTypeLabel(serviceType);
+  const id = String(serviceId || "").trim();
+  const modeLabel = formatExpenseStatusLabel(expenseStatus);
+  const hasMode = modeLabel !== "-";
+
+  if (!typeLabel && !id && !hasMode) {
+    return <span className="text-slate-400">-</span>;
+  }
+
+  const fields = [
+    {
+      label: "Service Type",
+      value: typeLabel,
+      labelClass: "text-violet-700",
+      valueClass: "font-semibold text-violet-900",
+    },
+    ...(id
+      ? [
+          {
+            label: "Service ID",
+            value: `#${id}`,
+            labelClass: "text-slate-600",
+            valueClass: "font-semibold tabular-nums text-slate-900",
+          },
+        ]
+      : []),
+    {
+      label: "Expense Mode",
+      value: hasMode ? modeLabel : "",
+      labelClass: "text-sky-700",
+      valueClass: "font-semibold text-sky-900",
+    },
+  ];
+
+  return (
+    <div className="flex min-w-[8.5rem] max-w-[12.5rem] flex-col gap-1 text-xs sm:text-sm">
+      {fields.map(({ label, value, labelClass, valueClass }) => (
+        <div key={label} className="min-w-0 leading-snug">
+          <span className={`font-semibold ${labelClass}`}>{label}:</span>{" "}
+          <span className={`break-words ${valueClass}`}>
+            {formatMeetingFieldValue(value)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function ExpenseStatusBadge({ status }) {
   const label = formatExpenseStatusLabel(status);
   if (label === "-") return <span className="text-slate-400">-</span>;

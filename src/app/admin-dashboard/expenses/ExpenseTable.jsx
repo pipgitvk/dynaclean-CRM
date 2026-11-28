@@ -24,7 +24,7 @@ import {
   ExpenseRowImageAttachments,
   ExpenseAmountApprovalCell,
   ExpenseLinkedStatementsCell,
-  ExpenseStatusBadge,
+  ExpenseServiceTypeAndModeCell,
   expenseSbiFilterInputClass,
   expenseSbiSelectClass,
 } from "@/components/ServiceBeforeInstallation/ExpenseApprovalSbiUi";
@@ -443,6 +443,10 @@ export default function ExpenseTable({
           return row.timestamp ? dayjs(row.timestamp).valueOf() : 0;
         case "expense_status":
           return (row.expense_status || "").toLowerCase();
+        case "service_type":
+          return (row.service_type || "").toLowerCase();
+        case "service_id":
+          return String(row.service_id || "");
         case "travel_mode":
           return formatExpenseTravelMode(row).toLowerCase();
         case "person_name":
@@ -1012,11 +1016,16 @@ export default function ExpenseTable({
                     </span>
                   </th>
                   <th
-                    onClick={() => handleSort("expense_status")}
-                    className="min-w-[7rem] whitespace-nowrap p-3 cursor-pointer select-none"
+                    onClick={() => handleSort("service_type")}
+                    className="min-w-[9.5rem] max-w-[14rem] p-3 cursor-pointer select-none"
                   >
-                    Expense Mode
-                    <SortIcon column="expense_status" />
+                    <span className="inline-flex flex-col gap-0.5 leading-tight">
+                      <span>Service Type</span>
+                      <span className="text-[10px] font-semibold normal-case text-violet-700/80">
+                        &amp; Expense Mode
+                      </span>
+                    </span>
+                    <SortIcon column="service_type" />
                   </th>
                   <th
                     onClick={() => handleSort("Total")}
@@ -1135,8 +1144,12 @@ export default function ExpenseTable({
                         <td className="min-w-[9.5rem] whitespace-nowrap p-3">
                           {formatExpenseUsername(row)}
                         </td>
-                        <td className="p-3">
-                          <ExpenseStatusBadge status={row.expense_status} />
+                        <td className="p-3 align-top">
+                          <ExpenseServiceTypeAndModeCell
+                            serviceType={row.service_type}
+                            serviceId={row.service_id}
+                            expenseStatus={row.expense_status}
+                          />
                         </td>
                         <td className="p-3 align-top">
                           <ExpenseAmountApprovalCell
@@ -1303,10 +1316,11 @@ export default function ExpenseTable({
                 </div>
               ) : null}
               {isSbiUi ? (
-                <div>
-                  <strong>Expense Mode:</strong>{" "}
-                  <ExpenseStatusBadge status={row.expense_status} />
-                </div>
+                <ExpenseServiceTypeAndModeCell
+                  serviceType={row.service_type}
+                  serviceId={row.service_id}
+                  expenseStatus={row.expense_status}
+                />
               ) : null}
               {isSbiUi ? (
                 <ExpenseAmountApprovalCell

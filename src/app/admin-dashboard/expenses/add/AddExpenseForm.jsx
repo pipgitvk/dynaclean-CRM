@@ -249,7 +249,7 @@ export default function AddExpenseForm({
             </div>
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium mb-1">
-                Installation / Complaint *
+                Service ID *
               </label>
               <select
                 {...register("service_id", { required: true })}
