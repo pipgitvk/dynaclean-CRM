@@ -16,27 +16,13 @@ import {
   SBI_TRAIN_CLASS_OPTIONS,
 } from "@/lib/sbiTravelOptions";
 import { INDIAN_STATES } from "@/lib/indianStates";
+import {
+  SBI_EXPENSE_MODE_OPTIONS,
+  SBI_SERVICE_TYPE_OPTIONS,
+  SBI_TRAVEL_MODE_OPTIONS,
+} from "@/lib/sbiExpenseFilterOptions";
 
-const SBI_TRAVEL_MODE_OPTIONS = [
-  { value: "Train booked by company", label: "Train booked by company" },
-  { value: "Train booked by self", label: "Train booked by self" },
-  { value: "By bus-company", label: "By bus-company" },
-  { value: "By bus-self", label: "By bus-self" },
-  { value: "Auto, rickshaw, cab", label: "Auto, rickshaw, cab" },
-  { value: "Bike", label: "Bike" },
-];
-
-const SBI_EXPENSE_STATUS_OPTIONS = [
-  { value: "travel", label: "Travel" },
-  { value: "food", label: "Food" },
-  { value: "hotel", label: "Hotel" },
-  { value: "other", label: "Other" },
-];
-
-const SBI_SERVICE_TYPE_OPTIONS = [
-  { value: "Installation", label: "Installation" },
-  { value: "Complaint", label: "Complaint" },
-];
+const SBI_EXPENSE_STATUS_OPTIONS = SBI_EXPENSE_MODE_OPTIONS;
 
 export default function AddExpenseForm({
   successRedirect = "/admin-dashboard/expenses",

@@ -18,6 +18,13 @@ export function isJwtAccountingRole(role) {
   return /\bACCOUNTANT\b/.test(k);
 }
 
+/** Expense Pay Now — same roles as accounts-dashboard expenses table. */
+export function canProcessExpensePaymentRole(role) {
+  const k = normalizeRoleKey(role || "");
+  if (isJwtAccountingRole(role)) return true;
+  return k === "ADMIN";
+}
+
 /** Order actions: accountant may only upload/view invoice report (not booking/dispatch). */
 export function isAccountantOnlyMenuRole(role) {
   const k = normalizeRoleKey(role || "");

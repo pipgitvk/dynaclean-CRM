@@ -34,6 +34,13 @@ import ExpenseSbiApprovalActions, {
   canManageExpenseApproval,
   SBI_EXPENSE_ACTION_ROW_CLASS,
 } from "@/components/ServiceBeforeInstallation/ExpenseSbiApprovalActions";
+import { canProcessExpensePaymentRole, isSuperAdminRole } from "@/lib/roleKeyUtils";
+import {
+  SBI_APPROVAL_STATUS_FILTER_OPTIONS,
+  SBI_EXPENSE_MODE_OPTIONS,
+  SBI_SERVICE_TYPE_OPTIONS,
+  SBI_TRAVEL_MODE_OPTIONS,
+} from "@/lib/sbiExpenseFilterOptions";
 
 function isInactiveExpenseEmployee(row) {
   return Number(row?.employee_status) === 0;
@@ -62,8 +69,20 @@ function formatExpenseSubmitTimestamp(value) {
   return d.isValid() ? d.format("DD-MM-YYYY HH:mm") : "-";
 }
 
+function normalizeExpenseModeKey(row) {
+  return String(row.expense_status || "").trim().toLowerCase();
+}
+
+function normalizeServiceTypeKey(row) {
+  return String(row.service_type || "").trim().toLowerCase();
+}
+
+function rowTravelModeValue(row) {
+  return String(row.travel_mode || row.ConveyanceMode || "").trim();
+}
+
 function formatExpenseTravelMode(row) {
-  const v = String(row.travel_mode || row.ConveyanceMode || "").trim();
+  const v = rowTravelModeValue(row);
   const trainClass = String(row.train_class || "").trim();
   if (!v || v === "-") return trainClass || "-";
   if (trainClass) return `${v} — ${trainClass}`;
@@ -306,6 +325,9 @@ export default function ExpenseTable({
   }, [initialSummaryBucket, clickableSummaryCards, isSbiUi]);
 
   const [selectedStatus, setSelectedStatus] = useState("");
+  const [selectedServiceType, setSelectedServiceType] = useState("");
+  const [selectedExpenseMode, setSelectedExpenseMode] = useState("");
+  const [selectedTravelMode, setSelectedTravelMode] = useState("");
   const [summaryBucket, setSummaryBucket] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
@@ -359,7 +381,7 @@ export default function ExpenseTable({
         ) : (
           <span className="inline-block h-8 w-8 shrink-0" aria-hidden />
         )}
-        {role === "SUPERADMIN" ? (
+        {canProcessExpensePaymentRole(role) ? (
           <button
             type="button"
             onClick={() => {
@@ -447,11 +469,29 @@ export default function ExpenseTable({
     if (isInactiveExpenseEmployee(row)) employeeInactiveByUsername.set(key, true);
   }
 
+  const showSuperAdminExpenseFilters = isSbiUi && isSuperAdminRole(role);
+
+  const rowMatchesSuperAdminFieldFilters = (row) => {
+    if (!showSuperAdminExpenseFilters) return true;
+    if (selectedServiceType) {
+      if (normalizeServiceTypeKey(row) !== selectedServiceType.toLowerCase()) return false;
+    }
+    if (selectedExpenseMode) {
+      if (normalizeExpenseModeKey(row) !== selectedExpenseMode.toLowerCase()) return false;
+    }
+    if (selectedTravelMode && rowTravelModeValue(row) !== selectedTravelMode) return false;
+    return true;
+  };
+
   const filteredRows = rows.filter((row) => {
     const matchesEmployee =
       !selectedEmployee ||
       String(row.username || "").trim() === String(selectedEmployee).trim();
-    return rowMatchesTableContext(row) && matchesEmployee;
+    return (
+      rowMatchesTableContext(row) &&
+      matchesEmployee &&
+      rowMatchesSuperAdminFieldFilters(row)
+    );
   });
 
   const isDirector = (role || "").toUpperCase() === "DIRECTOR";
@@ -683,6 +723,9 @@ export default function ExpenseTable({
     setSelectedEmployee("");
     updateQueryParam("username", "");
     setSelectedStatus("");
+    setSelectedServiceType("");
+    setSelectedExpenseMode("");
+    setSelectedTravelMode("");
     if (clickableSummaryCards) setSummaryBucket(null);
     setDatePeriodMode("month");
     setFromDate(dayjs().startOf("month").format("YYYY-MM-DD"));
@@ -1022,27 +1065,33 @@ export default function ExpenseTable({
             />
           ) : null}
         </div>
-        <div className={isSbiUi ? "relative" : ""}>
-          <select
-            value={selectedStatus}
-            onChange={(e) => {
-              setSelectedStatus(e.target.value);
-              if (clickableSummaryCards) setSummaryBucket(null);
-            }}
-            className={isSbiUi ? expenseSbiSelectClass : "px-4 py-2 border rounded-lg w-full sm:w-auto"}
-          >
-            <option value="">All Status</option>
-            <option value="Pending approval">Pending approval</option>
-            <option value="Approved">Approved</option>
-            <option value="Rejected">Rejected</option>
-          </select>
-          {isSbiUi ? (
-            <ChevronDown
-              className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
-              aria-hidden
-            />
-          ) : null}
-        </div>
+        {!showSuperAdminExpenseFilters ? (
+          <div className={isSbiUi ? "relative" : ""}>
+            <select
+              value={selectedStatus}
+              onChange={(e) => {
+                setSelectedStatus(e.target.value);
+                if (clickableSummaryCards) setSummaryBucket(null);
+              }}
+              className={
+                isSbiUi ? expenseSbiSelectClass : "px-4 py-2 border rounded-lg w-full sm:w-auto"
+              }
+            >
+              <option value="">All Status</option>
+              {SBI_APPROVAL_STATUS_FILTER_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            {isSbiUi ? (
+              <ChevronDown
+                className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                aria-hidden
+              />
+            ) : null}
+          </div>
+        ) : null}
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <span
             className={
@@ -1096,6 +1145,81 @@ export default function ExpenseTable({
           Reset
         </button>
       </div>
+      {showSuperAdminExpenseFilters ? (
+        <div className="mb-3 flex flex-wrap items-end gap-2 rounded-2xl border border-violet-100 bg-violet-50/50 p-3 sm:gap-3">
+          <span className="w-full shrink-0 text-xs font-semibold uppercase tracking-wide text-violet-800 sm:w-auto sm:pb-1">
+            Superadmin filters
+          </span>
+          {[
+              {
+                id: "serviceType",
+                label: "Service type",
+                value: selectedServiceType,
+                onChange: setSelectedServiceType,
+                options: SBI_SERVICE_TYPE_OPTIONS,
+                allLabel: "All service types",
+              },
+              {
+                id: "expenseMode",
+                label: "Expense mode",
+                value: selectedExpenseMode,
+                onChange: setSelectedExpenseMode,
+                options: SBI_EXPENSE_MODE_OPTIONS,
+                allLabel: "All expense modes",
+              },
+              {
+                id: "travelMode",
+                label: "Travel mode",
+                value: selectedTravelMode,
+                onChange: setSelectedTravelMode,
+                options: SBI_TRAVEL_MODE_OPTIONS,
+                allLabel: "All travel modes",
+              },
+              {
+                id: "approvalStatus",
+                label: "Status",
+                value: selectedStatus,
+                onChange: (val) => {
+                  setSelectedStatus(val);
+                  if (clickableSummaryCards) setSummaryBucket(null);
+                },
+                options: SBI_APPROVAL_STATUS_FILTER_OPTIONS,
+                allLabel: "All approval status",
+              },
+            ].map(({ id, label, value, onChange, options, allLabel }) => (
+              <div key={id} className="relative min-w-[10.5rem] flex-1 sm:max-w-[13rem]">
+                <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                  {label}
+                </label>
+                <select
+                  value={value}
+                  onChange={(e) => onChange(e.target.value)}
+                  className={expenseSbiSelectClass}
+                >
+                  <option value="">{allLabel}</option>
+                  {options.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown
+                  className="pointer-events-none absolute right-2.5 top-[calc(50%+0.5rem)] h-4 w-4 -translate-y-1/2 text-slate-400"
+                  aria-hidden
+                />
+              </div>
+            ))}
+          <span
+            className="inline-flex min-h-[2.75rem] shrink-0 items-center gap-1.5 self-end rounded-xl border border-violet-200 bg-white px-3 py-1.5 text-sm font-bold text-violet-900 shadow-sm"
+            title="Rows shown in the table with current filters"
+          >
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-violet-600">
+              Total
+            </span>
+            <span className="tabular-nums">{sortedRows.length}</span>
+          </span>
+        </div>
+      ) : null}
       <div className={sbiTableBleedClass}>
       {/* Desktop Table View */}
       <div className={tableWrapperClass}>
