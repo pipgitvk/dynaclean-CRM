@@ -411,11 +411,11 @@ const SBI_CARD_THEMES = {
   },
   pending_linked_statements: {
     icon: Link2,
-    surface: "bg-[#EEF2FF] border-indigo-100/90",
-    label: "text-indigo-600",
-    iconCircle: "bg-indigo-500 shadow-indigo-500/30",
-    iconGlow: "bg-indigo-400/25",
-    activeRing: "ring-indigo-400/70",
+    surface: "bg-orange-50 border-orange-100/90",
+    label: "text-orange-600",
+    iconCircle: "bg-orange-500 shadow-orange-500/30",
+    iconGlow: "bg-orange-400/25",
+    activeRing: "ring-orange-400/70",
   },
   paid: {
     icon: CheckCircle2,
