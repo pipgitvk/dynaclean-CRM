@@ -1,4 +1,5 @@
 import { getDbConnection } from "@/lib/db";
+import { countExpensePendingApproval } from "@/lib/fetchExpenseDashboardRows";
 import {
   sqlTrimUtf8EqColumns,
   sqlUtf8HasText,
@@ -2060,14 +2061,22 @@ export async function fetchServiceBeforeInstallationHubCounts(filters = {}) {
      WHERE 1=1 ${amcFilter.sql}`;
 
   const t0 = Date.now();
-  const [wpResult, srResult, amcResult, upcomingTotals, openInstallationBreakdown, overdueDelayedCount] =
-    await Promise.all([
+  const [
+    wpResult,
+    srResult,
+    amcResult,
+    upcomingTotals,
+    openInstallationBreakdown,
+    overdueDelayedCount,
+    expensePendingApproval,
+  ] = await Promise.all([
       pool.execute(wpSql, wpFilter.params),
       pool.execute(srSql, srFilter.params),
       pool.execute(amcSql, amcFilter.params),
       countUpcomingInstallationHubTotals(pool, f),
       fetchOpenInstallationCardsBreakdown(f),
       countOpenInstallationSegment("overdue-delayed-installation", f),
+      countExpensePendingApproval(pool, { from: f.from, to: f.to }),
     ]);
 
   const wpRow = wpResult[0]?.[0];
@@ -2086,6 +2095,7 @@ export async function fetchServiceBeforeInstallationHubCounts(filters = {}) {
     due_warranty_expiry: Number(wpRow?.due_warranty_expiry || 0),
     active_amc: Number(amcRow?.active_amc || 0),
     due_amc_expiring: Number(amcRow?.due_amc_expiring || 0),
+    expense_pending_approval: Number(expensePendingApproval || 0),
   };
 
   if (Date.now() - t0 > 800) {

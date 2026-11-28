@@ -34,7 +34,7 @@ export async function POST(req) {
     await conn.execute(
       `UPDATE expenses
        SET approved_amount = ?, approval_status = ?, approval_date = ?, approved_by = ?
-       WHERE id = ?`,
+       WHERE ID = ?`,
       [
         approved_amount,
         approval_status,

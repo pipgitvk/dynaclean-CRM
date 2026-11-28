@@ -185,6 +185,22 @@ export const SERVICE_BEFORE_INSTALLATION_SEGMENTS = [
   },
 ];
 
+/** Hub-only link cards (not SBI detail segments). */
+export const SERVICE_BEFORE_INSTALLATION_HUB_EXTRA_CARDS = [
+  {
+    id: "expense-approval-dashboard",
+    title: "Expense Approval Dashboard",
+    subtitle: "Employee expense approval & payment",
+    countKey: "expense_pending_approval",
+    accent: "from-violet-600 to-purple-600",
+    surface:
+      "bg-white/90 backdrop-blur-xl border-violet-200/45 shadow-[0_8px_30px_-8px_rgba(124,58,237,0.28)]",
+    glow: "bg-violet-400/25",
+    iconSurface: "bg-gradient-to-br from-violet-600 to-purple-600",
+    chartColor: "#7c3aed",
+  },
+];
+
 const SEGMENT_SET = new Set(
   SERVICE_BEFORE_INSTALLATION_SEGMENTS.map((s) => s.id),
 );
@@ -591,7 +607,7 @@ export function openInstallationTableCountApi(openInstallationBucket) {
 
 export function getServiceBeforeInstallationCards(dashboardBase) {
   const base = `/${dashboardBase}`;
-  return SERVICE_BEFORE_INSTALLATION_SEGMENTS.filter(
+  const segmentCards = SERVICE_BEFORE_INSTALLATION_SEGMENTS.filter(
     (c) => c.id !== "overdue-delayed-installation",
   ).map((c) => ({
     ...c,
@@ -601,6 +617,14 @@ export function getServiceBeforeInstallationCards(dashboardBase) {
         ? `${base}/service-before-installation/open-installation?openInstallationBucket=delivered_pending`
         : `${base}/service-before-installation/${c.id}`,
   }));
+  const linkCards = SERVICE_BEFORE_INSTALLATION_HUB_EXTRA_CARDS.map((c) => ({
+    ...c,
+    href:
+      c.id === "expense-approval-dashboard"
+        ? `${base}/service-before-installation/expense-approval-dashboard`
+        : c.href || null,
+  }));
+  return [...segmentCards, ...linkCards];
 }
 
 export function getSegmentMeta(segmentId) {

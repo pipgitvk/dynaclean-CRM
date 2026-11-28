@@ -11,6 +11,7 @@ import {
   MessageCircleOff,
   Package,
   PackageCheck,
+  ReceiptIndianRupee,
   Truck,
   Shield,
   ShieldCheck,
@@ -52,6 +53,7 @@ export const SBI_CARD_ICONS = {
   "due-warranty-expiry": CalendarClock,
   "active-amc": Shield,
   "due-amc-expiring": CalendarClock,
+  "expense-approval-dashboard": ReceiptIndianRupee,
 };
 
 export const SBI_SPARK_SEED = {
@@ -78,6 +80,7 @@ export const SBI_SPARK_SEED = {
   "due-warranty-expiry": 17,
   "active-amc": 19,
   "due-amc-expiring": 23,
+  "expense-approval-dashboard": 31,
 };
 
 const COMPACT_TITLES = {
@@ -251,6 +254,7 @@ export default function ServiceBeforeInstallationKpiCard({
     card.id === "open-installation-overdue-delayed" ||
     card.id === "due-warranty-expiry";
   const isHub = variant === "hub";
+  const hubLinkCard = Boolean(isHub && card.hubLinkCard);
 
   const compactHover =
     onClick || card.href
@@ -305,28 +309,34 @@ export default function ServiceBeforeInstallationKpiCard({
                 <p className="mt-1 line-clamp-2 text-sm text-slate-500">{card.subtitle}</p>
               </div>
             </div>
-            {!waiting && hasNumber ? (
+            {!hubLinkCard && !waiting && hasNumber ? (
               <SummarySparkline color={card.chartColor} value={displayTotal} seed={seed} />
             ) : null}
           </div>
 
-          <div className="mt-auto pt-5">
-            <span className="text-4xl font-bold tabular-nums tracking-tight text-slate-900 sm:text-[2.65rem]">
-              {waiting ? "…" : formatSbiNum(displayTotal)}
-            </span>
-            {showTrend ? (
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                {!waiting && (
-                  <ChangePill
-                    value={changePct}
-                    invertTrend={invertTrend}
-                    className="bg-white/95 shadow-sm"
-                  />
-                )}
-                <span className="text-xs font-medium text-slate-400 sm:text-sm">vs last month</span>
-              </div>
-            ) : null}
-          </div>
+          {hubLinkCard ? (
+            <div className="mt-auto" aria-hidden />
+          ) : (
+            <div className="mt-auto pt-5">
+              <span className="text-4xl font-bold tabular-nums tracking-tight text-slate-900 sm:text-[2.65rem]">
+                {waiting ? "…" : formatSbiNum(displayTotal)}
+              </span>
+              {showTrend ? (
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {!waiting && (
+                    <ChangePill
+                      value={changePct}
+                      invertTrend={invertTrend}
+                      className="bg-white/95 shadow-sm"
+                    />
+                  )}
+                  <span className="text-xs font-medium text-slate-400 sm:text-sm">
+                    vs last month
+                  </span>
+                </div>
+              ) : null}
+            </div>
+          )}
         </div>
       ) : (
         <>

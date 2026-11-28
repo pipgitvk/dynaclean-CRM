@@ -55,7 +55,7 @@ import { activeWarrantyBucketRecordCount } from "@/lib/activeWarrantyKpiSql";
 import {
   defaultSbiSelectFilters,
   normalizeAmcBucket,
-  normalizeOpenCompletionsBucket,
+  normalizeOpenCompletionsBucket, 
   normalizeOpenInstallationBucket,
   normalizeWarrantyBucket,
 } from "@/lib/serviceBeforeInstallationFilters";

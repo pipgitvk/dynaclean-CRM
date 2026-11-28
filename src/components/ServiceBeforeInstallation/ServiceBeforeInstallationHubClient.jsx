@@ -233,9 +233,10 @@ export default function ServiceBeforeInstallationHubClient({
             <ServiceBeforeInstallationKpiCard
               key={card.id}
               card={card}
-              total={counts[card.countKey] ?? 0}
-              changePct={changes[card.countKey]}
-              loading={loading}
+              total={card.countKey != null ? counts[card.countKey] ?? 0 : null}
+              changePct={card.countKey != null ? changes[card.countKey] : null}
+              loading={card.hubLinkCard ? false : loading}
+              showTrend={!card.hubLinkCard}
             />
           ))}
         </div>

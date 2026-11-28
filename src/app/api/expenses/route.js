@@ -91,6 +91,11 @@ import { NextResponse } from "next/server";
 // Removed Cloudinary import
 // import { v2 as cloudinary } from "cloudinary";
 import { getDbConnection } from "@/lib/db";
+import {
+  ensureExpenseDesignationColumn,
+  ensureExpenseStatusColumn,
+  ensureExpenseTravelModeColumn,
+} from "@/lib/fetchExpenseDashboardRows";
 import { jwtVerify } from "jose";
 import fs from "fs/promises"; // For asynchronous file operations
 import path from "path"; // For path manipulation
@@ -138,14 +143,20 @@ export async function POST(req) {
     console.log(`[expense-api] DB will store attachments="${attachmentsStr}"`);
 
     const conn = await getDbConnection();
+    await ensureExpenseTravelModeColumn(conn);
+    await ensureExpenseStatusColumn(conn);
+    await ensureExpenseDesignationColumn(conn);
+
+    const travelMode = String(fields.travel_mode || fields.ConveyanceMode || "").trim() || null;
+    const expenseStatus = String(fields.expense_status || "").trim().toLowerCase() || null;
 
     await conn.execute(
       `INSERT INTO expenses (
         username, TravelDate, FromLocation, Tolocation, distance,
-        description, person_name, person_contact, ConveyanceMode,
-        TicketCost, HotelCost, MealsCost, OtherExpenses,
+        description, person_name, person_contact, designation, ConveyanceMode, travel_mode,
+        expense_status, TicketCost, HotelCost, MealsCost, OtherExpenses,
         attachments, approval_status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         username,
         fields.TravelDate,
@@ -155,12 +166,15 @@ export async function POST(req) {
         fields.description,
         fields.person_name,
         fields.person_contact,
-        fields.ConveyanceMode,
+        fields.designation || null,
+        travelMode,
+        travelMode,
+        expenseStatus,
         fields.TicketCost,
         fields.HotelCost,
         fields.MealsCost,
         fields.OtherExpenses,
-        attachmentsStr, // This now contains comma-separated local paths
+        attachmentsStr,
         "Pending",
       ]
     );

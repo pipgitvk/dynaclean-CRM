@@ -3,12 +3,37 @@
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import Link from "next/link";
 import dayjs from "dayjs";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { Eye, CreditCard, Pencil, Link2, Edit3 } from "lucide-react";
+import {
+  Eye,
+  CreditCard,
+  Pencil,
+  Link2,
+  Edit3,
+  Search,
+  CalendarDays,
+  ChevronDown,
+  RotateCcw,
+  ReceiptIndianRupee,
+} from "lucide-react";
 import Modal from "./Model";
+import {
+  ExpenseSbiSummaryCard,
+  ExpenseApprovalStatusBadge,
+  ExpenseRowImageAttachments,
+  ExpenseTravelDetailsCell,
+  ExpenseAmountApprovalCell,
+  ExpenseLinkedStatementsCell,
+  ExpenseStatusBadge,
+  expenseSbiFilterInputClass,
+  expenseSbiSelectClass,
+} from "@/components/ServiceBeforeInstallation/ExpenseApprovalSbiUi";
 import StatementLinkModal from "./StatementLinkModal";
 import MultiStatementLinkModal from "./MultiStatementLinkModal";
+import ExpenseSbiApprovalActions, {
+  canManageExpenseApproval,
+} from "@/components/ServiceBeforeInstallation/ExpenseSbiApprovalActions";
 
 function isInactiveExpenseEmployee(row) {
   return Number(row?.employee_status) === 0;
@@ -25,7 +50,88 @@ function formatExpenseUsername(row) {
   );
 }
 
-export default function ExpenseTable({ rows, role }) {
+function formatExpenseTravelDate(value) {
+  if (value == null || value === "" || value === "0000-00-00") return "-";
+  const d = dayjs(value);
+  return d.isValid() ? d.format("DD-MM-YYYY") : "-";
+}
+
+function formatExpenseSubmitTimestamp(value) {
+  if (value == null || value === "" || value === "0000-00-00") return "-";
+  const d = dayjs(value);
+  return d.isValid() ? d.format("DD-MM-YYYY HH:mm") : "-";
+}
+
+function formatExpenseTravelMode(row) {
+  const v = String(row.travel_mode || row.ConveyanceMode || "").trim();
+  if (!v || v === "-") return "-";
+  return v;
+}
+
+function expenseSummaryBucketMatches(row, bucket, { statusOf, isBlankAmount, isBlankDate }) {
+  if (!bucket || bucket === "total") return true;
+  const status = statusOf(row);
+  switch (bucket) {
+    case "rejected":
+      return status === "rejected";
+    case "approved":
+      return status === "approved";
+    case "pending_approval":
+      return status === "pending" && isBlankAmount(row.approved_amount);
+    case "pending_payment":
+      return status === "approved" && isBlankDate(row.payment_date);
+    case "paid":
+      return status === "approved" && !isBlankDate(row.payment_date);
+    default:
+      return true;
+  }
+}
+
+function ExpenseSummaryCard({
+  label,
+  amount,
+  caption,
+  borderClass,
+  active,
+  clickable,
+  onClick,
+}) {
+  const shell = `bg-white p-4 rounded-lg shadow border-l-4 ${borderClass} text-left w-full`;
+  const interactive = clickable
+    ? ` cursor-pointer transition hover:shadow-md hover:-translate-y-0.5 ${
+        active ? "ring-2 ring-offset-2 ring-slate-400/80" : ""
+      }`
+    : "";
+
+  const inner = (
+    <>
+      <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">{label}</div>
+      <div className="text-2xl font-bold text-gray-800">₹{amount.toFixed(2)}</div>
+      <div className="text-xs text-gray-500 mt-1">{caption}</div>
+    </>
+  );
+
+  if (clickable) {
+    return (
+      <button type="button" onClick={onClick} className={`${shell} ${interactive}`}>
+        {inner}
+      </button>
+    );
+  }
+
+  return <div className={shell}>{inner}</div>;
+}
+
+export default function ExpenseTable({
+  rows,
+  role,
+  approverUsername = "",
+  clickableSummaryCards = false,
+  uiVariant = "default",
+}) {
+  const isSbiUi = uiVariant === "sbi";
+  const showSbiApprovalActions =
+    isSbiUi && canManageExpenseApproval(role);
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -38,6 +144,7 @@ export default function ExpenseTable({ rows, role }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [fromDate, setFromDate] = useState(dayjs().startOf("month").format("YYYY-MM-DD"));
   const [toDate, setToDate] = useState(dayjs().endOf("month").format("YYYY-MM-DD"));
+  const [periodMonth, setPeriodMonth] = useState(dayjs().format("YYYY-MM"));
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [selectedExpenseIds, setSelectedExpenseIds] = useState(new Set());
 
@@ -65,6 +172,7 @@ export default function ExpenseTable({ rows, role }) {
     }
   }, [searchParams]);
   const [selectedStatus, setSelectedStatus] = useState("");
+  const [summaryBucket, setSummaryBucket] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [isMultiLinkModalOpen, setIsMultiLinkModalOpen] = useState(false);
@@ -72,7 +180,96 @@ export default function ExpenseTable({ rows, role }) {
   const [selectedRowForLink, setSelectedRowForLink] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
 
-  const rowMatchesTableContext = (row) => {
+  const getRowTotal = (row) =>
+    Number(row.TicketCost || 0) +
+    Number(row.HotelCost || 0) +
+    Number(row.MealsCost || 0) +
+    Number(row.OtherExpenses || 0);
+
+  const refreshExpenseRows = useCallback(() => {
+    router.refresh();
+  }, [router]);
+
+  const renderExpenseSecondaryActions = useCallback(
+    (row) => (
+      <>
+        <Link
+          href={`${dashboardBase}/expenses/${row.ID}`}
+          className="text-blue-600 hover:underline"
+          title="View expense"
+        >
+          <Eye size={16} />
+        </Link>
+        {row.approval_status !== "Approved" && row.approval_status !== "Rejected" ? (
+          <Link
+            href={`${dashboardBase}/expenses/edit/${row.ID}`}
+            className="text-yellow-600 hover:text-yellow-800"
+            title="Edit expense"
+          >
+            <Pencil size={16} />
+          </Link>
+        ) : row.approval_status === "Approved" ? (
+          !row.linked_statement_ids ||
+          JSON.parse(row.linked_statement_ids || "[]").length === 0 ? (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedRowForLink(row);
+                setIsLinkModalOpen(true);
+              }}
+              className="text-indigo-600 hover:text-indigo-800 cursor-pointer"
+              title="Payment link"
+            >
+              <Link2 size={16} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedRowForLink(row);
+                setIsLinkModalOpen(true);
+              }}
+              className="text-blue-500 hover:text-blue-700 cursor-pointer"
+              title="Edit payment link"
+            >
+              <Edit3 size={16} />
+            </button>
+          )
+        ) : (
+          <span className="inline-block w-4" aria-hidden />
+        )}
+        {role === "SUPERADMIN" ? (
+          <button
+            type="button"
+            onClick={() => {
+              if (row.approval_status !== "Approved") {
+                alert("Please Approve the expense first");
+                return;
+              }
+              setSelectedRow(row);
+              setIsModalOpen(true);
+            }}
+            className="text-green-600 hover:text-green-800 cursor-pointer"
+            title="Process payment"
+          >
+            <CreditCard size={16} />
+          </button>
+        ) : (
+          <span className="inline-block w-4" aria-hidden />
+        )}
+      </>
+    ),
+    [dashboardBase, role],
+  );
+
+  const isBlankAmount = (value) =>
+    value == null || value === "" || Number.isNaN(Number(value)) || Number(value) <= 0;
+
+  const isBlankDate = (value) => !value || value === "0000-00-00";
+
+  const statusOf = (row) => (row.approval_status || "").toLowerCase();
+
+  const rowMatchesSearchAndDate = (row) => {
     const formattedDate = dayjs(row.TravelDate).format("DD-MM-YYYY");
     const matchesSearch =
       Object.values(row)
@@ -80,17 +277,37 @@ export default function ExpenseTable({ rows, role }) {
         .toLowerCase()
         .includes(searchQuery.toLowerCase()) ||
       formattedDate.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = !selectedStatus || row.approval_status === selectedStatus;
     const matchesDateRange =
       (!fromDate || dayjs(row.TravelDate).isAfter(dayjs(fromDate).subtract(1, "day"))) &&
       (!toDate || dayjs(row.TravelDate).isBefore(dayjs(toDate).add(1, "day")));
-    return matchesSearch && matchesStatus && matchesDateRange;
+    return matchesSearch && matchesDateRange;
   };
 
-  // Only usernames that appear in the table for the current date, status, and search.
-  const employees = Array.from(
-    new Set(rows.filter(rowMatchesTableContext).map((row) => row.username)),
-  )
+  const bucketHelpers = { statusOf, isBlankAmount, isBlankDate };
+
+  const rowMatchesTableContext = (row) => {
+    if (!rowMatchesSearchAndDate(row)) return false;
+    if (clickableSummaryCards && summaryBucket) {
+      return expenseSummaryBucketMatches(row, summaryBucket, bucketHelpers);
+    }
+    const matchesStatus = !selectedStatus || row.approval_status === selectedStatus;
+    return matchesStatus;
+  };
+
+  const toggleSummaryCard = (bucketId) => {
+    if (bucketId === "total") {
+      setSummaryBucket(null);
+      return;
+    }
+    setSummaryBucket((prev) => (prev === bucketId ? null : bucketId));
+    setSelectedStatus("");
+  };
+
+  const employeePoolRows = clickableSummaryCards
+    ? rows.filter(rowMatchesSearchAndDate)
+    : rows.filter(rowMatchesTableContext);
+
+  const employees = Array.from(new Set(employeePoolRows.map((row) => row.username)))
     .filter(Boolean)
     .sort((a, b) => String(a).trim().localeCompare(String(b).trim()));
 
@@ -110,21 +327,8 @@ export default function ExpenseTable({ rows, role }) {
 
   const isDirector = (role || "").toUpperCase() === "DIRECTOR";
 
-  const getRowTotal = (row) =>
-    Number(row.TicketCost || 0) +
-    Number(row.HotelCost || 0) +
-    Number(row.MealsCost || 0) +
-    Number(row.OtherExpenses || 0);
-
   const getApprovedValue = (row) =>
     row.approval_status === "Rejected" ? 0 : Number(row.approved_amount || 0);
-
-  const isBlankAmount = (value) =>
-    value == null || value === "" || Number.isNaN(Number(value)) || Number(value) <= 0;
-
-  const isBlankDate = (value) => !value || value === "0000-00-00";
-
-  const statusOf = (row) => (row.approval_status || "").toLowerCase();
 
   const calculateTotals = (data) => {
     const summary = {
@@ -179,6 +383,15 @@ export default function ExpenseTable({ rows, role }) {
     return summary;
   };
 
+  const summaryRows = clickableSummaryCards
+    ? rows.filter((row) => {
+        const matchesEmployee =
+          !selectedEmployee ||
+          String(row.username || "").trim() === String(selectedEmployee).trim();
+        return rowMatchesSearchAndDate(row) && matchesEmployee;
+      })
+    : filteredRows;
+
   const {
     totalAmount,
     totalCount,
@@ -192,7 +405,7 @@ export default function ExpenseTable({ rows, role }) {
     pendingPaymentCount,
     paidAmount,
     paidCount,
-  } = calculateTotals(filteredRows);
+  } = calculateTotals(summaryRows);
 
   const handleSort = (key) => {
     setSortConfig((prev) =>
@@ -213,6 +426,18 @@ export default function ExpenseTable({ rows, role }) {
           return Number(row.ID || 0);
         case "TravelDate":
           return row.TravelDate ? dayjs(row.TravelDate).valueOf() : 0;
+        case "timestamp":
+          return row.timestamp ? dayjs(row.timestamp).valueOf() : 0;
+        case "expense_status":
+          return (row.expense_status || "").toLowerCase();
+        case "travel_mode":
+          return formatExpenseTravelMode(row).toLowerCase();
+        case "person_name":
+          return (row.person_name || "").toLowerCase();
+        case "person_contact":
+          return (row.person_contact || "").toLowerCase();
+        case "designation":
+          return (row.designation || "").toLowerCase();
         case "username":
           return (row.username || "").toLowerCase();
         case "FromLocation":
@@ -323,8 +548,30 @@ export default function ExpenseTable({ rows, role }) {
     setSelectedEmployee("");
     updateQueryParam("username", "");
     setSelectedStatus("");
+    if (clickableSummaryCards) setSummaryBucket(null);
+    const defaultMonth = dayjs().format("YYYY-MM");
+    setPeriodMonth(defaultMonth);
     setFromDate(dayjs().startOf("month").format("YYYY-MM-DD"));
     setToDate(dayjs().endOf("month").format("YYYY-MM-DD"));
+  };
+
+  const periodMonthOptions = useMemo(() => {
+    const list = [];
+    const base = dayjs().startOf("month");
+    for (let i = 0; i < 18; i += 1) {
+      const d = base.subtract(i, "month");
+      list.push({ value: d.format("YYYY-MM"), label: d.format("MMM YYYY") });
+    }
+    return list;
+  }, []);
+
+  const handlePeriodMonthChange = (value) => {
+    setPeriodMonth(value);
+    const d = dayjs(`${value}-01`);
+    if (!d.isValid()) return;
+    setFromDate(d.startOf("month").format("YYYY-MM-DD"));
+    setToDate(d.endOf("month").format("YYYY-MM-DD"));
+    if (clickableSummaryCards) setSummaryBucket(null);
   };
 
   const closeModal = () => {
@@ -342,53 +589,225 @@ export default function ExpenseTable({ rows, role }) {
     // Optionally refresh data if needed, but router.refresh() inside modal might handle it
   };
 
+  const tableWrapperClass = isSbiUi
+    ? "hidden md:block w-full overflow-auto border-y border-violet-100/80 bg-white"
+    : "hidden md:block overflow-auto bg-white shadow rounded-lg";
+  const sbiTableBleedClass = isSbiUi ? "-mx-4 sm:-mx-6" : "";
+
+  const tableHeadClass = isSbiUi
+    ? "bg-violet-50/90 sticky top-0 z-10"
+    : "bg-gray-100 sticky top-0 z-10";
+
+  const tableHeadRowClass = isSbiUi
+    ? "text-left text-xs font-bold uppercase tracking-wide text-violet-900/90"
+    : "text-left font-semibold text-gray-700";
+
+  const tableBodyClass = isSbiUi
+    ? "divide-y divide-violet-50 text-slate-800"
+    : "text-gray-800 divide-y divide-gray-200";
+
+  const tableRowClass = (idx) =>
+    isSbiUi ? (idx % 2 === 0 ? "bg-white" : "bg-slate-50/60") : "";
+
+  const engineerColumnLabel = isSbiUi ? "Engineer Name" : "Username";
+  const allEngineersFilterLabel = isSbiUi ? "All Engineers" : "All Employees";
+  const travelFromColumnLabel = isSbiUi ? "Travel From" : "From";
+  const travelToColumnLabel = isSbiUi ? "Travel To" : "To";
+  const travelDateColumnLabel = isSbiUi ? "Date of Completion Task" : "Date";
+  const submitExpenseDateColumnLabel = isSbiUi ? "Date of Submit Expense" : null;
+  const expAmountColumnLabel = isSbiUi ? "Exp Amount" : "Total";
+
   return (
-    <div className="space-y-4">
-      {/* Summary Cards */}
-      <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 ${isDirector ? "xl:grid-cols-6" : "xl:grid-cols-5"} gap-4 mb-4`}>
-        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-600">
-          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Total</div>
-          <div className="text-2xl font-bold text-gray-800">₹{totalAmount.toFixed(2)}</div>
-          <div className="text-xs text-gray-500 mt-1">{totalCount} uploaded by employees</div>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-red-600">
-          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Rejected</div>
-          <div className="text-2xl font-bold text-gray-800">₹{rejectedAmount.toFixed(2)}</div>
-          <div className="text-xs text-gray-500 mt-1">{rejectedCount} rejected</div>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-green-600">
-          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Approved</div>
-          <div className="text-2xl font-bold text-gray-800">₹{approvedAmount.toFixed(2)}</div>
-          <div className="text-xs text-gray-500 mt-1">{approvedCount} approved</div>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-yellow-600">
-          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Pending approval</div>
-          <div className="text-2xl font-bold text-gray-800">₹{pendingApprovalAmount.toFixed(2)}</div>
-          <div className="text-xs text-gray-500 mt-1">{pendingApprovalCount} pending, amount blank</div>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-orange-600">
-          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Pending to payment</div>
-          <div className="text-2xl font-bold text-gray-800">₹{pendingPaymentAmount.toFixed(2)}</div>
-          <div className="text-xs text-gray-500 mt-1">{pendingPaymentCount} approved, not paid</div>
-        </div>
-        {isDirector && (
-          <div className="bg-white p-4 rounded-lg shadow border-l-4 border-teal-600">
-            <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Paid</div>
-            <div className="text-2xl font-bold text-gray-800">₹{paidAmount.toFixed(2)}</div>
-            <div className="text-xs text-gray-500 mt-1">{paidCount} paid</div>
+    <div className={isSbiUi ? "space-y-5" : "space-y-4"}>
+      {isSbiUi ? (
+        <div className="flex flex-col gap-4 border-b border-violet-100/80 pb-5 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="shrink-0 rounded-xl bg-gradient-to-br from-violet-600 to-violet-800 p-2.5 text-white shadow-lg shadow-violet-500/25">
+              <ReceiptIndianRupee className="h-5 w-5" strokeWidth={2.25} aria-hidden />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-lg font-bold text-slate-900 sm:text-xl">
+                Expense Approval Dashboard
+              </h2>
+              <p className="mt-0.5 text-sm text-slate-500">
+                Review employee uploads, approvals, and pending payments
+              </p>
+            </div>
           </div>
+          <div className="relative inline-flex w-full max-w-[11rem] items-center sm:w-auto">
+            <CalendarDays
+              className="pointer-events-none absolute left-3 z-10 h-4 w-4 text-violet-600"
+              aria-hidden
+            />
+            <select
+              value={periodMonth}
+              onChange={(e) => handlePeriodMonthChange(e.target.value)}
+              className={`${expenseSbiSelectClass} w-full pl-10 font-semibold`}
+              aria-label="Month"
+            >
+              {periodMonthOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              className="pointer-events-none absolute right-2.5 h-4 w-4 text-slate-400"
+              aria-hidden
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {/* Summary Cards */}
+      <div
+        className={
+          isSbiUi
+            ? `grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 ${isDirector ? "xl:grid-cols-6" : "xl:grid-cols-5"}`
+            : `grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 ${isDirector ? "xl:grid-cols-6" : "xl:grid-cols-5"} gap-4 mb-4`
+        }
+      >
+        {isSbiUi ? (
+          <>
+            <ExpenseSbiSummaryCard
+              bucketId="total"
+              label="Total"
+              amount={totalAmount}
+              caption={`${totalCount} uploaded by engineers`}
+              clickable={clickableSummaryCards}
+              active={false}
+              onClick={() => toggleSummaryCard("total")}
+            />
+            <ExpenseSbiSummaryCard
+              bucketId="rejected"
+              label="Rejected"
+              amount={rejectedAmount}
+              caption={`${rejectedCount} rejected`}
+              clickable={clickableSummaryCards}
+              active={summaryBucket === "rejected"}
+              onClick={() => toggleSummaryCard("rejected")}
+            />
+            <ExpenseSbiSummaryCard
+              bucketId="approved"
+              label="Approved"
+              amount={approvedAmount}
+              caption={`${approvedCount} approved`}
+              clickable={clickableSummaryCards}
+              active={summaryBucket === "approved"}
+              onClick={() => toggleSummaryCard("approved")}
+            />
+            <ExpenseSbiSummaryCard
+              bucketId="pending_approval"
+              label="Pending approval"
+              amount={pendingApprovalAmount}
+              caption={`${pendingApprovalCount} pending, amount blank`}
+              clickable={clickableSummaryCards}
+              active={summaryBucket === "pending_approval"}
+              onClick={() => toggleSummaryCard("pending_approval")}
+            />
+            <ExpenseSbiSummaryCard
+              bucketId="pending_payment"
+              label="Pending to payment"
+              amount={pendingPaymentAmount}
+              caption={`${pendingPaymentCount} approved, not paid`}
+              clickable={clickableSummaryCards}
+              active={summaryBucket === "pending_payment"}
+              onClick={() => toggleSummaryCard("pending_payment")}
+            />
+            {isDirector ? (
+              <ExpenseSbiSummaryCard
+                bucketId="paid"
+                label="Paid"
+                amount={paidAmount}
+                caption={`${paidCount} paid`}
+                clickable={clickableSummaryCards}
+                active={summaryBucket === "paid"}
+                onClick={() => toggleSummaryCard("paid")}
+              />
+            ) : null}
+          </>
+        ) : (
+          <>
+            <ExpenseSummaryCard
+              label="Total"
+              amount={totalAmount}
+              caption={`${totalCount} uploaded by employees`}
+              borderClass="border-blue-600"
+              clickable={clickableSummaryCards}
+              active={false}
+              onClick={() => toggleSummaryCard("total")}
+            />
+            <ExpenseSummaryCard
+              label="Rejected"
+              amount={rejectedAmount}
+              caption={`${rejectedCount} rejected`}
+              borderClass="border-red-600"
+              clickable={clickableSummaryCards}
+              active={summaryBucket === "rejected"}
+              onClick={() => toggleSummaryCard("rejected")}
+            />
+            <ExpenseSummaryCard
+              label="Approved"
+              amount={approvedAmount}
+              caption={`${approvedCount} approved`}
+              borderClass="border-green-600"
+              clickable={clickableSummaryCards}
+              active={summaryBucket === "approved"}
+              onClick={() => toggleSummaryCard("approved")}
+            />
+            <ExpenseSummaryCard
+              label="Pending approval"
+              amount={pendingApprovalAmount}
+              caption={`${pendingApprovalCount} pending, amount blank`}
+              borderClass="border-yellow-600"
+              clickable={clickableSummaryCards}
+              active={summaryBucket === "pending_approval"}
+              onClick={() => toggleSummaryCard("pending_approval")}
+            />
+            <ExpenseSummaryCard
+              label="Pending to payment"
+              amount={pendingPaymentAmount}
+              caption={`${pendingPaymentCount} approved, not paid`}
+              borderClass="border-orange-600"
+              clickable={clickableSummaryCards}
+              active={summaryBucket === "pending_payment"}
+              onClick={() => toggleSummaryCard("pending_payment")}
+            />
+            {isDirector && (
+              <ExpenseSummaryCard
+                label="Paid"
+                amount={paidAmount}
+                caption={`${paidCount} paid`}
+                borderClass="border-teal-600"
+                clickable={clickableSummaryCards}
+                active={summaryBucket === "paid"}
+                onClick={() => toggleSummaryCard("paid")}
+              />
+            )}
+          </>
         )}
         {selectedExpenseIds.size > 0 && (
-          <div className="bg-white p-4 rounded-lg shadow border-l-4 border-purple-600">
+          <div
+            className={
+              isSbiUi
+                ? "rounded-2xl border border-violet-100 bg-violet-50/50 p-4 shadow-sm"
+                : "bg-white p-4 rounded-lg shadow border-l-4 border-purple-600"
+            }
+          >
             <div className="flex justify-between items-start">
               <div>
-                <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Selected Approved Amount</div>
-                <div className="text-2xl font-bold text-gray-800">₹{selectedApprovedAmount.toFixed(2)}</div>
+                <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">
+                  Selected Approved Amount
+                </div>
+                <div className="text-2xl font-bold text-gray-800">
+                  ₹{selectedApprovedAmount.toFixed(2)}
+                </div>
               </div>
               <button
                 onClick={() => setIsMultiLinkModalOpen(true)}
                 className="text-purple-600 hover:text-purple-800 cursor-pointer"
                 title="Link Payment"
+                type="button"
               >
                 <Link2 size={20} />
               </button>
@@ -398,63 +817,133 @@ export default function ExpenseTable({ rows, role }) {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2 sm:gap-4 mb-4">
-        <input
-          type="text"
-          placeholder="Search anything..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="px-4 py-2 border rounded-lg w-full sm:w-auto"
-        />
-        <select
-          value={selectedEmployee}
-          onChange={(e) => {
-            const val = e.target.value;
-            setSelectedEmployee(val);
-            updateQueryParam("username", val);
-          }}
-          className="px-4 py-2 border rounded-lg w-full sm:w-auto"
-        >
-          <option value="">All Employees</option>
-          {employees.map((emp) => (
-            <option key={emp} value={emp}>
-              {emp}
-              {employeeInactiveByUsername.has(String(emp).trim())
-                ? " (Inactive)"
-                : ""}
-            </option>
-          ))}
-        </select>
-        <select
-          value={selectedStatus}
-          onChange={(e) => setSelectedStatus(e.target.value)}
-          className="px-4 py-2 border rounded-lg w-full sm:w-auto"
-        >
-          <option value="">All Status</option>
-          <option value="Pending">Pending</option>
-          <option value="Approved">Approved</option>
-          <option value="Rejected">Rejected</option>
-        </select>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <span className="text-sm text-gray-500 hidden sm:inline">From:</span>
-          <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="px-4 py-2 border rounded-lg w-full sm:w-auto"/>
+      <div
+        className={
+          isSbiUi
+            ? "flex flex-wrap items-center gap-2 rounded-2xl border border-slate-100 bg-slate-50/70 p-3 sm:gap-3"
+            : "flex flex-wrap items-center gap-2 sm:gap-4 mb-4"
+        }
+      >
+        <div className="relative w-full min-w-[12rem] flex-1 sm:max-w-md">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+            aria-hidden
+          />
+          <input
+            type="text"
+            placeholder="Search anything..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className={
+              isSbiUi ? expenseSbiFilterInputClass : "px-4 py-2 border rounded-lg w-full sm:w-auto"
+            }
+          />
+        </div>
+        <div className={isSbiUi ? "relative" : ""}>
+          <select
+            value={selectedEmployee}
+            onChange={(e) => {
+              const val = e.target.value;
+              setSelectedEmployee(val);
+              updateQueryParam("username", val);
+            }}
+            className={isSbiUi ? expenseSbiSelectClass : "px-4 py-2 border rounded-lg w-full sm:w-auto"}
+          >
+            <option value="">{allEngineersFilterLabel}</option>
+            {employees.map((emp) => (
+              <option key={emp} value={emp}>
+                {emp}
+                {employeeInactiveByUsername.has(String(emp).trim()) ? " (Inactive)" : ""}
+              </option>
+            ))}
+          </select>
+          {isSbiUi ? (
+            <ChevronDown
+              className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+              aria-hidden
+            />
+          ) : null}
+        </div>
+        <div className={isSbiUi ? "relative" : ""}>
+          <select
+            value={selectedStatus}
+            onChange={(e) => {
+              setSelectedStatus(e.target.value);
+              if (clickableSummaryCards) setSummaryBucket(null);
+            }}
+            className={isSbiUi ? expenseSbiSelectClass : "px-4 py-2 border rounded-lg w-full sm:w-auto"}
+          >
+            <option value="">All Status</option>
+            <option value="Pending">Pending</option>
+            <option value="Approved">Approved</option>
+            <option value="Rejected">Rejected</option>
+          </select>
+          {isSbiUi ? (
+            <ChevronDown
+              className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+              aria-hidden
+            />
+          ) : null}
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <span className="text-sm text-gray-500 hidden sm:inline">To:</span>
-          <TypeableDateFilterInput value={toDate} onChange={setToDate} className="px-4 py-2 border rounded-lg w-full sm:w-auto"/>
+          <span
+            className={
+              isSbiUi
+                ? "text-xs font-semibold text-slate-500"
+                : "text-sm text-gray-500 hidden sm:inline"
+            }
+          >
+            From:
+          </span>
+          <TypeableDateFilterInput
+            value={fromDate}
+            onChange={setFromDate}
+            className={
+              isSbiUi
+                ? "rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm w-full sm:w-auto"
+                : "px-4 py-2 border rounded-lg w-full sm:w-auto"
+            }
+          />
+        </div>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <span
+            className={
+              isSbiUi
+                ? "text-xs font-semibold text-slate-500"
+                : "text-sm text-gray-500 hidden sm:inline"
+            }
+          >
+            To:
+          </span>
+          <TypeableDateFilterInput
+            value={toDate}
+            onChange={setToDate}
+            className={
+              isSbiUi
+                ? "rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm w-full sm:w-auto"
+                : "px-4 py-2 border rounded-lg w-full sm:w-auto"
+            }
+          />
         </div>
         <button
+          type="button"
           onClick={handleReset}
-          className="px-4 py-2 bg-gray-300 rounded-lg text-sm cursor-pointer w-full sm:w-auto hover:bg-gray-400 transition-colors"
+          className={
+            isSbiUi
+              ? "inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700 sm:w-auto"
+              : "px-4 py-2 bg-gray-300 rounded-lg text-sm cursor-pointer w-full sm:w-auto hover:bg-gray-400 transition-colors"
+          }
         >
+          {isSbiUi ? <RotateCcw className="h-4 w-4" aria-hidden /> : null}
           Reset
         </button>
       </div>
+      <div className={sbiTableBleedClass}>
       {/* Desktop Table View */}
-      <div className="hidden md:block overflow-auto bg-white shadow rounded-lg">
+      <div className={tableWrapperClass}>
         <table className="min-w-full table-auto text-sm">
-          <thead className="bg-gray-100 sticky top-0 z-10">
-            <tr className="text-left font-semibold text-gray-700">
+          <thead className={tableHeadClass}>
+            <tr className={tableHeadRowClass}>
               <th className="p-3">
                 <input
                   type="checkbox"
@@ -470,22 +959,121 @@ export default function ExpenseTable({ rows, role }) {
                 />
               </th>
               <th onClick={() => handleSort("ID")} className="p-3 cursor-pointer select-none">ID<SortIcon column="ID" /></th>
-              <th onClick={() => handleSort("TravelDate")} className="p-3 cursor-pointer select-none">Date<SortIcon column="TravelDate" /></th>
-              <th onClick={() => handleSort("username")} className="p-3 cursor-pointer select-none">Username<SortIcon column="username" /></th>
-              <th onClick={() => handleSort("FromLocation")} className="p-3 cursor-pointer select-none">From<SortIcon column="FromLocation" /></th>
-              <th onClick={() => handleSort("Tolocation")} className="p-3 cursor-pointer select-none">To<SortIcon column="Tolocation" /></th>
-              <th onClick={() => handleSort("Total")} className="p-3 cursor-pointer select-none">Total<SortIcon column="Total" /></th>
-              <th onClick={() => handleSort("approved_amount")} className="p-3 cursor-pointer select-none">Approved Amt<SortIcon column="approved_amount" /></th>
-              <th className="p-3">Approved By</th>
-              <th onClick={() => handleSort("payment_date")} className="p-3 cursor-pointer select-none">Payment Date<SortIcon column="payment_date" /></th>
-              <th onClick={() => handleSort("approval_status")} className="p-3 cursor-pointer select-none">Status<SortIcon column="approval_status" /></th>
-              <th className="p-3">Linked Statements</th>
+              {isSbiUi ? (
+                <>
+                  <th
+                    onClick={() => handleSort("timestamp")}
+                    className="min-w-[11.5rem] whitespace-nowrap p-3 cursor-pointer select-none"
+                  >
+                    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                      {submitExpenseDateColumnLabel}
+                      <SortIcon column="timestamp" />
+                    </span>
+                  </th>
+                  <th
+                    onClick={() => handleSort("username")}
+                    className="min-w-[9.5rem] whitespace-nowrap p-3 cursor-pointer select-none pr-4"
+                  >
+                    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                      {engineerColumnLabel}
+                      <SortIcon column="username" />
+                    </span>
+                  </th>
+                  <th
+                    onClick={() => handleSort("expense_status")}
+                    className="min-w-[7rem] whitespace-nowrap p-3 cursor-pointer select-none"
+                  >
+                    Expense Status
+                    <SortIcon column="expense_status" />
+                  </th>
+                  <th
+                    onClick={() => handleSort("Total")}
+                    className="min-w-[10rem] max-w-[14rem] p-3 cursor-pointer select-none"
+                  >
+                    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                      Amount &amp; Approval
+                      <SortIcon column="Total" />
+                    </span>
+                  </th>
+                  <th
+                    onClick={() => handleSort("FromLocation")}
+                    className="min-w-[10rem] max-w-[15rem] p-3 cursor-pointer select-none"
+                  >
+                    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                      Travel Details
+                      <SortIcon column="FromLocation" />
+                    </span>
+                  </th>
+                  <th
+                    onClick={() => handleSort("TravelDate")}
+                    className="min-w-[7.5rem] whitespace-nowrap p-3 cursor-pointer select-none"
+                  >
+                    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                      {travelDateColumnLabel}
+                      <SortIcon column="TravelDate" />
+                    </span>
+                  </th>
+                  <th onClick={() => handleSort("payment_date")} className="p-3 cursor-pointer select-none">
+                    Payment Date
+                    <SortIcon column="payment_date" />
+                  </th>
+                  <th onClick={() => handleSort("approval_status")} className="p-3 cursor-pointer select-none">
+                    Status
+                    <SortIcon column="approval_status" />
+                  </th>
+                  <th className="min-w-[5.5rem] whitespace-nowrap p-3">Image</th>
+                </>
+              ) : (
+                <>
+                  <th
+                    onClick={() => handleSort("TravelDate")}
+                    className="p-3 cursor-pointer select-none"
+                  >
+                    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                      {travelDateColumnLabel}
+                      <SortIcon column="TravelDate" />
+                    </span>
+                  </th>
+                  <th onClick={() => handleSort("username")} className="p-3 cursor-pointer select-none">
+                    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                      {engineerColumnLabel}
+                      <SortIcon column="username" />
+                    </span>
+                  </th>
+                  <th onClick={() => handleSort("FromLocation")} className="p-3 cursor-pointer select-none">
+                    {travelFromColumnLabel}
+                    <SortIcon column="FromLocation" />
+                  </th>
+                  <th onClick={() => handleSort("Tolocation")} className="p-3 cursor-pointer select-none">
+                    {travelToColumnLabel}
+                    <SortIcon column="Tolocation" />
+                  </th>
+                  <th onClick={() => handleSort("Total")} className="p-3 cursor-pointer select-none">
+                    {expAmountColumnLabel}
+                    <SortIcon column="Total" />
+                  </th>
+                  <th onClick={() => handleSort("approved_amount")} className="p-3 cursor-pointer select-none">
+                    Approved Amt
+                    <SortIcon column="approved_amount" />
+                  </th>
+                  <th className="p-3">Approved By</th>
+                  <th onClick={() => handleSort("payment_date")} className="p-3 cursor-pointer select-none">
+                    Payment Date
+                    <SortIcon column="payment_date" />
+                  </th>
+                  <th onClick={() => handleSort("approval_status")} className="p-3 cursor-pointer select-none">
+                    Status
+                    <SortIcon column="approval_status" />
+                  </th>
+                </>
+              )}
+              <th className={isSbiUi ? "min-w-[9rem] p-3" : "p-3"}>Linked Statements</th>
               <th className="p-3">Action</th>
             </tr>
           </thead>
-          <tbody className="text-gray-800 divide-y divide-gray-200">
+          <tbody className={tableBodyClass}>
             {sortedRows.length > 0 ? (
-              sortedRows.map((row) => {
+              sortedRows.map((row, rowIdx) => {
                 const totalCost =
                   Number(row.TicketCost || 0) +
                   Number(row.HotelCost || 0) +
@@ -493,7 +1081,7 @@ export default function ExpenseTable({ rows, role }) {
                   Number(row.OtherExpenses || 0);
 
                 return (
-                  <tr key={row.ID}>
+                  <tr key={row.ID} className={tableRowClass(rowIdx)}>
                     <td className="p-3">
                       <input
                         type="checkbox"
@@ -504,96 +1092,101 @@ export default function ExpenseTable({ rows, role }) {
                       />
                     </td>
                     <td className="p-3">{row.ID}</td>
-                    <td className="p-3">
-                      {row.TravelDate
-                        ? dayjs(row.TravelDate).format("DD-MM-YYYY")
-                        : "-"}
-                    </td>
-                    <td className="p-3">{formatExpenseUsername(row)}</td>
-                    <td className="p-3">{row.FromLocation}</td>
-                    <td className="p-3">{row.Tolocation}</td>
-                    <td className="p-3">₹{totalCost.toFixed(2)}</td>
-                    <td className="p-3">
-                      {row.approval_status === "Rejected" ||
-                      !(Number(row.approved_amount) > 0)
-                        ? "-"
-                        : `₹${Number(row.approved_amount).toFixed(2)}`}
-                    </td>
-                    <td className="p-3">{row.approved_by || "-"}</td>
-                    <td className="p-3">
-                      {row.payment_date && row.payment_date !== "0000-00-00"
-                        ? dayjs(row.payment_date).format("DD-MM-YYYY")
-                        : "-"}
-                    </td>
-                    <td className="p-3">{row.approval_status}</td>
-                    <td className="p-3">
-                      {(() => {
-                        try {
-                          const linkedIds = JSON.parse(row.linked_statement_ids || "[]");
-                          return linkedIds.length > 0 ? linkedIds.join(", ") : "-";
-                        } catch (e) {
-                          return "-";
-                        }
-                      })()}
-                    </td>
-                    <td className="p-3 flex gap-2 items-center">
-                      <Link
-                        href={`${dashboardBase}/expenses/${row.ID}`}
-                        className="text-blue-600 hover:underline"
-                      >
-                        <Eye size={16} />
-                      </Link>
-                      {row.approval_status !== "Approved" && row.approval_status !== "Rejected" && (
-                        <Link
-                          href={`${dashboardBase}/expenses/edit/${row.ID}`}
-                          className="text-yellow-600 hover:text-yellow-800"
-                          title="Edit Expense"
-                        >
-                          <Pencil size={16} />
-                        </Link>
-                      )}
-                      {role === "SUPERADMIN" && (
-                        <button
-                          onClick={() => {
-                            if (row.approval_status !== "Approved") {
-                              alert("Please Approve the expense first");
-                              return; // Stop execution here
+                    {isSbiUi ? (
+                      <>
+                        <td className="whitespace-nowrap p-3 text-xs tabular-nums sm:text-sm">
+                          {formatExpenseSubmitTimestamp(row.timestamp)}
+                        </td>
+                        <td className="min-w-[9.5rem] whitespace-nowrap p-3">
+                          {formatExpenseUsername(row)}
+                        </td>
+                        <td className="p-3">
+                          <ExpenseStatusBadge status={row.expense_status} />
+                        </td>
+                        <td className="p-3 align-top">
+                          <ExpenseAmountApprovalCell
+                            expAmount={`₹${totalCost.toFixed(2)}`}
+                            approvedAmount={
+                              row.approval_status === "Rejected" ||
+                              !(Number(row.approved_amount) > 0)
+                                ? "-"
+                                : `₹${Number(row.approved_amount).toFixed(2)}`
                             }
-                            setSelectedRow(row); // Store the selected row
-                            setIsModalOpen(true); // Open the modal
-                          }}
-                          className="text-green-600 hover:text-green-800 cursor-pointer"
-                          title="Process Payment"
-                        >
-                          <CreditCard size={16} />
-                        </button>
-                      )}
-
-                      {/* Payment Link / Edit Button - Available for all roles if Approved */}
-                      {row.approval_status === "Approved" && (
-                        !row.linked_statement_ids || JSON.parse(row.linked_statement_ids || "[]").length === 0 ? (
-                          <button
-                            onClick={() => {
-                              setSelectedRowForLink(row);
-                              setIsLinkModalOpen(true);
-                            }}
-                            className="text-indigo-600 hover:text-indigo-800 cursor-pointer"
-                            title="Payment Link"
-                          >
-                            <Link2 size={16} />
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              setSelectedRowForLink(row);
-                              setIsLinkModalOpen(true);
-                            }}
-                            className="text-blue-500 hover:text-blue-700 cursor-pointer"
-                            title="Edit Payment Link"
-                          >
-                            <Edit3 size={16} />
-                          </button>
-                        )
+                            approvedBy={row.approved_by}
+                          />
+                        </td>
+                        <td className="p-3 align-top">
+                          <ExpenseTravelDetailsCell
+                            travelFrom={row.FromLocation}
+                            travelTo={row.Tolocation}
+                            travelMode={formatExpenseTravelMode(row)}
+                          />
+                        </td>
+                        <td className="whitespace-nowrap p-3">
+                          {formatExpenseTravelDate(row.TravelDate)}
+                        </td>
+                        <td className="p-3">
+                          {row.payment_date && row.payment_date !== "0000-00-00"
+                            ? dayjs(row.payment_date).format("DD-MM-YYYY")
+                            : "-"}
+                        </td>
+                        <td className="p-3">
+                          <ExpenseApprovalStatusBadge status={row.approval_status} />
+                        </td>
+                        <td className="w-14 min-w-14 max-w-14 p-2 align-middle">
+                          <ExpenseRowImageAttachments
+                            attachmentsRaw={row.attachments}
+                            variant="table"
+                          />
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="p-3">{formatExpenseTravelDate(row.TravelDate)}</td>
+                        <td className="p-3">{formatExpenseUsername(row)}</td>
+                        <td className="p-3">{row.FromLocation}</td>
+                        <td className="p-3">{row.Tolocation}</td>
+                        <td className="p-3">₹{totalCost.toFixed(2)}</td>
+                        <td className="p-3">
+                          {row.approval_status === "Rejected" ||
+                          !(Number(row.approved_amount) > 0)
+                            ? "-"
+                            : `₹${Number(row.approved_amount).toFixed(2)}`}
+                        </td>
+                        <td className="p-3">{row.approved_by || "-"}</td>
+                        <td className="p-3">
+                          {row.payment_date && row.payment_date !== "0000-00-00"
+                            ? dayjs(row.payment_date).format("DD-MM-YYYY")
+                            : "-"}
+                        </td>
+                        <td className="p-3">{row.approval_status}</td>
+                      </>
+                    )}
+                    <td className="p-3 align-top">
+                      <ExpenseLinkedStatementsCell
+                        linkedStatementIdsRaw={row.linked_statement_ids}
+                        statementBasePath={dashboardBase}
+                        variant={isSbiUi ? "sbi" : "default"}
+                      />
+                    </td>
+                    <td className="min-w-[9rem] p-3 align-top">
+                      {showSbiApprovalActions ? (
+                        <div className="inline-flex flex-col gap-1.5">
+                          <ExpenseSbiApprovalActions
+                            expenseId={row.ID}
+                            totalAmount={totalCost}
+                            approvalStatus={row.approval_status}
+                            approverUsername={approverUsername}
+                            onSuccess={refreshExpenseRows}
+                          />
+                          <div className="flex items-center gap-2">
+                            {renderExpenseSecondaryActions(row)}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap items-center gap-2">
+                          {renderExpenseSecondaryActions(row)}
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -601,7 +1194,10 @@ export default function ExpenseTable({ rows, role }) {
               })
             ) : (
               <tr>
-                <td colSpan="9" className="p-4 text-center text-gray-500">
+                <td
+                  colSpan={isSbiUi ? 13 : 13}
+                  className="p-4 text-center text-gray-500"
+                >
                   No entries found.
                 </td>
               </tr>
@@ -637,31 +1233,80 @@ export default function ExpenseTable({ rows, role }) {
                 />
                 <strong>ID:</strong> {row.ID}
               </div>
-              <div>
-                <strong>Date:</strong>{" "}
-                {row.TravelDate
-                  ? dayjs(row.TravelDate).format("DD-MM-YYYY")
-                  : "-"}
-              </div>
-              <div>
-                <strong>From:</strong> {row.FromLocation}
-              </div>
-              <div>
-                <strong>To:</strong> {row.Tolocation}
-              </div>
-              <div>
-                <strong>Total:</strong> ₹{totalCost.toFixed(2)}
-              </div>
-              <div>
-                <strong>Approved Amt:</strong>{" "}
-                {row.approval_status === "Rejected" ||
-                !(Number(row.approved_amount) > 0)
-                  ? "-"
-                  : `₹${Number(row.approved_amount).toFixed(2)}`}
-              </div>
-              <div>
-                <strong>Approved By:</strong> {row.approved_by || "-"}
-              </div>
+              {!isSbiUi ? (
+                <div>
+                  <strong>Date:</strong> {formatExpenseTravelDate(row.TravelDate)}
+                </div>
+              ) : null}
+              {isSbiUi ? (
+                <div>
+                  <strong>Date of Submit Expense:</strong>{" "}
+                  {formatExpenseSubmitTimestamp(row.timestamp)}
+                </div>
+              ) : null}
+              {isSbiUi ? (
+                <div>
+                  <strong>Engineer Name:</strong> {formatExpenseUsername(row)}
+                </div>
+              ) : null}
+              {isSbiUi ? (
+                <div>
+                  <strong>Expense Status:</strong>{" "}
+                  <ExpenseStatusBadge status={row.expense_status} />
+                </div>
+              ) : null}
+              {isSbiUi ? (
+                <ExpenseAmountApprovalCell
+                  expAmount={`₹${totalCost.toFixed(2)}`}
+                  approvedAmount={
+                    row.approval_status === "Rejected" ||
+                    !(Number(row.approved_amount) > 0)
+                      ? "-"
+                      : `₹${Number(row.approved_amount).toFixed(2)}`
+                  }
+                  approvedBy={row.approved_by}
+                />
+              ) : (
+                <div>
+                  <strong>Total:</strong> ₹{totalCost.toFixed(2)}
+                </div>
+              )}
+              {!isSbiUi ? (
+                <>
+                  <div>
+                    <strong>Approved Amt:</strong>{" "}
+                    {row.approval_status === "Rejected" ||
+                    !(Number(row.approved_amount) > 0)
+                      ? "-"
+                      : `₹${Number(row.approved_amount).toFixed(2)}`}
+                  </div>
+                  <div>
+                    <strong>Approved By:</strong> {row.approved_by || "-"}
+                  </div>
+                </>
+              ) : null}
+              {isSbiUi ? (
+                <>
+                  <ExpenseTravelDetailsCell
+                    travelFrom={row.FromLocation}
+                    travelTo={row.Tolocation}
+                    travelMode={formatExpenseTravelMode(row)}
+                  />
+                  <div>
+                    <strong>Date of Completion Task:</strong>{" "}
+                    {formatExpenseTravelDate(row.TravelDate)}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <strong>From:</strong> {row.FromLocation}
+                  </div>
+                  <div>
+                    <strong>To:</strong> {row.Tolocation}
+                  </div>
+                </>
+              )}
               <div>
                 <strong>Payment Date:</strong>{" "}
                 {row.payment_date && row.payment_date !== "0000-00-00"
@@ -669,82 +1314,62 @@ export default function ExpenseTable({ rows, role }) {
                   : "-"}
               </div>
               <div>
-                <strong>Status:</strong> {row.approval_status}
+                <strong>Status:</strong>{" "}
+                {isSbiUi ? (
+                  <ExpenseApprovalStatusBadge status={row.approval_status} />
+                ) : (
+                  row.approval_status
+                )}
               </div>
+              {isSbiUi ? (
+                <div className="flex items-center gap-2">
+                  <strong>Image:</strong>
+                  <ExpenseRowImageAttachments
+                    attachmentsRaw={row.attachments}
+                    variant="table"
+                  />
+                </div>
+              ) : null}
               <div>
-                <strong>Linked Statements:</strong>{" "}
-                {(() => {
-                  try {
-                    const linkedIds = JSON.parse(row.linked_statement_ids || "[]");
-                    return linkedIds.length > 0 ? linkedIds.join(", ") : "-";
-                  } catch (e) {
-                    return "-";
-                  }
-                })()}
+                <strong className="block pb-1">Linked Statements</strong>
+                <ExpenseLinkedStatementsCell
+                  linkedStatementIdsRaw={row.linked_statement_ids}
+                  statementBasePath={dashboardBase}
+                  variant={isSbiUi ? "sbi" : "default"}
+                />
               </div>
-              <div className="flex items-center gap-4 pt-2">
-                <Link
-                  href={`${dashboardBase}/expenses/${row.ID}`}
-                  className="text-blue-600 hover:underline"
-                >
-                  <Eye size={16} />
-                </Link>
-                {row.approval_status !== "Approved" && row.approval_status !== "Rejected" && (
-                  <Link
-                    href={`${dashboardBase}/expenses/edit/${row.ID}`}
-                    className="text-yellow-600 hover:text-yellow-800"
-                    title="Edit Expense"
-                  >
-                    <Pencil size={16} />
-                  </Link>
-                )}
-                {role === "SUPERADMIN" && (
-                  <button
-                    onClick={() => {
-                      if (row.approval_status !== "Approved") {
-                        alert("Please Approve the expense first");
-                        return; // Stop execution here
-                      }
-                      setSelectedRow(row); // Store the selected row
-                      setIsModalOpen(true); // Open the modal
-                    }}
-                    className="text-green-600 hover:text-green-800 cursor-pointer"
-                    title="Process Payment"
-                  >
-                    <CreditCard size={16} />
-                  </button>
-                )}
-
-                {/* Payment Link / Edit Button - Available for all roles if Approved */}
-                {row.approval_status === "Approved" && (
-                  !row.linked_statement_ids || JSON.parse(row.linked_statement_ids || "[]").length === 0 ? (
-                    <button
-                      onClick={() => {
-                        setSelectedRowForLink(row);
-                        setIsLinkModalOpen(true);
-                      }}
-                      className="text-indigo-600 hover:text-indigo-800 cursor-pointer"
-                      title="Payment Link"
-                    >
-                      <Link2 size={16} />
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        setSelectedRowForLink(row);
-                        setIsLinkModalOpen(true);
-                      }}
-                      className="text-blue-500 hover:text-blue-700 cursor-pointer"
-                      title="Edit Payment Link"
-                    >
-                      <Edit3 size={16} />
-                    </button>
-                  )
+              <div className="pt-2">
+                {showSbiApprovalActions ? (
+                  <div className="inline-flex flex-col gap-1.5">
+                    <ExpenseSbiApprovalActions
+                      expenseId={row.ID}
+                      totalAmount={totalCost}
+                      approvalStatus={row.approval_status}
+                      approverUsername={approverUsername}
+                      onSuccess={refreshExpenseRows}
+                    />
+                    <div className="flex items-center gap-2">
+                      {renderExpenseSecondaryActions(row)}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {renderExpenseSecondaryActions(row)}
+                  </div>
                 )}
               </div>
             </div>
           );
         })}
+      </div>
+
+      {isSbiUi ? (
+        <p className="px-4 pt-3 text-sm font-medium text-slate-500 sm:px-6">
+          {sortedRows.length === 0
+            ? "Showing 0 entries"
+            : `Showing 1 to ${sortedRows.length} of ${sortedRows.length} entries`}
+        </p>
+      ) : null}
       </div>
 
       <Modal

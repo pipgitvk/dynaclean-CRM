@@ -1,4 +1,9 @@
 import { getDbConnection } from "@/lib/db";
+import {
+  ensureExpenseDesignationColumn,
+  ensureExpenseStatusColumn,
+  ensureExpenseTravelModeColumn,
+} from "@/lib/fetchExpenseDashboardRows";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 
@@ -15,7 +20,10 @@ export async function PUT(req, { params }) {
     const distance = formData.get("distance");
     const person_name = formData.get("person_name");
     const person_contact = formData.get("person_contact");
+    const designation = formData.get("designation");
     const ConveyanceMode = formData.get("ConveyanceMode");
+    const travelModeRaw = formData.get("travel_mode");
+    const expenseStatusRaw = formData.get("expense_status");
     const TicketCost = formData.get("TicketCost");
     const HotelCost = formData.get("HotelCost");
     const MealsCost = formData.get("MealsCost");
@@ -54,6 +62,14 @@ export async function PUT(req, { params }) {
     console.log(`[expense-edit] finalAttachments="${finalAttachments}"`);
 
     const conn = await getDbConnection();
+    await ensureExpenseTravelModeColumn(conn);
+    await ensureExpenseStatusColumn(conn);
+    await ensureExpenseDesignationColumn(conn);
+    const travelMode =
+      String(travelModeRaw || ConveyanceMode || "")
+        .trim() || null;
+    const expenseStatus = String(expenseStatusRaw || "").trim().toLowerCase() || null;
+
     const [expenseRows] = await conn.execute(
       "SELECT approval_status FROM expenses WHERE ID = ?",
       [expenseId],
@@ -80,7 +96,10 @@ export async function PUT(req, { params }) {
       distance = ?,
       person_name = ?,
       person_contact = ?,
+      designation = ?,
       ConveyanceMode = ?,
+      travel_mode = ?,
+      expense_status = ?,
       TicketCost = ?,
       HotelCost = ?,
       MealsCost = ?,
@@ -96,7 +115,10 @@ export async function PUT(req, { params }) {
       Number(distance || 0),
       person_name || null,
       person_contact || null,
-      ConveyanceMode || null,
+      designation || null,
+      travelMode,
+      travelMode,
+      expenseStatus,
       Number(TicketCost || 0),
       Number(HotelCost || 0),
       Number(MealsCost || 0),
