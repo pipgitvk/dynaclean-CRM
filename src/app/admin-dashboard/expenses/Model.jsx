@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { toast } from "react-hot-toast"; // Import toast
 import dayjs from "dayjs";
 import { useRouter } from "next/navigation";
@@ -11,7 +12,21 @@ import {
 const Modal = ({ isOpen, closeModal, row, role, onPaymentSuccess }) => {
   const [notes, setNotes] = useState("");
   const [expenseDetails, setExpenseDetails] = useState(null);
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     if (row && isOpen) {
@@ -81,13 +96,20 @@ const Modal = ({ isOpen, closeModal, row, role, onPaymentSuccess }) => {
 
   // console.log("Final isPaymentDone:", isPaymentDone);
 
-  if (!isOpen || !expenseDetails) return null;
+  if (!isOpen || !expenseDetails || !mounted) return null;
 
   const attachmentPaths = splitAttachmentList(expenseDetails.attachments);
 
-  return (
-    <div className="fixed inset-0 bg-opacity-50 flex justify-center items-center z-50">
-      <div className="bg-white p-6 rounded-lg w-96">
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 p-4"
+      role="dialog"
+      aria-modal="true"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) closeModal();
+      }}
+    >
+      <div className="relative z-10 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
         <h2 className="text-xl font-semibold">Payment Details</h2>
         <div className="space-y-4 mt-4">
           <div>
@@ -157,7 +179,8 @@ const Modal = ({ isOpen, closeModal, row, role, onPaymentSuccess }) => {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 

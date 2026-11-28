@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { toast } from "react-hot-toast";
 import dayjs from "dayjs";
 import { useRouter } from "next/navigation";
@@ -10,7 +11,21 @@ const MultiStatementLinkModal = ({ isOpen, closeModal, selectedExpenseIds, selec
   const [selectedIds, setSelectedIds] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen) {
@@ -94,7 +109,7 @@ const MultiStatementLinkModal = ({ isOpen, closeModal, selectedExpenseIds, selec
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const filteredStatements = statements.filter((s) =>
     (s.description || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -105,9 +120,16 @@ const MultiStatementLinkModal = ({ isOpen, closeModal, selectedExpenseIds, selec
     .filter((s) => selectedIds.includes(s.id))
     .reduce((sum, s) => sum + Number(s.amount || 0), 0);
 
-  return (
-    <div className="fixed inset-0 bg-black/50 bg-opacity-50 flex justify-center items-center z-50 p-4">
-      <div className="bg-white p-6 rounded-lg w-full max-w-6xl max-h-[90vh] flex flex-col shadow-xl">
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 p-4"
+      role="dialog"
+      aria-modal="true"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) closeModal();
+      }}
+    >
+      <div className="relative z-10 flex max-h-[min(90vh,920px)] min-h-0 w-full max-w-6xl flex-col rounded-xl bg-white p-6 shadow-xl">
         <div className="flex justify-between items-center mb-4">
           <div>
             <h2 className="text-xl font-semibold text-gray-800">Link Statements to Selected Expenses</h2>
@@ -208,7 +230,8 @@ const MultiStatementLinkModal = ({ isOpen, closeModal, selectedExpenseIds, selec
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 
