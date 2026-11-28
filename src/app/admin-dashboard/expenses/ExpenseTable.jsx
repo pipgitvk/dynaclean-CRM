@@ -22,7 +22,6 @@ import {
   ExpenseSbiSummaryCard,
   ExpenseApprovalStatusBadge,
   ExpenseRowImageAttachments,
-  ExpenseTravelDetailsCell,
   ExpenseAmountApprovalCell,
   ExpenseLinkedStatementsCell,
   ExpenseStatusBadge,
@@ -64,7 +63,9 @@ function formatExpenseSubmitTimestamp(value) {
 
 function formatExpenseTravelMode(row) {
   const v = String(row.travel_mode || row.ConveyanceMode || "").trim();
-  if (!v || v === "-") return "-";
+  const trainClass = String(row.train_class || "").trim();
+  if (!v || v === "-") return trainClass || "-";
+  if (trainClass) return `${v} — ${trainClass}`;
   return v;
 }
 
@@ -77,7 +78,10 @@ function expenseSummaryBucketMatches(row, bucket, { statusOf, isBlankAmount, isB
     case "approved":
       return status === "approved";
     case "pending_approval":
-      return status === "pending" && isBlankAmount(row.approved_amount);
+      return (
+        (status === "pending" || status === "pending approval") &&
+        isBlankAmount(row.approved_amount)
+      );
     case "pending_payment":
       return status === "approved" && isBlankDate(row.payment_date);
     case "paid":
@@ -290,7 +294,12 @@ export default function ExpenseTable({
     if (clickableSummaryCards && summaryBucket) {
       return expenseSummaryBucketMatches(row, summaryBucket, bucketHelpers);
     }
-    const matchesStatus = !selectedStatus || row.approval_status === selectedStatus;
+    const matchesStatus =
+      !selectedStatus ||
+      row.approval_status === selectedStatus ||
+      (selectedStatus === "Pending approval" &&
+        (row.approval_status === "Pending" ||
+          row.approval_status === "Pending approval"));
     return matchesStatus;
   };
 
@@ -364,7 +373,10 @@ export default function ExpenseTable({
         summary.approvedCount += 1;
       }
 
-      if (status === "pending" && isBlankAmount(row.approved_amount)) {
+      if (
+        (status === "pending" || status === "pending approval") &&
+        isBlankAmount(row.approved_amount)
+      ) {
         summary.pendingApprovalAmount += uploaded;
         summary.pendingApprovalCount += 1;
       }
@@ -874,7 +886,7 @@ export default function ExpenseTable({
             className={isSbiUi ? expenseSbiSelectClass : "px-4 py-2 border rounded-lg w-full sm:w-auto"}
           >
             <option value="">All Status</option>
-            <option value="Pending">Pending</option>
+            <option value="Pending approval">Pending approval</option>
             <option value="Approved">Approved</option>
             <option value="Rejected">Rejected</option>
           </select>
@@ -971,6 +983,15 @@ export default function ExpenseTable({
                     </span>
                   </th>
                   <th
+                    onClick={() => handleSort("TravelDate")}
+                    className="min-w-[7.5rem] whitespace-nowrap p-3 cursor-pointer select-none"
+                  >
+                    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                      {travelDateColumnLabel}
+                      <SortIcon column="TravelDate" />
+                    </span>
+                  </th>
+                  <th
                     onClick={() => handleSort("username")}
                     className="min-w-[9.5rem] whitespace-nowrap p-3 cursor-pointer select-none pr-4"
                   >
@@ -983,7 +1004,7 @@ export default function ExpenseTable({
                     onClick={() => handleSort("expense_status")}
                     className="min-w-[7rem] whitespace-nowrap p-3 cursor-pointer select-none"
                   >
-                    Expense Status
+                    Expense Mode
                     <SortIcon column="expense_status" />
                   </th>
                   <th
@@ -991,37 +1012,37 @@ export default function ExpenseTable({
                     className="min-w-[10rem] max-w-[14rem] p-3 cursor-pointer select-none"
                   >
                     <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                      Amount &amp; Approval
+                      Amount Details
                       <SortIcon column="Total" />
                     </span>
                   </th>
-                  <th
-                    onClick={() => handleSort("FromLocation")}
-                    className="min-w-[10rem] max-w-[15rem] p-3 cursor-pointer select-none"
-                  >
-                    <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                      Travel Details
-                      <SortIcon column="FromLocation" />
-                    </span>
+                  <th onClick={() => handleSort("FromLocation")} className="p-3 cursor-pointer select-none">
+                    {travelFromColumnLabel}
+                    <SortIcon column="FromLocation" />
+                  </th>
+                  <th onClick={() => handleSort("Tolocation")} className="p-3 cursor-pointer select-none">
+                    {travelToColumnLabel}
+                    <SortIcon column="Tolocation" />
                   </th>
                   <th
-                    onClick={() => handleSort("TravelDate")}
-                    className="min-w-[7.5rem] whitespace-nowrap p-3 cursor-pointer select-none"
+                    onClick={() => handleSort("travel_mode")}
+                    className="min-w-[9rem] whitespace-nowrap p-3 cursor-pointer select-none"
                   >
-                    <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                      {travelDateColumnLabel}
-                      <SortIcon column="TravelDate" />
-                    </span>
-                  </th>
-                  <th onClick={() => handleSort("payment_date")} className="p-3 cursor-pointer select-none">
-                    Payment Date
-                    <SortIcon column="payment_date" />
+                    Travel Mode
+                    <SortIcon column="travel_mode" />
                   </th>
                   <th onClick={() => handleSort("approval_status")} className="p-3 cursor-pointer select-none">
                     Status
                     <SortIcon column="approval_status" />
                   </th>
-                  <th className="min-w-[5.5rem] whitespace-nowrap p-3">Image</th>
+                  <th className="min-w-[9rem] p-3">Linked Statements</th>
+                  <th onClick={() => handleSort("payment_date")} className="p-3 cursor-pointer select-none">
+                    Paid Date
+                    <SortIcon column="payment_date" />
+                  </th>
+                  <th className="w-14 min-w-14 max-w-14 whitespace-nowrap p-2 text-center">
+                    Image
+                  </th>
                 </>
               ) : (
                 <>
@@ -1067,7 +1088,7 @@ export default function ExpenseTable({
                   </th>
                 </>
               )}
-              <th className={isSbiUi ? "min-w-[9rem] p-3" : "p-3"}>Linked Statements</th>
+              {!isSbiUi ? <th className="p-3">Linked Statements</th> : null}
               <th className="p-3">Action</th>
             </tr>
           </thead>
@@ -1097,6 +1118,9 @@ export default function ExpenseTable({
                         <td className="whitespace-nowrap p-3 text-xs tabular-nums sm:text-sm">
                           {formatExpenseSubmitTimestamp(row.timestamp)}
                         </td>
+                        <td className="whitespace-nowrap p-3">
+                          {formatExpenseTravelDate(row.TravelDate)}
+                        </td>
                         <td className="min-w-[9.5rem] whitespace-nowrap p-3">
                           {formatExpenseUsername(row)}
                         </td>
@@ -1115,23 +1139,28 @@ export default function ExpenseTable({
                             approvedBy={row.approved_by}
                           />
                         </td>
-                        <td className="p-3 align-top">
-                          <ExpenseTravelDetailsCell
-                            travelFrom={row.FromLocation}
-                            travelTo={row.Tolocation}
-                            travelMode={formatExpenseTravelMode(row)}
-                          />
+                        <td className="p-3">{row.FromLocation}</td>
+                        <td className="p-3">{row.Tolocation}</td>
+                        <td
+                          className="max-w-[10rem] truncate p-3 text-xs sm:text-sm"
+                          title={formatExpenseTravelMode(row)}
+                        >
+                          {formatExpenseTravelMode(row)}
                         </td>
-                        <td className="whitespace-nowrap p-3">
-                          {formatExpenseTravelDate(row.TravelDate)}
+                        <td className="p-3">
+                          <ExpenseApprovalStatusBadge status={row.approval_status} />
+                        </td>
+                        <td className="p-3 align-top">
+                          <ExpenseLinkedStatementsCell
+                            linkedStatementIdsRaw={row.linked_statement_ids}
+                            statementBasePath={dashboardBase}
+                            variant="sbi"
+                          />
                         </td>
                         <td className="p-3">
                           {row.payment_date && row.payment_date !== "0000-00-00"
                             ? dayjs(row.payment_date).format("DD-MM-YYYY")
                             : "-"}
-                        </td>
-                        <td className="p-3">
-                          <ExpenseApprovalStatusBadge status={row.approval_status} />
                         </td>
                         <td className="w-14 min-w-14 max-w-14 p-2 align-middle">
                           <ExpenseRowImageAttachments
@@ -1162,16 +1191,18 @@ export default function ExpenseTable({
                         <td className="p-3">{row.approval_status}</td>
                       </>
                     )}
-                    <td className="p-3 align-top">
-                      <ExpenseLinkedStatementsCell
-                        linkedStatementIdsRaw={row.linked_statement_ids}
-                        statementBasePath={dashboardBase}
-                        variant={isSbiUi ? "sbi" : "default"}
-                      />
-                    </td>
-                    <td className="min-w-[9rem] p-3 align-top">
+                    {!isSbiUi ? (
+                      <td className="p-3 align-top">
+                        <ExpenseLinkedStatementsCell
+                          linkedStatementIdsRaw={row.linked_statement_ids}
+                          statementBasePath={dashboardBase}
+                          variant="default"
+                        />
+                      </td>
+                    ) : null}
+                    <td className="min-w-[10.5rem] p-3 align-top">
                       {showSbiApprovalActions ? (
-                        <div className="inline-flex flex-col gap-1.5">
+                        <div className="inline-flex flex-col gap-2.5">
                           <ExpenseSbiApprovalActions
                             expenseId={row.ID}
                             totalAmount={totalCost}
@@ -1179,7 +1210,7 @@ export default function ExpenseTable({
                             approverUsername={approverUsername}
                             onSuccess={refreshExpenseRows}
                           />
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2.5 pt-0.5">
                             {renderExpenseSecondaryActions(row)}
                           </div>
                         </div>
@@ -1195,7 +1226,7 @@ export default function ExpenseTable({
             ) : (
               <tr>
                 <td
-                  colSpan={isSbiUi ? 13 : 13}
+                  colSpan={isSbiUi ? 15 : 13}
                   className="p-4 text-center text-gray-500"
                 >
                   No entries found.
@@ -1246,12 +1277,18 @@ export default function ExpenseTable({
               ) : null}
               {isSbiUi ? (
                 <div>
+                  <strong>Date of Completion Task:</strong>{" "}
+                  {formatExpenseTravelDate(row.TravelDate)}
+                </div>
+              ) : null}
+              {isSbiUi ? (
+                <div>
                   <strong>Engineer Name:</strong> {formatExpenseUsername(row)}
                 </div>
               ) : null}
               {isSbiUi ? (
                 <div>
-                  <strong>Expense Status:</strong>{" "}
+                  <strong>Expense Mode:</strong>{" "}
                   <ExpenseStatusBadge status={row.expense_status} />
                 </div>
               ) : null}
@@ -1287,14 +1324,14 @@ export default function ExpenseTable({
               ) : null}
               {isSbiUi ? (
                 <>
-                  <ExpenseTravelDetailsCell
-                    travelFrom={row.FromLocation}
-                    travelTo={row.Tolocation}
-                    travelMode={formatExpenseTravelMode(row)}
-                  />
                   <div>
-                    <strong>Date of Completion Task:</strong>{" "}
-                    {formatExpenseTravelDate(row.TravelDate)}
+                    <strong>Travel From:</strong> {row.FromLocation}
+                  </div>
+                  <div>
+                    <strong>Travel To:</strong> {row.Tolocation}
+                  </div>
+                  <div>
+                    <strong>Travel Mode:</strong> {formatExpenseTravelMode(row)}
                   </div>
                 </>
               ) : (
@@ -1307,19 +1344,29 @@ export default function ExpenseTable({
                   </div>
                 </>
               )}
+              {isSbiUi ? (
+                <div>
+                  <strong>Status:</strong>{" "}
+                  <ExpenseApprovalStatusBadge status={row.approval_status} />
+                </div>
+              ) : (
+                <div>
+                  <strong>Status:</strong> {row.approval_status}
+                </div>
+              )}
               <div>
-                <strong>Payment Date:</strong>{" "}
+                <strong className="block pb-1">Linked Statements</strong>
+                <ExpenseLinkedStatementsCell
+                  linkedStatementIdsRaw={row.linked_statement_ids}
+                  statementBasePath={dashboardBase}
+                  variant={isSbiUi ? "sbi" : "default"}
+                />
+              </div>
+              <div>
+                <strong>{isSbiUi ? "Paid Date:" : "Payment Date:"}</strong>{" "}
                 {row.payment_date && row.payment_date !== "0000-00-00"
                   ? dayjs(row.payment_date).format("DD-MM-YYYY")
                   : "-"}
-              </div>
-              <div>
-                <strong>Status:</strong>{" "}
-                {isSbiUi ? (
-                  <ExpenseApprovalStatusBadge status={row.approval_status} />
-                ) : (
-                  row.approval_status
-                )}
               </div>
               {isSbiUi ? (
                 <div className="flex items-center gap-2">
@@ -1330,17 +1377,9 @@ export default function ExpenseTable({
                   />
                 </div>
               ) : null}
-              <div>
-                <strong className="block pb-1">Linked Statements</strong>
-                <ExpenseLinkedStatementsCell
-                  linkedStatementIdsRaw={row.linked_statement_ids}
-                  statementBasePath={dashboardBase}
-                  variant={isSbiUi ? "sbi" : "default"}
-                />
-              </div>
               <div className="pt-2">
                 {showSbiApprovalActions ? (
-                  <div className="inline-flex flex-col gap-1.5">
+                  <div className="inline-flex flex-col gap-2.5">
                     <ExpenseSbiApprovalActions
                       expenseId={row.ID}
                       totalAmount={totalCost}
@@ -1348,7 +1387,7 @@ export default function ExpenseTable({
                       approverUsername={approverUsername}
                       onSuccess={refreshExpenseRows}
                     />
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2.5 pt-0.5">
                       {renderExpenseSecondaryActions(row)}
                     </div>
                   </div>

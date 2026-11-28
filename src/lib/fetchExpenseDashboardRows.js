@@ -1,7 +1,7 @@
 import { getDbConnection } from "@/lib/db";
 
 const EXPENSE_LIST_SQL = `
-  SELECT e.ID, e.TravelDate, e.timestamp, e.attachments, e.travel_mode, e.ConveyanceMode,
+  SELECT e.ID, e.TravelDate, e.timestamp, e.attachments, e.travel_mode, e.train_class, e.ConveyanceMode,
          e.expense_status,
          e.FromLocation, e.Tolocation,
          e.TicketCost, e.HotelCost, e.MealsCost, e.OtherExpenses,
@@ -42,6 +42,16 @@ export async function ensureExpenseTravelModeColumn(conn) {
   }
 }
 
+export async function ensureExpenseTrainClassColumn(conn) {
+  try {
+    await conn.execute("SELECT train_class FROM expenses LIMIT 1");
+  } catch (_) {
+    try {
+      await conn.execute("ALTER TABLE expenses ADD COLUMN train_class VARCHAR(128) NULL");
+    } catch (__) {}
+  }
+}
+
 export async function ensureExpenseDesignationColumn(conn) {
   try {
     await conn.execute("SELECT designation FROM expenses LIMIT 1");
@@ -67,7 +77,7 @@ export async function countExpensePendingApproval(conn, { from = "", to = "" } =
   let sql = `
     SELECT COUNT(*) AS c
     FROM expenses e
-    WHERE LOWER(TRIM(COALESCE(e.approval_status, 'pending'))) = 'pending'
+    WHERE LOWER(TRIM(COALESCE(e.approval_status, 'pending'))) IN ('pending', 'pending approval')
       AND (
         e.approved_amount IS NULL
         OR CAST(COALESCE(e.approved_amount, 0) AS DECIMAL(12, 2)) <= 0
@@ -90,6 +100,7 @@ export async function fetchExpenseDashboardRows() {
   const conn = await getDbConnection();
   await ensureExpenseLinkedStatementColumn(conn);
   await ensureExpenseTravelModeColumn(conn);
+  await ensureExpenseTrainClassColumn(conn);
   await ensureExpenseStatusColumn(conn);
   await ensureExpenseDesignationColumn(conn);
   const [results] = await conn.execute(EXPENSE_LIST_SQL);

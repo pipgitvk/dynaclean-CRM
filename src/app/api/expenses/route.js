@@ -94,8 +94,14 @@ import { getDbConnection } from "@/lib/db";
 import {
   ensureExpenseDesignationColumn,
   ensureExpenseStatusColumn,
+  ensureExpenseTrainClassColumn,
   ensureExpenseTravelModeColumn,
 } from "@/lib/fetchExpenseDashboardRows";
+import { isSbiTrainTravelMode } from "@/lib/sbiTravelOptions";
+import {
+  getSbiFoodExpenseError,
+  getSbiHotelExpenseError,
+} from "@/lib/sbiFoodExpenseRules";
 import { jwtVerify } from "jose";
 import fs from "fs/promises"; // For asynchronous file operations
 import path from "path"; // For path manipulation
@@ -144,19 +150,71 @@ export async function POST(req) {
 
     const conn = await getDbConnection();
     await ensureExpenseTravelModeColumn(conn);
+    await ensureExpenseTrainClassColumn(conn);
     await ensureExpenseStatusColumn(conn);
     await ensureExpenseDesignationColumn(conn);
 
     const travelMode = String(fields.travel_mode || fields.ConveyanceMode || "").trim() || null;
     const expenseStatus = String(fields.expense_status || "").trim().toLowerCase() || null;
+    const trainClassRaw = String(fields.train_class || "").trim();
+    const trainClass = trainClassRaw || null;
+
+    if (expenseStatus === "travel" && isSbiTrainTravelMode(travelMode) && !trainClass) {
+      return NextResponse.json(
+        { error: "Please select train class (Sleeper / AC)." },
+        { status: 400 }
+      );
+    }
+
+    if (expenseStatus === "food") {
+      const travelDate = fields.TravelDate;
+      const [foodRows] = await conn.execute(
+        `SELECT COALESCE(SUM(MealsCost), 0) AS total
+         FROM expenses
+         WHERE username = ?
+           AND LOWER(COALESCE(expense_status, '')) = 'food'
+           AND TravelDate = ?
+           AND COALESCE(approval_status, '') NOT IN ('Rejected')`,
+        [username, travelDate]
+      );
+      const existingFoodTotal = Number(foodRows?.[0]?.total || 0);
+      const foodError = getSbiFoodExpenseError({
+        mealsCost: fields.MealsCost,
+        existingTotalForDay: existingFoodTotal,
+      });
+      if (foodError) {
+        return NextResponse.json({ error: foodError }, { status: 400 });
+      }
+    }
+
+    if (expenseStatus === "hotel") {
+      const travelDate = fields.TravelDate;
+      const [hotelRows] = await conn.execute(
+        `SELECT COALESCE(SUM(HotelCost), 0) AS total
+         FROM expenses
+         WHERE username = ?
+           AND LOWER(COALESCE(expense_status, '')) = 'hotel'
+           AND TravelDate = ?
+           AND COALESCE(approval_status, '') NOT IN ('Rejected')`,
+        [username, travelDate]
+      );
+      const existingHotelTotal = Number(hotelRows?.[0]?.total || 0);
+      const hotelError = getSbiHotelExpenseError({
+        hotelCost: fields.HotelCost,
+        existingTotalForDay: existingHotelTotal,
+      });
+      if (hotelError) {
+        return NextResponse.json({ error: hotelError }, { status: 400 });
+      }
+    }
 
     await conn.execute(
       `INSERT INTO expenses (
         username, TravelDate, FromLocation, Tolocation, distance,
         description, person_name, person_contact, designation, ConveyanceMode, travel_mode,
-        expense_status, TicketCost, HotelCost, MealsCost, OtherExpenses,
+        train_class, expense_status, TicketCost, HotelCost, MealsCost, OtherExpenses,
         attachments, approval_status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         username,
         fields.TravelDate,
@@ -169,6 +227,7 @@ export async function POST(req) {
         fields.designation || null,
         travelMode,
         travelMode,
+        isSbiTrainTravelMode(travelMode) ? trainClass : null,
         expenseStatus,
         fields.TicketCost,
         fields.HotelCost,

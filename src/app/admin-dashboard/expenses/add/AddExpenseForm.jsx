@@ -4,6 +4,16 @@ import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { useState } from "react";
+import {
+  getSbiFoodAmountError,
+  getSbiHotelAmountError,
+  SBI_FOOD_MAX_AMOUNT,
+  SBI_HOTEL_MAX_AMOUNT,
+} from "@/lib/sbiFoodExpenseRules";
+import {
+  isSbiTrainTravelMode,
+  SBI_TRAIN_CLASS_OPTIONS,
+} from "@/lib/sbiTravelOptions";
 
 const SBI_TRAVEL_MODE_OPTIONS = [
   { value: "Train booked by company", label: "Train booked by company" },
@@ -31,17 +41,46 @@ export default function AddExpenseForm({
   const { register, handleSubmit, reset, watch } = useForm({
     defaultValues: {
       expense_status: "",
+      train_class: "",
       HotelCost: 0,
       MealsCost: 0,
       OtherExpenses: 0,
     },
   });
   const expenseStatus = watch("expense_status");
+  const travelMode = watch("travel_mode");
   const isTravelExpense = !isSbiUi || expenseStatus === "travel";
+  const showTrainClass = isSbiUi && expenseStatus === "travel" && isSbiTrainTravelMode(travelMode);
 
   const onSubmit = async (data) => {
     if (isSbiUi && !data.expense_status) {
-      toast.error("Please select expense status");
+      toast.error("Please select expense mode");
+      return;
+    }
+
+    if (isSbiUi && String(data.expense_status || "").toLowerCase() === "food") {
+      const foodError = getSbiFoodAmountError(data.MealsCost);
+      if (foodError) {
+        toast.error(foodError);
+        return;
+      }
+    }
+
+    if (isSbiUi && String(data.expense_status || "").toLowerCase() === "hotel") {
+      const hotelError = getSbiHotelAmountError(data.HotelCost);
+      if (hotelError) {
+        toast.error(hotelError);
+        return;
+      }
+    }
+
+    if (
+      isSbiUi &&
+      String(data.expense_status || "").toLowerCase() === "travel" &&
+      isSbiTrainTravelMode(data.travel_mode) &&
+      !String(data.train_class || "").trim()
+    ) {
+      toast.error("Please select train class (Sleeper / AC).");
       return;
     }
 
@@ -62,9 +101,13 @@ export default function AddExpenseForm({
         payload.Tolocation = data.Tolocation || "-";
         payload.distance = data.distance || 0;
         payload.travel_mode = "";
+        payload.train_class = "";
         payload.ConveyanceMode = "-";
       } else if (data.travel_mode) {
         payload.ConveyanceMode = data.travel_mode;
+        payload.train_class = isSbiTrainTravelMode(data.travel_mode)
+          ? String(data.train_class || "").trim()
+          : "";
       }
     }
 
@@ -134,7 +177,7 @@ export default function AddExpenseForm({
 
         {isSbiUi ? (
           <div className="sm:col-span-2">
-            <label className="block text-sm font-medium mb-1">Expense Status *</label>
+            <label className="block text-sm font-medium mb-1">Expense Mode *</label>
             <select
               {...register("expense_status", { required: true })}
               className={fieldClass}
@@ -226,6 +269,26 @@ export default function AddExpenseForm({
           </div>
         ) : null}
 
+        {showTrainClass ? (
+          <div>
+            <label className="block text-sm font-medium mb-1">Train Class *</label>
+            <select
+              {...register("train_class", { required: true })}
+              className={fieldClass}
+              defaultValue=""
+            >
+              <option value="" disabled>
+                Select Sleeper / AC class
+              </option>
+              {SBI_TRAIN_CLASS_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
+
         {!isSbiUi ? (
           <div>
             <label className="block text-sm font-medium mb-1">Conveyance Mode *</label>
@@ -291,9 +354,21 @@ export default function AddExpenseForm({
             <label className="block text-sm font-medium mb-1">Food Cost *</label>
             <input
               type="number"
-              {...register("MealsCost", { required: true })}
+              min={0}
+              max={SBI_FOOD_MAX_AMOUNT}
+              step="0.01"
+              {...register("MealsCost", {
+                required: true,
+                max: {
+                  value: SBI_FOOD_MAX_AMOUNT,
+                  message: `Maximum ₹${SBI_FOOD_MAX_AMOUNT}`,
+                },
+              })}
               className={fieldClass}
             />
+            <p className="mt-1 text-xs text-slate-500">
+              Food allowance is ₹{SBI_FOOD_MAX_AMOUNT} per 24 hours.
+            </p>
           </div>
         ) : null}
         {isSbiUi && expenseStatus === "hotel" ? (
@@ -301,9 +376,21 @@ export default function AddExpenseForm({
             <label className="block text-sm font-medium mb-1">Hotel Cost *</label>
             <input
               type="number"
-              {...register("HotelCost", { required: true })}
+              min={0}
+              max={SBI_HOTEL_MAX_AMOUNT}
+              step="0.01"
+              {...register("HotelCost", {
+                required: true,
+                max: {
+                  value: SBI_HOTEL_MAX_AMOUNT,
+                  message: `Maximum ₹${SBI_HOTEL_MAX_AMOUNT}`,
+                },
+              })}
               className={fieldClass}
             />
+            <p className="mt-1 text-xs text-slate-500">
+              Hotel allowance is ₹{SBI_HOTEL_MAX_AMOUNT} per 24 hours.
+            </p>
           </div>
         ) : null}
         {isSbiUi && expenseStatus === "other" ? (

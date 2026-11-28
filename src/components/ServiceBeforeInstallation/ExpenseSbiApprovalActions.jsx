@@ -1,7 +1,6 @@
 "use client";
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
-import { Check, Clock, X } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
 const APPROVER_ROLES = new Set([
@@ -12,11 +11,21 @@ const APPROVER_ROLES = new Set([
   "DIRECTOR",
 ]);
 
+const PENDING_APPROVAL_LABEL = "Pending approval";
+
 function normalizeApprovalStatus(raw) {
   const v = String(raw || "").trim().toLowerCase();
   if (v === "approved") return "Approved";
   if (v === "rejected") return "Rejected";
-  return "Pending";
+  if (v === "pending" || v === "pending approval" || !v) {
+    return PENDING_APPROVAL_LABEL;
+  }
+  return raw;
+}
+
+function isPendingApprovalStatus(raw) {
+  const v = String(raw || "").trim().toLowerCase();
+  return v === "pending" || v === "pending approval" || !v;
 }
 
 async function postExpenseApproval(body) {
@@ -75,10 +84,10 @@ export default function ExpenseSbiApprovalActions({
   );
 
   const setPending = () => {
-    if (current === "Pending") return;
+    if (current === PENDING_APPROVAL_LABEL) return;
     runUpdate("pending", {
       approved_amount: 0,
-      approval_status: "Pending",
+      approval_status: PENDING_APPROVAL_LABEL,
       approval_date: today,
       approved_by: approverUsername || "",
     });
@@ -115,61 +124,57 @@ export default function ExpenseSbiApprovalActions({
     });
   };
 
-  const iconBtnBase =
-    "inline-flex cursor-pointer items-center disabled:cursor-not-allowed disabled:opacity-40";
+  const btnBase =
+    "w-full rounded-lg px-1.5 py-1.5 text-[9px] font-bold leading-tight shadow-sm transition disabled:opacity-50 sm:text-[10px] sm:leading-snug";
 
   return (
     <>
       <div
-        className="flex items-center gap-2"
+        className="flex w-[9.25rem] flex-col gap-2"
         role="group"
         aria-label="Expense approval actions"
       >
-        <button
-          type="button"
-          disabled={loading != null || current === "Pending"}
-          onClick={setPending}
-          className={`${iconBtnBase} ${
-            current === "Pending"
-              ? "text-amber-700"
-              : "text-amber-600 hover:text-amber-800"
-          }`}
-          title="Pending approval"
-          aria-label="Set pending approval"
-        >
-          <Clock size={16} aria-hidden />
-        </button>
-        <button
-          type="button"
-          disabled={loading != null}
-          onClick={() => {
-            setApprovedAmount(String(Number(totalAmount || 0).toFixed(2)));
-            setApprovalDate(today);
-            setApproveOpen(true);
-          }}
-          className={`${iconBtnBase} ${
-            current === "Approved"
-              ? "text-green-700"
-              : "text-green-600 hover:text-green-800"
-          }`}
-          title="Approve expense"
-          aria-label="Approve expense"
-        >
-          <Check size={16} aria-hidden />
-        </button>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            disabled={loading != null || isPendingApprovalStatus(approvalStatus)}
+            onClick={setPending}
+            className={`${btnBase} ${
+              isPendingApprovalStatus(approvalStatus)
+                ? "bg-amber-200 text-amber-950 ring-2 ring-amber-400/80"
+                : "bg-amber-100 text-amber-900 ring-1 ring-amber-300/90 hover:bg-amber-200"
+            }`}
+          >
+            Pending approval
+          </button>
+          <button
+            type="button"
+            disabled={loading != null}
+            onClick={() => {
+              setApprovedAmount(String(Number(totalAmount || 0).toFixed(2)));
+              setApprovalDate(today);
+              setApproveOpen(true);
+            }}
+            className={`${btnBase} ${
+              current === "Approved"
+                ? "bg-emerald-200 text-emerald-950 ring-2 ring-emerald-400/80"
+                : "bg-emerald-100 text-emerald-900 ring-1 ring-emerald-300/90 hover:bg-emerald-200"
+            }`}
+          >
+            Approved
+          </button>
+        </div>
         <button
           type="button"
           disabled={loading != null}
           onClick={setRejected}
-          className={`${iconBtnBase} ${
+          className={`${btnBase} ${
             current === "Rejected"
-              ? "text-red-700"
-              : "text-red-600 hover:text-red-800"
+              ? "bg-rose-200 text-rose-950 ring-2 ring-rose-400/80"
+              : "bg-rose-100 text-rose-900 ring-1 ring-rose-300/90 hover:bg-rose-200"
           }`}
-          title="Reject expense"
-          aria-label="Reject expense"
         >
-          <X size={16} aria-hidden />
+          Reject
         </button>
       </div>
       {approveOpen ? (
