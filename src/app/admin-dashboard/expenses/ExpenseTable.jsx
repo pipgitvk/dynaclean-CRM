@@ -27,6 +27,7 @@ import {
   ExpenseServiceTypeAndModeCell,
   expenseSbiFilterInputClass,
   expenseSbiSelectClass,
+  formatExpenseStatusLabel,
 } from "@/components/ServiceBeforeInstallation/ExpenseApprovalSbiUi";
 import StatementLinkModal from "./StatementLinkModal";
 import MultiStatementLinkModal from "./MultiStatementLinkModal";
@@ -67,6 +68,85 @@ function formatExpenseTravelMode(row) {
   if (!v || v === "-") return trainClass || "-";
   if (trainClass) return `${v} — ${trainClass}`;
   return v;
+}
+
+function expenseRowTotalAmount(row) {
+  return (
+    Number(row.TicketCost || 0) +
+    Number(row.HotelCost || 0) +
+    Number(row.MealsCost || 0) +
+    Number(row.OtherExpenses || 0)
+  );
+}
+
+function buildExpenseRowSearchText(row) {
+  const total = expenseRowTotalAmount(row);
+  const approved = Number(row.approved_amount || 0);
+  const chunks = [];
+
+  for (const v of Object.values(row)) {
+    if (v == null || v === "") continue;
+    chunks.push(String(v));
+  }
+
+  chunks.push(total.toFixed(2), String(total));
+  if (approved > 0) {
+    chunks.push(approved.toFixed(2), String(approved));
+  }
+
+  ["TicketCost", "HotelCost", "MealsCost", "OtherExpenses"].forEach((key) => {
+    const n = Number(row[key] || 0);
+    if (n > 0) {
+      chunks.push(n.toFixed(2), String(n));
+    }
+  });
+
+  chunks.push(
+    formatExpenseTravelMode(row),
+    formatExpenseStatusLabel(row.expense_status),
+    formatExpenseTravelDate(row.TravelDate),
+    formatExpenseSubmitTimestamp(row.timestamp),
+    row.timestamp ? dayjs(row.timestamp).format("YYYY-MM-DD") : "",
+    String(row.username || ""),
+    String(row.approval_status || ""),
+    String(row.service_type || ""),
+    row.service_id ? `#${row.service_id}` : "",
+    String(row.service_id || ""),
+    String(row.rejection_remark || ""),
+    `₹${total.toFixed(2)}`,
+    approved > 0 ? `₹${approved.toFixed(2)}` : "",
+  );
+
+  try {
+    const linked = JSON.parse(row.linked_statement_ids || "[]");
+    if (Array.isArray(linked)) {
+      linked.forEach((id) => {
+        chunks.push(String(id), `#${id}`);
+      });
+    }
+  } catch {
+    const raw = String(row.linked_statement_ids || "").trim();
+    if (raw) chunks.push(raw);
+  }
+
+  return chunks.join(" ").toLowerCase();
+}
+
+function expenseRowMatchesSearch(row, rawQuery) {
+  const q = String(rawQuery || "").trim().toLowerCase();
+  if (!q) return true;
+
+  const haystack = buildExpenseRowSearchText(row);
+  const qPlain = q.replace(/[₹,]/g, "").trim();
+
+  if (haystack.includes(q)) return true;
+  if (qPlain && haystack.includes(qPlain)) return true;
+
+  const tokens = qPlain.split(/\s+/).filter(Boolean);
+  if (tokens.length > 1) {
+    return tokens.every((token) => haystack.includes(token));
+  }
+  return false;
 }
 
 function expenseSummaryBucketMatches(row, bucket, { statusOf, isBlankAmount, isBlankDate }) {
@@ -275,13 +355,7 @@ export default function ExpenseTable({
   const statusOf = (row) => (row.approval_status || "").toLowerCase();
 
   const rowMatchesSearchAndDate = (row) => {
-    const formattedDate = dayjs(row.TravelDate).format("DD-MM-YYYY");
-    const matchesSearch =
-      Object.values(row)
-        .join(" ")
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase()) ||
-      formattedDate.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = expenseRowMatchesSearch(row, searchQuery);
     const matchesDateRange =
       (!fromDate || dayjs(row.TravelDate).isAfter(dayjs(fromDate).subtract(1, "day"))) &&
       (!toDate || dayjs(row.TravelDate).isBefore(dayjs(toDate).add(1, "day")));
@@ -858,7 +932,11 @@ export default function ExpenseTable({
           />
           <input
             type="text"
-            placeholder="Search anything..."
+            placeholder={
+              isSbiUi
+                ? "Search amount, ID, engineer, service, location…"
+                : "Search amount, ID, name, location…"
+            }
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className={

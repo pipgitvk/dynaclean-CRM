@@ -24,11 +24,6 @@ function normalizeApprovalStatus(raw) {
   return raw;
 }
 
-function isPendingApprovalStatus(raw) {
-  const v = String(raw || "").trim().toLowerCase();
-  return v === "pending" || v === "pending approval" || !v;
-}
-
 function ExpenseApprovalModal({ open, titleId, onClose, children }) {
   const [mounted, setMounted] = useState(false);
 
@@ -124,16 +119,6 @@ export default function ExpenseSbiApprovalActions({
     [expenseId, onSuccess],
   );
 
-  const setPending = () => {
-    if (current === PENDING_APPROVAL_LABEL) return;
-    runUpdate("pending", {
-      approved_amount: 0,
-      approval_status: PENDING_APPROVAL_LABEL,
-      approval_date: today,
-      approved_by: approverUsername || "",
-    });
-  };
-
   const openRejectModal = () => {
     setRejectionRemark("");
     setRejectOpen(true);
@@ -173,26 +158,25 @@ export default function ExpenseSbiApprovalActions({
   const btnBase =
     "w-full rounded-lg px-1.5 py-1.5 text-[9px] font-bold leading-tight shadow-sm transition disabled:opacity-50 sm:text-[10px] sm:leading-snug";
 
+  const isApproved = current === "Approved";
+  const isRejected = current === "Rejected";
+  const showApprove = !isApproved;
+  const showReject = !isRejected;
+
+  if (!showApprove && !showReject) {
+    return null;
+  }
+
   return (
     <>
       <div
-        className="flex w-[9.25rem] flex-col gap-2"
+        className={`grid w-[9.25rem] gap-2 ${
+          showApprove && showReject ? "grid-cols-2" : "grid-cols-1"
+        }`}
         role="group"
         aria-label="Expense approval actions"
       >
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            disabled={loading != null || isPendingApprovalStatus(approvalStatus)}
-            onClick={setPending}
-            className={`${btnBase} ${
-              isPendingApprovalStatus(approvalStatus)
-                ? "bg-amber-200 text-amber-950 ring-2 ring-amber-400/80"
-                : "bg-amber-100 text-amber-900 ring-1 ring-amber-300/90 hover:bg-amber-200"
-            }`}
-          >
-            Pending approval
-          </button>
+        {showApprove ? (
           <button
             type="button"
             disabled={loading != null}
@@ -201,27 +185,21 @@ export default function ExpenseSbiApprovalActions({
               setApprovalDate(today);
               setApproveOpen(true);
             }}
-            className={`${btnBase} ${
-              current === "Approved"
-                ? "bg-emerald-200 text-emerald-950 ring-2 ring-emerald-400/80"
-                : "bg-emerald-100 text-emerald-900 ring-1 ring-emerald-300/90 hover:bg-emerald-200"
-            }`}
+            className={`${btnBase} bg-emerald-100 text-emerald-900 ring-1 ring-emerald-300/90 hover:bg-emerald-200`}
           >
             Approved
           </button>
-        </div>
-        <button
-          type="button"
-          disabled={loading != null}
-          onClick={openRejectModal}
-          className={`${btnBase} ${
-            current === "Rejected"
-              ? "bg-rose-200 text-rose-950 ring-2 ring-rose-400/80"
-              : "bg-rose-100 text-rose-900 ring-1 ring-rose-300/90 hover:bg-rose-200"
-          }`}
-        >
-          Reject
-        </button>
+        ) : null}
+        {showReject ? (
+          <button
+            type="button"
+            disabled={loading != null}
+            onClick={openRejectModal}
+            className={`${btnBase} bg-rose-100 text-rose-900 ring-1 ring-rose-300/90 hover:bg-rose-200`}
+          >
+            Reject
+          </button>
+        ) : null}
       </div>
       <ExpenseApprovalModal
         open={rejectOpen}
