@@ -287,7 +287,7 @@ export function ExpenseLinkedStatementsCell({
 
   const chipClass =
     variant === "sbi"
-      ? "inline-flex rounded-md bg-violet-50 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-violet-900 ring-1 ring-violet-200/90 transition hover:bg-violet-100"
+      ? "inline-flex rounded-md bg-violet-50 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-violet-900 ring-1 ring-violet-200/90"
       : "inline-flex rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-slate-700 hover:bg-slate-200";
 
   return (
@@ -304,16 +304,22 @@ export function ExpenseLinkedStatementsCell({
         </span>
       ) : null}
       <div className="flex flex-wrap gap-1">
-        {ids.map((id) => (
-          <Link
-            key={id}
-            href={`${statementBasePath}/statements/${id}`}
-            className={chipClass}
-            title={`Open statement #${id}`}
-          >
-            #{id}
-          </Link>
-        ))}
+        {ids.map((id) =>
+          variant === "sbi" ? (
+            <span key={id} className={chipClass} title={`Statement #${id}`}>
+              #{id}
+            </span>
+          ) : (
+            <Link
+              key={id}
+              href={`${statementBasePath}/statements/${id}`}
+              className={chipClass}
+              title={`Open statement #${id}`}
+            >
+              #{id}
+            </Link>
+          ),
+        )}
       </div>
     </div>
   );
