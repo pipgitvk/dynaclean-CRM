@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
-import { ensureExpenseRejectionRemarkColumn } from "@/lib/fetchExpenseDashboardRows";
+import {
+  ensureExpenseLinkedStatementColumn,
+  ensureExpenseRejectionRemarkColumn,
+} from "@/lib/fetchExpenseDashboardRows";
 import { jwtVerify } from "jose";
 
 export async function POST(req) {
@@ -33,9 +36,13 @@ export async function POST(req) {
 
     const conn = await getDbConnection();
     await ensureExpenseRejectionRemarkColumn(conn);
+    await ensureExpenseLinkedStatementColumn(conn);
 
     const status = String(approval_status || "").trim();
-    const isRejected = status.toLowerCase() === "rejected";
+    const statusLower = status.toLowerCase();
+    const isRejected = statusLower === "rejected";
+    const isRevertToPending =
+      statusLower === "pending" || statusLower === "pending approval";
     const rejectionRemark = String(rejectionRemarkRaw || "").trim();
 
     if (isRejected && !rejectionRemark) {
@@ -45,22 +52,72 @@ export async function POST(req) {
       );
     }
 
-    const remarkToStore = isRejected ? rejectionRemark : null;
+    if (isRevertToPending) {
+      const [expenseRows] = await conn.execute(
+        `SELECT approval_status, payment_date, linked_statement_ids
+         FROM expenses WHERE ID = ?`,
+        [expense_id],
+      );
+      if (!expenseRows?.length) {
+        return NextResponse.json({ error: "Expense not found" }, { status: 404 });
+      }
+      const row = expenseRows[0];
+      const currentStatus = String(row.approval_status || "").trim().toLowerCase();
+      if (currentStatus !== "approved") {
+        return NextResponse.json(
+          { error: "Only approved expenses can be reverted." },
+          { status: 400 },
+        );
+      }
+      if (row.payment_date) {
+        return NextResponse.json(
+          { error: "Cannot revert: payment has already been processed." },
+          { status: 400 },
+        );
+      }
+      try {
+        const linked = JSON.parse(row.linked_statement_ids || "[]");
+        if (Array.isArray(linked) && linked.length > 0) {
+          return NextResponse.json(
+            {
+              error:
+                "Cannot revert: payment statements are linked. Remove the link first.",
+            },
+            { status: 400 },
+          );
+        }
+      } catch {
+        /* treat invalid JSON as no links */
+      }
 
-    await conn.execute(
-      `UPDATE expenses
-       SET approved_amount = ?, approval_status = ?, approval_date = ?, approved_by = ?,
-           rejection_remark = ?
-       WHERE ID = ?`,
-      [
-        approved_amount,
-        approval_status,
-        approval_date,
-        approved_by,
-        remarkToStore,
-        expense_id,
-      ]
-    );
+      await conn.execute(
+        `UPDATE expenses
+         SET approved_amount = 0,
+             approval_status = 'Pending',
+             approval_date = NULL,
+             approved_by = NULL,
+             rejection_remark = NULL
+         WHERE ID = ?`,
+        [expense_id],
+      );
+    } else {
+      const remarkToStore = isRejected ? rejectionRemark : null;
+
+      await conn.execute(
+        `UPDATE expenses
+         SET approved_amount = ?, approval_status = ?, approval_date = ?, approved_by = ?,
+             rejection_remark = ?
+         WHERE ID = ?`,
+        [
+          approved_amount,
+          approval_status,
+          approval_date,
+          approved_by,
+          remarkToStore,
+          expense_id,
+        ],
+      );
+    }
 
         // await conn.end();
 

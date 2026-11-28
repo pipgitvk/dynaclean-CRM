@@ -9,8 +9,7 @@ import {
   Eye,
   CreditCard,
   Pencil,
-  Link2,
-  Edit3,
+  Link as LinkIcon,
   Search,
   CalendarDays,
   ChevronDown,
@@ -33,6 +32,7 @@ import StatementLinkModal from "./StatementLinkModal";
 import MultiStatementLinkModal from "./MultiStatementLinkModal";
 import ExpenseSbiApprovalActions, {
   canManageExpenseApproval,
+  SBI_EXPENSE_ACTION_ROW_CLASS,
 } from "@/components/ServiceBeforeInstallation/ExpenseSbiApprovalActions";
 
 function isInactiveExpenseEmployee(row) {
@@ -132,6 +132,39 @@ function buildExpenseRowSearchText(row) {
   return chunks.join(" ").toLowerCase();
 }
 
+/** SBI — submit on/after this date (inclusive), approved, statement not linked */
+const SBI_PENDING_LINK_STATEMENTS_FROM_DATE = "2026-05-10";
+
+function expenseHasLinkedStatements(row) {
+  const raw = row?.linked_statement_ids;
+  if (raw == null || raw === "") return false;
+  const s = String(raw).trim();
+  if (!s || s === "[]" || s === "null") return false;
+  try {
+    const linked = JSON.parse(s);
+    if (Array.isArray(linked)) return linked.length > 0;
+  } catch {
+  return false;
+  }
+  return false;
+}
+
+function expenseSubmitOnOrAfterSbiLinkCutoff(row) {
+  const ts = row?.timestamp;
+  if (!ts || ts === "0000-00-00 00:00:00" || ts === "0000-00-00") return false;
+  const submitted = dayjs(ts);
+  if (!submitted.isValid()) return false;
+  return !submitted.isBefore(dayjs(SBI_PENDING_LINK_STATEMENTS_FROM_DATE), "day");
+}
+
+function isPendingLinkedStatementsRow(row, statusOfFn) {
+  return (
+    statusOfFn(row) === "approved" &&
+    !expenseHasLinkedStatements(row) &&
+    expenseSubmitOnOrAfterSbiLinkCutoff(row)
+  );
+}
+
 function expenseRowMatchesSearch(row, rawQuery) {
   const q = String(rawQuery || "").trim().toLowerCase();
   if (!q) return true;
@@ -166,6 +199,8 @@ function expenseSummaryBucketMatches(row, bucket, { statusOf, isBlankAmount, isB
       return status === "approved" && isBlankDate(row.payment_date);
     case "paid":
       return status === "approved" && !isBlankDate(row.payment_date);
+    case "pending_linked_statements":
+      return isPendingLinkedStatementsRow(row, statusOf);
     default:
       return true;
   }
@@ -275,12 +310,14 @@ export default function ExpenseTable({
     router.refresh();
   }, [router]);
 
+  const isExpenseSettled = (row) => expenseHasLinkedStatements(row);
+
   const renderExpenseSecondaryActions = useCallback(
     (row) => (
       <>
         <Link
           href={`${dashboardBase}/expenses/${row.ID}`}
-          className="text-blue-600 hover:underline"
+          className="inline-flex h-8 w-8 items-center justify-center text-blue-600 hover:text-blue-800"
           title="View expense"
         >
           <Eye size={16} />
@@ -288,40 +325,25 @@ export default function ExpenseTable({
         {row.approval_status !== "Approved" && row.approval_status !== "Rejected" ? (
           <Link
             href={`${dashboardBase}/expenses/edit/${row.ID}`}
-            className="text-yellow-600 hover:text-yellow-800"
+            className="inline-flex h-8 w-8 items-center justify-center text-yellow-600 hover:text-yellow-800"
             title="Edit expense"
           >
             <Pencil size={16} />
           </Link>
         ) : row.approval_status === "Approved" ? (
-          !row.linked_statement_ids ||
-          JSON.parse(row.linked_statement_ids || "[]").length === 0 ? (
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedRowForLink(row);
-                setIsLinkModalOpen(true);
-              }}
-              className="text-indigo-600 hover:text-indigo-800 cursor-pointer"
-              title="Payment link"
-            >
-              <Link2 size={16} />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedRowForLink(row);
-                setIsLinkModalOpen(true);
-              }}
-              className="text-blue-500 hover:text-blue-700 cursor-pointer"
-              title="Edit payment link"
-            >
-              <Edit3 size={16} />
-            </button>
-          )
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedRowForLink(row);
+              setIsLinkModalOpen(true);
+            }}
+            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-indigo-700 transition hover:bg-indigo-50 hover:text-indigo-900"
+            title={isExpenseSettled(row) ? "Edit payment link" : "Link payment"}
+          >
+            <LinkIcon size={18} strokeWidth={2.35} aria-hidden />
+          </button>
         ) : (
-          <span className="inline-block w-4" aria-hidden />
+          <span className="inline-block h-8 w-8 shrink-0" aria-hidden />
         )}
         {role === "SUPERADMIN" ? (
           <button
@@ -334,13 +356,13 @@ export default function ExpenseTable({
               setSelectedRow(row);
               setIsModalOpen(true);
             }}
-            className="text-green-600 hover:text-green-800 cursor-pointer"
+            className="inline-flex h-8 w-8 items-center justify-center text-green-600 hover:text-green-800"
             title="Process payment"
           >
             <CreditCard size={16} />
           </button>
         ) : (
-          <span className="inline-block w-4" aria-hidden />
+          <span className="inline-block h-8 w-8 shrink-0" aria-hidden />
         )}
       </>
     ),
@@ -356,9 +378,12 @@ export default function ExpenseTable({
 
   const rowMatchesSearchAndDate = (row) => {
     const matchesSearch = expenseRowMatchesSearch(row, searchQuery);
+    const useSubmitTimestamp =
+      clickableSummaryCards && summaryBucket === "pending_linked_statements";
+    const rowDate = useSubmitTimestamp ? row.timestamp : row.TravelDate;
     const matchesDateRange =
-      (!fromDate || dayjs(row.TravelDate).isAfter(dayjs(fromDate).subtract(1, "day"))) &&
-      (!toDate || dayjs(row.TravelDate).isBefore(dayjs(toDate).add(1, "day")));
+      (!fromDate || dayjs(rowDate).isAfter(dayjs(fromDate).subtract(1, "day"))) &&
+      (!toDate || dayjs(rowDate).isBefore(dayjs(toDate).add(1, "day")));
     return matchesSearch && matchesDateRange;
   };
 
@@ -383,7 +408,13 @@ export default function ExpenseTable({
       setSummaryBucket(null);
       return;
     }
-    setSummaryBucket((prev) => (prev === bucketId ? null : bucketId));
+    const activating = summaryBucket !== bucketId;
+    if (activating && bucketId === "pending_linked_statements" && isSbiUi) {
+      setDatePeriodMode("custom");
+      setFromDate(SBI_PENDING_LINK_STATEMENTS_FROM_DATE);
+      setToDate(dayjs().format("YYYY-MM-DD"));
+    }
+    setSummaryBucket(activating ? bucketId : null);
     setSelectedStatus("");
   };
 
@@ -426,6 +457,8 @@ export default function ExpenseTable({
       pendingApprovalCount: 0,
       pendingPaymentAmount: 0,
       pendingPaymentCount: 0,
+      pendingLinkedStatementsAmount: 0,
+      pendingLinkedStatementsCount: 0,
       paidAmount: 0,
       paidCount: 0,
     };
@@ -461,6 +494,11 @@ export default function ExpenseTable({
         summary.pendingPaymentCount += 1;
       }
 
+      if (isPendingLinkedStatementsRow(row, statusOf)) {
+        summary.pendingLinkedStatementsAmount += approvedAmt > 0 ? approvedAmt : uploaded;
+        summary.pendingLinkedStatementsCount += 1;
+      }
+
       if (status === "approved" && !isBlankDate(row.payment_date)) {
         summary.paidAmount += approvedAmt > 0 ? approvedAmt : uploaded;
         summary.paidCount += 1;
@@ -490,6 +528,8 @@ export default function ExpenseTable({
     pendingApprovalCount,
     pendingPaymentAmount,
     pendingPaymentCount,
+    pendingLinkedStatementsAmount,
+    pendingLinkedStatementsCount,
     paidAmount,
     paidCount,
   } = calculateTotals(summaryRows);
@@ -557,16 +597,6 @@ export default function ExpenseTable({
     }
     return (va - vb) * dir;
   });
-
-  // Helper function to check if expense is settled
-  const isExpenseSettled = (row) => {
-    try {
-      const linkedIds = JSON.parse(row.linked_statement_ids || "[]");
-      return linkedIds.length > 0;
-    } catch (e) {
-      return false;
-    }
-  };
 
   const toggleExpenseSelection = (id, row) => {
     if (row.approval_status !== "Approved") {
@@ -764,7 +794,7 @@ export default function ExpenseTable({
       <div
         className={
           isSbiUi
-            ? `grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 ${isDirector ? "xl:grid-cols-6" : "xl:grid-cols-5"}`
+            ? `grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 ${isDirector ? "xl:grid-cols-4 2xl:grid-cols-7" : "xl:grid-cols-3 2xl:grid-cols-6"}`
             : `grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 ${isDirector ? "xl:grid-cols-6" : "xl:grid-cols-5"} gap-4 mb-4`
         }
       >
@@ -814,6 +844,15 @@ export default function ExpenseTable({
               clickable={clickableSummaryCards}
               active={summaryBucket === "pending_payment"}
               onClick={() => toggleSummaryCard("pending_payment")}
+            />
+            <ExpenseSbiSummaryCard
+              bucketId="pending_linked_statements"
+              label="Pending to linked statements"
+              amount={pendingLinkedStatementsAmount}
+              caption={`${pendingLinkedStatementsCount} approved · no statement link · submit ≥ 10-05-2026`}
+              clickable={clickableSummaryCards}
+              active={summaryBucket === "pending_linked_statements"}
+              onClick={() => toggleSummaryCard("pending_linked_statements")}
             />
             {isDirector ? (
               <ExpenseSbiSummaryCard
@@ -910,7 +949,7 @@ export default function ExpenseTable({
                 title="Link Payment"
                 type="button"
               >
-                <Link2 size={20} />
+                <LinkIcon size={20} strokeWidth={2.35} className="text-indigo-700" />
               </button>
             </div>
           </div>
@@ -1309,7 +1348,9 @@ export default function ExpenseTable({
                     ) : null}
                     <td className="min-w-[10.5rem] p-3 align-top">
                       {showSbiApprovalActions ? (
-                        <div className="inline-flex flex-col gap-2.5">
+                        <div
+                          className={`inline-flex flex-col items-stretch gap-2.5 ${SBI_EXPENSE_ACTION_ROW_CLASS}`}
+                        >
                           <ExpenseSbiApprovalActions
                             expenseId={row.ID}
                             totalAmount={totalCost}
@@ -1317,7 +1358,7 @@ export default function ExpenseTable({
                             approverUsername={approverUsername}
                             onSuccess={refreshExpenseRows}
                           />
-                          <div className="flex items-center gap-2.5 pt-0.5">
+                          <div className="flex w-full items-center justify-between pt-0.5">
                             {renderExpenseSecondaryActions(row)}
                           </div>
                         </div>
@@ -1490,7 +1531,9 @@ export default function ExpenseTable({
               ) : null}
               <div className="pt-2">
                 {showSbiApprovalActions ? (
-                  <div className="inline-flex flex-col gap-2.5">
+                  <div
+                    className={`inline-flex flex-col items-stretch gap-2.5 ${SBI_EXPENSE_ACTION_ROW_CLASS}`}
+                  >
                     <ExpenseSbiApprovalActions
                       expenseId={row.ID}
                       totalAmount={totalCost}
@@ -1498,7 +1541,7 @@ export default function ExpenseTable({
                       approverUsername={approverUsername}
                       onSuccess={refreshExpenseRows}
                     />
-                    <div className="flex items-center gap-2.5 pt-0.5">
+                    <div className="flex w-full items-center justify-between pt-0.5">
                       {renderExpenseSecondaryActions(row)}
                     </div>
                   </div>

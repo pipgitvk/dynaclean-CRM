@@ -14,6 +14,9 @@ const APPROVER_ROLES = new Set([
 
 const PENDING_APPROVAL_LABEL = "Pending approval";
 
+/** Matches three action icons below (view / link / pay) in the expense table */
+export const SBI_EXPENSE_ACTION_ROW_CLASS = "w-[6.75rem]";
+
 function normalizeApprovalStatus(raw) {
   const v = String(raw || "").trim().toLowerCase();
   if (v === "approved") return "Approved";
@@ -158,20 +161,40 @@ export default function ExpenseSbiApprovalActions({
   const btnBase =
     "w-full rounded-lg px-1.5 py-1.5 text-[9px] font-bold leading-tight shadow-sm transition disabled:opacity-50 sm:text-[10px] sm:leading-snug";
 
+  const submitRevert = () => {
+    if (
+      !window.confirm(
+        "Revert this expense to Pending approval? Approval details will be cleared.",
+      )
+    ) {
+      return;
+    }
+    runUpdate("revert", {
+      approved_amount: 0,
+      approval_status: "Pending",
+      approval_date: null,
+      approved_by: null,
+      rejection_remark: null,
+    });
+  };
+
   const isApproved = current === "Approved";
   const isRejected = current === "Rejected";
   const showApprove = !isApproved;
-  const showReject = !isRejected;
+  const showReject = !isRejected && !isApproved;
+  const showRevert = isApproved;
 
-  if (!showApprove && !showReject) {
+  if (!showApprove && !showReject && !showRevert) {
     return null;
   }
+
+  const actionCount = [showApprove, showReject, showRevert].filter(Boolean).length;
 
   return (
     <>
       <div
-        className={`grid w-[9.25rem] gap-2 ${
-          showApprove && showReject ? "grid-cols-2" : "grid-cols-1"
+        className={`grid w-full gap-2 ${
+          actionCount > 1 ? "grid-cols-2" : "grid-cols-1"
         }`}
         role="group"
         aria-label="Expense approval actions"
@@ -198,6 +221,16 @@ export default function ExpenseSbiApprovalActions({
             className={`${btnBase} bg-rose-100 text-rose-900 ring-1 ring-rose-300/90 hover:bg-rose-200`}
           >
             Reject
+          </button>
+        ) : null}
+        {showRevert ? (
+          <button
+            type="button"
+            disabled={loading != null}
+            onClick={submitRevert}
+            className={`${btnBase} bg-amber-100 text-amber-950 ring-1 ring-amber-300/90 hover:bg-amber-200`}
+          >
+            {loading === "revert" ? "Reverting…" : "Revert"}
           </button>
         ) : null}
       </div>
