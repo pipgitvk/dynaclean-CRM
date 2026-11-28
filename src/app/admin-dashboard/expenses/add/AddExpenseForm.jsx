@@ -3,7 +3,7 @@
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   getSbiFoodAmountError,
   getSbiHotelAmountError,
@@ -31,6 +31,11 @@ const SBI_EXPENSE_STATUS_OPTIONS = [
   { value: "other", label: "Other" },
 ];
 
+const SBI_SERVICE_TYPE_OPTIONS = [
+  { value: "Installation", label: "Installation" },
+  { value: "Complaint", label: "Complaint" },
+];
+
 export default function AddExpenseForm({
   successRedirect = "/admin-dashboard/expenses",
   uiVariant = "default",
@@ -38,9 +43,11 @@ export default function AddExpenseForm({
   const isSbiUi = uiVariant === "sbi";
   const router = useRouter();
   const [isSubmitting, setSubmitting] = useState(false);
-  const { register, handleSubmit, reset, watch } = useForm({
+  const { register, handleSubmit, reset, watch, setValue } = useForm({
     defaultValues: {
       expense_status: "",
+      service_type: "",
+      service_id: "",
       train_class: "",
       HotelCost: 0,
       MealsCost: 0,
@@ -48,13 +55,59 @@ export default function AddExpenseForm({
     },
   });
   const expenseStatus = watch("expense_status");
+  const serviceType = watch("service_type");
   const travelMode = watch("travel_mode");
+  const [serviceJobOptions, setServiceJobOptions] = useState([]);
+  const [serviceJobsLoading, setServiceJobsLoading] = useState(false);
   const isTravelExpense = !isSbiUi || expenseStatus === "travel";
   const showTrainClass = isSbiUi && expenseStatus === "travel" && isSbiTrainTravelMode(travelMode);
+
+  useEffect(() => {
+    setValue("service_id", "");
+    if (!isSbiUi || !serviceType) {
+      setServiceJobOptions([]);
+      return;
+    }
+
+    let cancelled = false;
+    setServiceJobsLoading(true);
+    fetch(`/api/expenses/sbi-service-options?service_type=${encodeURIComponent(serviceType)}`, {
+      credentials: "include",
+    })
+      .then((res) => res.json())
+      .then((body) => {
+        if (cancelled) return;
+        if (!body?.success) {
+          setServiceJobOptions([]);
+          return;
+        }
+        setServiceJobOptions(body.data || []);
+      })
+      .catch(() => {
+        if (!cancelled) setServiceJobOptions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setServiceJobsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isSbiUi, serviceType, setValue]);
 
   const onSubmit = async (data) => {
     if (isSbiUi && !data.expense_status) {
       toast.error("Please select expense mode");
+      return;
+    }
+
+    if (isSbiUi && !data.service_type) {
+      toast.error("Please select service type");
+      return;
+    }
+
+    if (isSbiUi && !data.service_id) {
+      toast.error("Please select installation or complaint service");
       return;
     }
 
@@ -174,6 +227,54 @@ export default function AddExpenseForm({
             className={fieldClass}
           />
         </div>
+
+        {isSbiUi ? (
+          <>
+            <div>
+              <label className="block text-sm font-medium mb-1">Service Type *</label>
+              <select
+                {...register("service_type", { required: true })}
+                className={fieldClass}
+                defaultValue=""
+              >
+                <option value="" disabled>
+                  Select service type
+                </option>
+                {SBI_SERVICE_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium mb-1">
+                Installation / Complaint *
+              </label>
+              <select
+                {...register("service_id", { required: true })}
+                className={fieldClass}
+                disabled={!serviceType || serviceJobsLoading}
+                defaultValue=""
+              >
+                <option value="" disabled>
+                  {serviceJobsLoading
+                    ? "Loading services…"
+                    : serviceType
+                      ? serviceJobOptions.length
+                        ? "Select service"
+                        : "No pending services assigned to you"
+                      : "Select service type first"}
+                </option>
+                {serviceJobOptions.map((job) => (
+                  <option key={job.service_id} value={job.service_id}>
+                    {job.label || job.service_id}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
+        ) : null}
 
         {isSbiUi ? (
           <div className="sm:col-span-2">

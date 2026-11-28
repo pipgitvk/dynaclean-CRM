@@ -94,6 +94,8 @@ import { getDbConnection } from "@/lib/db";
 import {
   ensureExpenseDesignationColumn,
   ensureExpenseStatusColumn,
+  ensureExpenseServiceIdColumn,
+  ensureExpenseServiceTypeColumn,
   ensureExpenseTrainClassColumn,
   ensureExpenseTravelModeColumn,
 } from "@/lib/fetchExpenseDashboardRows";
@@ -151,6 +153,8 @@ export async function POST(req) {
     const conn = await getDbConnection();
     await ensureExpenseTravelModeColumn(conn);
     await ensureExpenseTrainClassColumn(conn);
+    await ensureExpenseServiceTypeColumn(conn);
+    await ensureExpenseServiceIdColumn(conn);
     await ensureExpenseStatusColumn(conn);
     await ensureExpenseDesignationColumn(conn);
 
@@ -163,6 +167,21 @@ export async function POST(req) {
       return NextResponse.json(
         { error: "Please select train class (Sleeper / AC)." },
         { status: 400 }
+      );
+    }
+
+    const serviceType = String(fields.service_type || "").trim() || null;
+    const serviceId = String(fields.service_id || "").trim() || null;
+    if (expenseStatus && !serviceType) {
+      return NextResponse.json(
+        { error: "Please select service type (Installation or Complaint)." },
+        { status: 400 },
+      );
+    }
+    if (expenseStatus && !serviceId) {
+      return NextResponse.json(
+        { error: "Please select an installation or complaint service." },
+        { status: 400 },
       );
     }
 
@@ -212,9 +231,10 @@ export async function POST(req) {
       `INSERT INTO expenses (
         username, TravelDate, FromLocation, Tolocation, distance,
         description, person_name, person_contact, designation, ConveyanceMode, travel_mode,
-        train_class, expense_status, TicketCost, HotelCost, MealsCost, OtherExpenses,
+        train_class, expense_status, service_type, service_id,
+        TicketCost, HotelCost, MealsCost, OtherExpenses,
         attachments, approval_status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         username,
         fields.TravelDate,
@@ -229,6 +249,8 @@ export async function POST(req) {
         travelMode,
         isSbiTrainTravelMode(travelMode) ? trainClass : null,
         expenseStatus,
+        serviceType,
+        serviceId,
         fields.TicketCost,
         fields.HotelCost,
         fields.MealsCost,

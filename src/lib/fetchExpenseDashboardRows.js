@@ -5,7 +5,7 @@ const EXPENSE_LIST_SQL = `
          e.expense_status,
          e.FromLocation, e.Tolocation,
          e.TicketCost, e.HotelCost, e.MealsCost, e.OtherExpenses,
-         e.person_name, e.person_contact, e.designation,
+         e.person_name, e.person_contact, e.designation, e.service_type, e.service_id,
          e.approved_amount, e.payment_date, e.approval_status, e.rejection_remark, e.username,
          e.linked_statement_ids, e.approved_by,
          COALESCE(r.status, 1) AS employee_status
@@ -48,6 +48,26 @@ export async function ensureExpenseTrainClassColumn(conn) {
   } catch (_) {
     try {
       await conn.execute("ALTER TABLE expenses ADD COLUMN train_class VARCHAR(128) NULL");
+    } catch (__) {}
+  }
+}
+
+export async function ensureExpenseServiceTypeColumn(conn) {
+  try {
+    await conn.execute("SELECT service_type FROM expenses LIMIT 1");
+  } catch (_) {
+    try {
+      await conn.execute("ALTER TABLE expenses ADD COLUMN service_type VARCHAR(32) NULL");
+    } catch (__) {}
+  }
+}
+
+export async function ensureExpenseServiceIdColumn(conn) {
+  try {
+    await conn.execute("SELECT service_id FROM expenses LIMIT 1");
+  } catch (_) {
+    try {
+      await conn.execute("ALTER TABLE expenses ADD COLUMN service_id VARCHAR(64) NULL");
     } catch (__) {}
   }
 }
@@ -112,6 +132,8 @@ export async function fetchExpenseDashboardRows() {
   await ensureExpenseTravelModeColumn(conn);
   await ensureExpenseTrainClassColumn(conn);
   await ensureExpenseRejectionRemarkColumn(conn);
+  await ensureExpenseServiceTypeColumn(conn);
+  await ensureExpenseServiceIdColumn(conn);
   await ensureExpenseStatusColumn(conn);
   await ensureExpenseDesignationColumn(conn);
   const [results] = await conn.execute(EXPENSE_LIST_SQL);
