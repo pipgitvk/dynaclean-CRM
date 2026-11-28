@@ -93,6 +93,7 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import {
   ensureExpenseDesignationColumn,
+  ensureExpenseStateColumn,
   ensureExpenseStatusColumn,
   ensureExpenseServiceIdColumn,
   ensureExpenseServiceTypeColumn,
@@ -105,6 +106,7 @@ import {
   getSbiHotelExpenseError,
 } from "@/lib/sbiFoodExpenseRules";
 import { jwtVerify } from "jose";
+import { INDIAN_STATES } from "@/lib/indianStates";
 import fs from "fs/promises"; // For asynchronous file operations
 import path from "path"; // For path manipulation
 
@@ -157,6 +159,7 @@ export async function POST(req) {
     await ensureExpenseServiceIdColumn(conn);
     await ensureExpenseStatusColumn(conn);
     await ensureExpenseDesignationColumn(conn);
+    await ensureExpenseStateColumn(conn);
 
     const travelMode = String(fields.travel_mode || fields.ConveyanceMode || "").trim() || null;
     const expenseStatus = String(fields.expense_status || "").trim().toLowerCase() || null;
@@ -178,11 +181,12 @@ export async function POST(req) {
         { status: 400 },
       );
     }
-    if (expenseStatus && !serviceId) {
-      return NextResponse.json(
-        { error: "Please select an installation or complaint service." },
-        { status: 400 },
-      );
+    const expenseState = String(fields.state || "").trim() || null;
+    if (expenseStatus && !expenseState) {
+      return NextResponse.json({ error: "Please select state." }, { status: 400 });
+    }
+    if (expenseState && !INDIAN_STATES.includes(expenseState)) {
+      return NextResponse.json({ error: "Invalid state selected." }, { status: 400 });
     }
 
     if (expenseStatus === "food") {
@@ -230,11 +234,11 @@ export async function POST(req) {
     await conn.execute(
       `INSERT INTO expenses (
         username, TravelDate, FromLocation, Tolocation, distance,
-        description, person_name, person_contact, designation, ConveyanceMode, travel_mode,
+        description, person_name, person_contact, designation, state, ConveyanceMode, travel_mode,
         train_class, expense_status, service_type, service_id,
         TicketCost, HotelCost, MealsCost, OtherExpenses,
         attachments, approval_status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         username,
         fields.TravelDate,
@@ -245,6 +249,7 @@ export async function POST(req) {
         fields.person_name,
         fields.person_contact,
         fields.designation || null,
+        expenseState,
         travelMode,
         travelMode,
         isSbiTrainTravelMode(travelMode) ? trainClass : null,

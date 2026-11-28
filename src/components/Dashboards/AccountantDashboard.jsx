@@ -1,11 +1,19 @@
 // components/Dashboards/AccountantDashboard.jsx
 import UpcomingTasks from "@/components/task/UpcomingTasks";
 import AccountantPendingCards from "@/components/AccountantPendingCards";
+import AccountantExpenseApprovalKpiCard from "@/components/AccountantExpenseApprovalKpiCard";
 import ManualPaymentUpcomingFollowups from "@/components/manual-payments/ManualPaymentUpcomingFollowups";
 
-export default function AccountantDashboard({ user, reportingManager, counts }) {
+export default function AccountantDashboard({
+  user,
+  reportingManager,
+  counts,
+  expensePendingLinkedStatements = 0,
+}) {
   return (
     <div className="space-y-4 md:space-y-5">
+      <AccountantExpenseApprovalKpiCard count={expensePendingLinkedStatements} />
+
       {/* Today's Pending Summary Cards */}
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
         <AccountantPendingCards />

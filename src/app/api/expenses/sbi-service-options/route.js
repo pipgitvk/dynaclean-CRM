@@ -21,6 +21,7 @@ export async function GET(req) {
     const data = await fetchSbiExpenseServiceOptions({
       username,
       serviceType,
+      viewerRole: payload.role,
     });
 
     return NextResponse.json({ success: true, data });

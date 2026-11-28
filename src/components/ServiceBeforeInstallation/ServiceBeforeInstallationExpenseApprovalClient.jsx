@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ChevronLeft, Plus } from "lucide-react";
 import ExpenseTable from "@/app/admin-dashboard/expenses/ExpenseTable";
 
@@ -10,7 +11,12 @@ export default function ServiceBeforeInstallationExpenseApprovalClient({
   role,
   approverUsername = "",
 }) {
-  const hubHref = `/${dashboardBase}/service-before-installation`;
+  const searchParams = useSearchParams();
+  const initialSummaryBucket = searchParams.get("bucket") || undefined;
+  const hubHref =
+    dashboardBase === "accounts-dashboard"
+      ? `/${dashboardBase}`
+      : `/${dashboardBase}/service-before-installation`;
   const addExpenseHref = `/${dashboardBase}/service-before-installation/expense-approval-dashboard/add`;
 
   return (
@@ -27,7 +33,7 @@ export default function ServiceBeforeInstallationExpenseApprovalClient({
             className="inline-flex items-center gap-2 rounded-lg px-1 text-sm font-semibold text-violet-700 hover:text-violet-900"
           >
             <ChevronLeft className="h-4 w-4" aria-hidden />
-            Back to Hub
+            {dashboardBase === "accounts-dashboard" ? "Back to Dashboard" : "Back to Hub"}
           </Link>
           <Link
             href={addExpenseHref}
@@ -45,6 +51,7 @@ export default function ServiceBeforeInstallationExpenseApprovalClient({
             approverUsername={approverUsername}
             clickableSummaryCards
             uiVariant="sbi"
+            initialSummaryBucket={initialSummaryBucket}
           />
         </div>
       </div>

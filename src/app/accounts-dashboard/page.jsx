@@ -5,6 +5,8 @@ import { getDbConnection } from "@/lib/db";
 import { DASHBOARD_MAP } from "@/components/Dashboards";
 import { getReportingManagerForEmployee } from "@/lib/reportingManager";
 import { countWarehouseDispatchPending } from "@/lib/warehouseDispatchPendingCount";
+import { countExpensePendingLinkedStatements } from "@/lib/fetchExpenseDashboardRows";
+import { canAccessExpenseApprovalDashboard } from "@/lib/serviceBeforeInstallationAccess";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
@@ -96,7 +98,19 @@ export default async function UserDashboardPage() {
       pendingSpares: pendingSparesCount,
     };
 
-    return <DashboardComponent user={user} reportingManager={reportingManager} counts={counts} />;
+    let expensePendingLinkedStatements = 0;
+    if (canAccessExpenseApprovalDashboard(role)) {
+      expensePendingLinkedStatements = await countExpensePendingLinkedStatements(connection);
+    }
+
+    return (
+      <DashboardComponent
+        user={user}
+        reportingManager={reportingManager}
+        counts={counts}
+        expensePendingLinkedStatements={expensePendingLinkedStatements}
+      />
+    );
   } catch (error) {
     console.error("Dashboard error:", error.message);
     return <p className="text-red-600">Failed to load dashboard</p>;

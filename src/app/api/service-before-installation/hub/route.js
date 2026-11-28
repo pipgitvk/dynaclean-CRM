@@ -28,7 +28,9 @@ export async function GET(request) {
 
     if (rangeKey === SBI_RANGE_SELECT.id || rangeKey === "all") {
       const filters = parseSbiFilters(baseFilterInput);
-      const counts = await fetchServiceBeforeInstallationHubCounts(filters);
+      const counts = await fetchServiceBeforeInstallationHubCounts(filters, {
+        viewerRole: auth.payload?.role,
+      });
       return NextResponse.json({
         success: true,
         counts,
@@ -58,9 +60,10 @@ export async function GET(request) {
       to: resolved.prevTo,
     });
 
+    const hubCountOpts = { viewerRole: auth.payload?.role };
     const [counts, prevCounts] = await Promise.all([
-      fetchServiceBeforeInstallationHubCounts(filters),
-      fetchServiceBeforeInstallationHubCounts(prevFilters),
+      fetchServiceBeforeInstallationHubCounts(filters, hubCountOpts),
+      fetchServiceBeforeInstallationHubCounts(prevFilters, hubCountOpts),
     ]);
 
     return NextResponse.json({

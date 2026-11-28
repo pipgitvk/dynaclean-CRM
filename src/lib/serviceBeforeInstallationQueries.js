@@ -1,5 +1,8 @@
 import { getDbConnection } from "@/lib/db";
-import { countExpensePendingApproval } from "@/lib/fetchExpenseDashboardRows";
+import {
+  countExpensePendingApproval,
+  limitExpenseRowsToServiceEngineers,
+} from "@/lib/fetchExpenseDashboardRows";
 import {
   sqlTrimUtf8EqColumns,
   sqlUtf8HasText,
@@ -2016,9 +2019,13 @@ export async function fetchActiveWarrantyKpiBreakdown(conn, filters = {}) {
   };
 }
 
-export async function fetchServiceBeforeInstallationHubCounts(filters = {}) {
+export async function fetchServiceBeforeInstallationHubCounts(
+  filters = {},
+  { viewerRole } = {},
+) {
   const f = parseSbiFilters(filters);
-  const cacheKey = JSON.stringify(f);
+  const serviceEngineersOnly = limitExpenseRowsToServiceEngineers(viewerRole);
+  const cacheKey = JSON.stringify({ f, serviceEngineersOnly });
   const cached = HUB_COUNTS_CACHE.get(cacheKey);
   if (cached && Date.now() - cached.at < HUB_COUNTS_TTL_MS) {
     return cached.data;
@@ -2076,7 +2083,11 @@ export async function fetchServiceBeforeInstallationHubCounts(filters = {}) {
       countUpcomingInstallationHubTotals(pool, f),
       fetchOpenInstallationCardsBreakdown(f),
       countOpenInstallationSegment("overdue-delayed-installation", f),
-      countExpensePendingApproval(pool, { from: f.from, to: f.to }),
+      countExpensePendingApproval(pool, {
+        from: f.from,
+        to: f.to,
+        serviceEngineersOnly,
+      }),
     ]);
 
   const wpRow = wpResult[0]?.[0];

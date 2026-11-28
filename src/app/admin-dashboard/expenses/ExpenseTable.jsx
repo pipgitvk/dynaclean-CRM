@@ -110,6 +110,7 @@ function buildExpenseRowSearchText(row) {
     String(row.username || ""),
     String(row.approval_status || ""),
     String(row.service_type || ""),
+    String(row.state || ""),
     row.service_id ? `#${row.service_id}` : "",
     String(row.service_id || ""),
     String(row.rejection_remark || ""),
@@ -247,6 +248,7 @@ export default function ExpenseTable({
   approverUsername = "",
   clickableSummaryCards = false,
   uiVariant = "default",
+  initialSummaryBucket = "",
 }) {
   const isSbiUi = uiVariant === "sbi";
   const showSbiApprovalActions =
@@ -291,6 +293,18 @@ export default function ExpenseTable({
       setSelectedEmployee("");
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    const bucket = String(initialSummaryBucket || "").trim();
+    if (!clickableSummaryCards || !bucket) return;
+    setSummaryBucket(bucket);
+    if (bucket === "pending_linked_statements" && isSbiUi) {
+      setDatePeriodMode("custom");
+      setFromDate(SBI_PENDING_LINK_STATEMENTS_FROM_DATE);
+      setToDate("");
+    }
+  }, [initialSummaryBucket, clickableSummaryCards, isSbiUi]);
+
   const [selectedStatus, setSelectedStatus] = useState("");
   const [summaryBucket, setSummaryBucket] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);

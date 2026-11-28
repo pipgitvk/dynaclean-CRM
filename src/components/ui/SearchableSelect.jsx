@@ -22,6 +22,7 @@ export default function SearchableSelect({
   className = "",
   searchPlaceholder = "Search...",
   onOpen,
+  disabled = false,
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -41,22 +42,28 @@ export default function SearchableSelect({
           o.label.toLowerCase().includes(search.toLowerCase().trim()),
         );
 
-  const updateMenuPosition = () => {
+  const positionMenu = (optionCount = filtered.length) => {
     const trigger = triggerRef.current;
-    if (!trigger) return;
+    if (!trigger) return null;
 
     const rect = trigger.getBoundingClientRect();
     const gap = 4;
-    const estimatedMenuHeight = Math.min(280, 56 + filtered.length * 36);
+    const estimatedMenuHeight = Math.min(280, 56 + optionCount * 36);
     const spaceBelow = window.innerHeight - rect.bottom - gap;
     const spaceAbove = rect.top - gap;
     const upward = spaceBelow < estimatedMenuHeight && spaceAbove > spaceBelow;
-    setOpenUpward(upward);
-    setMenuRect({
+    const nextRect = {
       left: rect.left,
       width: Math.max(rect.width, 200),
       top: upward ? rect.top - gap : rect.bottom + gap,
-    });
+    };
+    setOpenUpward(upward);
+    setMenuRect(nextRect);
+    return nextRect;
+  };
+
+  const updateMenuPosition = () => {
+    positionMenu();
   };
 
   useLayoutEffect(() => {
@@ -159,16 +166,21 @@ export default function SearchableSelect({
       <button
         ref={triggerRef}
         type="button"
+        disabled={disabled}
         onClick={() => {
-          setOpen((o) => {
-            const next = !o;
-            if (next) onOpen?.();
-            return next;
-          });
+          if (disabled) return;
+          if (open) {
+            setOpen(false);
+            return;
+          }
+          positionMenu(options.length);
+          setOpen(true);
+          onOpen?.();
         }}
-        className={`flex w-full items-center justify-between gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-left text-sm transition hover:border-gray-400 ${className}`}
+        className={`flex w-full items-center justify-between gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-left text-sm transition hover:border-gray-400 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-60 ${className}`}
         aria-expanded={open}
         aria-haspopup="listbox"
+        aria-disabled={disabled}
       >
         <span
           className={`min-w-0 flex-1 truncate text-left ${value ? "text-gray-900" : "text-gray-500"}`}

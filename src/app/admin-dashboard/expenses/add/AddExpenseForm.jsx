@@ -1,9 +1,10 @@
 "use client";
 
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
+import SearchableSelect from "@/components/ui/SearchableSelect";
 import {
   getSbiFoodAmountError,
   getSbiHotelAmountError,
@@ -14,6 +15,7 @@ import {
   isSbiTrainTravelMode,
   SBI_TRAIN_CLASS_OPTIONS,
 } from "@/lib/sbiTravelOptions";
+import { INDIAN_STATES } from "@/lib/indianStates";
 
 const SBI_TRAVEL_MODE_OPTIONS = [
   { value: "Train booked by company", label: "Train booked by company" },
@@ -43,11 +45,11 @@ export default function AddExpenseForm({
   const isSbiUi = uiVariant === "sbi";
   const router = useRouter();
   const [isSubmitting, setSubmitting] = useState(false);
-  const { register, handleSubmit, reset, watch, setValue } = useForm({
+  const { register, handleSubmit, reset, watch, control } = useForm({
     defaultValues: {
       expense_status: "",
       service_type: "",
-      service_id: "",
+      state: "",
       train_class: "",
       HotelCost: 0,
       MealsCost: 0,
@@ -55,46 +57,13 @@ export default function AddExpenseForm({
     },
   });
   const expenseStatus = watch("expense_status");
-  const serviceType = watch("service_type");
   const travelMode = watch("travel_mode");
-  const [serviceJobOptions, setServiceJobOptions] = useState([]);
-  const [serviceJobsLoading, setServiceJobsLoading] = useState(false);
   const isTravelExpense = !isSbiUi || expenseStatus === "travel";
   const showTrainClass = isSbiUi && expenseStatus === "travel" && isSbiTrainTravelMode(travelMode);
-
-  useEffect(() => {
-    setValue("service_id", "");
-    if (!isSbiUi || !serviceType) {
-      setServiceJobOptions([]);
-      return;
-    }
-
-    let cancelled = false;
-    setServiceJobsLoading(true);
-    fetch(`/api/expenses/sbi-service-options?service_type=${encodeURIComponent(serviceType)}`, {
-      credentials: "include",
-    })
-      .then((res) => res.json())
-      .then((body) => {
-        if (cancelled) return;
-        if (!body?.success) {
-          setServiceJobOptions([]);
-          return;
-        }
-        setServiceJobOptions(body.data || []);
-      })
-      .catch(() => {
-        if (!cancelled) setServiceJobOptions([]);
-      })
-      .finally(() => {
-        if (!cancelled) setServiceJobsLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isSbiUi, serviceType, setValue]);
-
+  const indianStateOptions = useMemo(
+    () => INDIAN_STATES.map((st) => ({ value: st, label: st })),
+    [],
+  );
   const onSubmit = async (data) => {
     if (isSbiUi && !data.expense_status) {
       toast.error("Please select expense mode");
@@ -106,8 +75,8 @@ export default function AddExpenseForm({
       return;
     }
 
-    if (isSbiUi && !data.service_id) {
-      toast.error("Please select installation or complaint service");
+    if (isSbiUi && !String(data.state || "").trim()) {
+      toast.error("Please select state");
       return;
     }
 
@@ -247,31 +216,27 @@ export default function AddExpenseForm({
                 ))}
               </select>
             </div>
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium mb-1">
-                Service ID *
-              </label>
-              <select
-                {...register("service_id", { required: true })}
-                className={fieldClass}
-                disabled={!serviceType || serviceJobsLoading}
-                defaultValue=""
-              >
-                <option value="" disabled>
-                  {serviceJobsLoading
-                    ? "Loading services…"
-                    : serviceType
-                      ? serviceJobOptions.length
-                        ? "Select service"
-                        : "No pending services assigned to you"
-                      : "Select service type first"}
-                </option>
-                {serviceJobOptions.map((job) => (
-                  <option key={job.service_id} value={job.service_id}>
-                    {job.label || job.service_id}
-                  </option>
-                ))}
-              </select>
+            <div>
+              <label className="block text-sm font-medium mb-1">State *</label>
+              <Controller
+                name="state"
+                control={control}
+                rules={{ required: true }}
+                render={({ field }) => (
+                  <SearchableSelect
+                    options={indianStateOptions}
+                    value={field.value || ""}
+                    onChange={field.onChange}
+                    placeholder="Select state"
+                    searchPlaceholder="Search state…"
+                    className={
+                      isSbiUi
+                        ? "rounded-xl border-slate-200/90 py-2.5 shadow-sm focus:border-violet-300"
+                        : ""
+                    }
+                  />
+                )}
+              />
             </div>
           </>
         ) : null}

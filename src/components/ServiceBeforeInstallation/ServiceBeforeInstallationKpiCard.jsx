@@ -240,6 +240,7 @@ export default function ServiceBeforeInstallationKpiCard({
   variant = "hub",
   showTrend = true,
   onClick,
+  className: outerClassName = "",
 }) {
   const Icon = SBI_CARD_ICONS[card.id] || Package;
   const seed = SBI_SPARK_SEED[card.id] ?? 1;
@@ -283,7 +284,7 @@ export default function ServiceBeforeInstallationKpiCard({
             : card.id === "aw-expired" || card.id === "aa-expired"
               ? "ring-2 ring-red-500/75 ring-offset-2 ring-offset-red-50/60"
               : "ring-2 ring-violet-500/75 ring-offset-2 ring-offset-violet-50/60";
-  const className = `group relative block overflow-hidden rounded-2xl ${shell} ${active ? activeRing : ""}`;
+  const className = `group relative block overflow-hidden rounded-2xl ${shell} ${active ? activeRing : ""} ${outerClassName}`;
 
   const inner = (
     <>

@@ -1,11 +1,25 @@
 import { getDbConnection } from "@/lib/db";
+import { normalizeRoleKey } from "@/lib/roleKeyUtils";
+
+/** SERVICE SUPPORT / SALES CUM BACKOFFICE — expense list only for service engineers */
+export function limitExpenseRowsToServiceEngineers(viewerRole) {
+  const key = normalizeRoleKey(viewerRole);
+  return key === "SERVICE SUPPORT" || key === "SALES CUM BACKOFFICE";
+}
+
+const EXPENSE_SERVICE_ENGINEER_ONLY_SQL = `
+  AND EXISTS (
+    SELECT 1 FROM rep_list r_eng
+    WHERE TRIM(r_eng.username) = TRIM(e.username)
+      AND UPPER(TRIM(COALESCE(r_eng.userRole, ''))) = 'SERVICE ENGINEER'
+  )`;
 
 const EXPENSE_LIST_SQL = `
   SELECT e.ID, e.TravelDate, e.timestamp, e.attachments, e.travel_mode, e.train_class, e.ConveyanceMode,
          e.expense_status,
          e.FromLocation, e.Tolocation,
          e.TicketCost, e.HotelCost, e.MealsCost, e.OtherExpenses,
-         e.person_name, e.person_contact, e.designation, e.service_type, e.service_id,
+         e.person_name, e.person_contact, e.designation, e.state, e.service_type, e.service_id,
          e.approved_amount, e.payment_date, e.approval_status, e.rejection_remark, e.username,
          e.linked_statement_ids, e.approved_by,
          COALESCE(r.status, 1) AS employee_status
@@ -82,6 +96,16 @@ export async function ensureExpenseRejectionRemarkColumn(conn) {
   }
 }
 
+export async function ensureExpenseStateColumn(conn) {
+  try {
+    await conn.execute("SELECT state FROM expenses LIMIT 1");
+  } catch (_) {
+    try {
+      await conn.execute("ALTER TABLE expenses ADD COLUMN state VARCHAR(64) NULL");
+    } catch (__) {}
+  }
+}
+
 export async function ensureExpenseDesignationColumn(conn) {
   try {
     await conn.execute("SELECT designation FROM expenses LIMIT 1");
@@ -102,8 +126,14 @@ export async function ensureExpenseStatusColumn(conn) {
   }
 }
 
+/** SBI / accounts — approved, no statement link, submit on or after this date */
+export const SBI_PENDING_LINK_STATEMENTS_FROM_DATE = "2026-05-10";
+
 /** Hub KPI — same rule as ExpenseTable “Pending approval” bucket. */
-export async function countExpensePendingApproval(conn, { from = "", to = "" } = {}) {
+export async function countExpensePendingApproval(
+  conn,
+  { from = "", to = "", serviceEngineersOnly = false } = {},
+) {
   let sql = `
     SELECT COUNT(*) AS c
     FROM expenses e
@@ -113,6 +143,9 @@ export async function countExpensePendingApproval(conn, { from = "", to = "" } =
         OR CAST(COALESCE(e.approved_amount, 0) AS DECIMAL(12, 2)) <= 0
       )`;
   const params = [];
+  if (serviceEngineersOnly) {
+    sql += EXPENSE_SERVICE_ENGINEER_ONLY_SQL;
+  }
   if (from) {
     sql += " AND DATE(e.timestamp) >= ?";
     params.push(from);
@@ -125,8 +158,34 @@ export async function countExpensePendingApproval(conn, { from = "", to = "" } =
   return Number(rows?.[0]?.c || 0);
 }
 
+/** Accountant home KPI — matches ExpenseTable “Pending to linked statements”. */
+export async function countExpensePendingLinkedStatements(
+  conn,
+  { serviceEngineersOnly = false } = {},
+) {
+  await ensureExpenseLinkedStatementColumn(conn);
+  let sql = `
+    SELECT COUNT(*) AS c
+    FROM expenses e
+    WHERE LOWER(TRIM(COALESCE(e.approval_status, ''))) = 'approved'
+      AND (
+        e.linked_statement_ids IS NULL
+        OR TRIM(e.linked_statement_ids) = ''
+        OR TRIM(e.linked_statement_ids) = '[]'
+        OR TRIM(e.linked_statement_ids) = 'null'
+      )
+      AND e.timestamp IS NOT NULL
+      AND TRIM(e.timestamp) NOT IN ('', '0000-00-00', '0000-00-00 00:00:00')
+      AND DATE(e.timestamp) >= ?`;
+  if (serviceEngineersOnly) {
+    sql += EXPENSE_SERVICE_ENGINEER_ONLY_SQL;
+  }
+  const [rows] = await conn.execute(sql, [SBI_PENDING_LINK_STATEMENTS_FROM_DATE]);
+  return Number(rows?.[0]?.c || 0);
+}
+
 /** Shared expense list for all-expenses and SBI expense approval dashboard. */
-export async function fetchExpenseDashboardRows() {
+export async function fetchExpenseDashboardRows({ viewerRole } = {}) {
   const conn = await getDbConnection();
   await ensureExpenseLinkedStatementColumn(conn);
   await ensureExpenseTravelModeColumn(conn);
@@ -136,6 +195,14 @@ export async function fetchExpenseDashboardRows() {
   await ensureExpenseServiceIdColumn(conn);
   await ensureExpenseStatusColumn(conn);
   await ensureExpenseDesignationColumn(conn);
-  const [results] = await conn.execute(EXPENSE_LIST_SQL);
+  await ensureExpenseStateColumn(conn);
+  let sql = EXPENSE_LIST_SQL;
+  if (limitExpenseRowsToServiceEngineers(viewerRole)) {
+    sql = sql.replace(
+      "ORDER BY e.TravelDate DESC",
+      `${EXPENSE_SERVICE_ENGINEER_ONLY_SQL} ORDER BY e.TravelDate DESC`,
+    );
+  }
+  const [results] = await conn.execute(sql);
   return results;
 }

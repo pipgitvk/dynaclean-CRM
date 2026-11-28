@@ -24,7 +24,7 @@ export default function ServiceBeforeInstallationExpenseAddClient({ dashboardBas
           Back to Expense Approval Dashboard
         </Link>
 
-        <div className="overflow-hidden rounded-2xl border border-violet-100/90 bg-white/95 p-4 shadow-[0_20px_50px_-20px_rgba(91,33,182,0.22)] backdrop-blur-sm sm:p-6">
+        <div className="overflow-visible rounded-2xl border border-violet-100/90 bg-white/95 p-4 shadow-[0_20px_50px_-20px_rgba(91,33,182,0.22)] backdrop-blur-sm sm:p-6">
           <header className="mb-6 flex flex-col gap-3 border-b border-violet-100/80 pb-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-start gap-3">
               <div className="shrink-0 rounded-xl bg-gradient-to-br from-violet-600 to-violet-800 p-2.5 text-white shadow-lg shadow-violet-500/25">

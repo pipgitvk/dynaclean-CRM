@@ -1,4 +1,4 @@
-import { requireSuperAdminForServiceBeforeInstallation } from "@/lib/serviceBeforeInstallationAccess";
+import { requireExpenseApprovalDashboard } from "@/lib/serviceBeforeInstallationAccess";
 import { getSessionPayload } from "@/lib/auth";
 import { fetchExpenseDashboardRows } from "@/lib/fetchExpenseDashboardRows";
 import ServiceBeforeInstallationExpenseApprovalClient from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationExpenseApprovalClient";
@@ -8,14 +8,14 @@ export const dynamic = "force-dynamic";
 export default async function ServiceBeforeInstallationExpenseApprovalPage({
   dashboardBase,
 }) {
-  await requireSuperAdminForServiceBeforeInstallation(`/${dashboardBase}`);
+  await requireExpenseApprovalDashboard(`/${dashboardBase}`);
   const payload = await getSessionPayload();
   const role = payload?.role ?? "";
   const approverUsername = payload?.username ?? "";
 
   let rows = [];
   try {
-    rows = await fetchExpenseDashboardRows();
+    rows = await fetchExpenseDashboardRows({ viewerRole: role });
   } catch (err) {
     console.error("Expense approval dashboard fetch failed:", err);
     return (
